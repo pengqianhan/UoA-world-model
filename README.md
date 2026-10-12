@@ -6,6 +6,12 @@ University logos or branding.
 
 **Live site: https://pengqianhan.github.io/UoA-world-model/**
 
+![The City Campus by day](docs/campus-day.jpg)
+
+| Inside a building: floor G of the Science Centre | The same campus at night |
+| --- | --- |
+| ![A lecture theatre selected on a cut-away floor](docs/room.jpg) | ![The campus at night with lit windows](docs/campus-night.jpg) |
+
 It is built to answer two questions a student actually has:
 
 1. *Which building and floor is my room in?* Type a room code such as `303-G23`, a building name or

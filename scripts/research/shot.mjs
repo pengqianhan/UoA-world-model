@@ -13,6 +13,6 @@ page.on("requestfailed", (r) => errors.push(`[requestfailed] ${r.url()}`));
 await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
 await page.waitForTimeout(+waitMs);
 if (js) { console.log("eval:", await page.evaluate(js)); await page.waitForTimeout(1800); }
-await page.screenshot({ path: out });
+await page.screenshot(out.endsWith(".jpg") ? { path: out, type: "jpeg", quality: 84 } : { path: out });
 console.log(errors.slice(0, 12).join("\n") || "no console errors");
 await browser.close();

@@ -3,23 +3,49 @@
 Handover notes for whoever (probably a future session of the same agent) picks this up next.
 Read `GOAL.md` (local only, not committed) first, then this file, then `git status` / `git log`.
 
-Last updated: 2026-10-13, about 01:15 NZDT (session 1)
+Last updated: 2026-10-13, about 01:30 NZDT (session 1)
 
 ## Now working on
 
-Step 4-5 of GOAL §10: README, About verification on the live site, then polish and bonus items.
+Everything in GOAL §2 that can be done without a timetable source is done and verified on the live
+site (see "Acceptance criteria" below). What remains is optional polish.
 
-**Next concrete steps, in order:**
+**If you are a new session:** check `gh run list --limit 3` is green, run
+`E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e`, then either pick a bonus
+item below or, if the user has added a timetable snapshot, follow README "Adding the class timetable".
 
-1. README: how to run, how to refresh the data snapshot, how to add a language, data sources and licences.
-2. `scripts/fetch-classes.ts` (reads `UOA_API_KEY` / client credentials from the environment, pages
-   through the Classes API into `data/raw/uoa-classes/`). `scripts/lib/classes.ts` already turns such
-   records into `schedule.json` and is unit-tested with a synthetic fixture.
-3. Run the e2e suite against the live site
-   (`E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e`) and look at the
-   screenshots in `e2e/screenshots/`.
-4. Polish / bonus (only after 1-3): favicon, terrain, room interiors, remote campuses in 3D.
-5. Final report (GOAL §13) and delete the cron job.
+Bonus ideas, in rough order of value (none started unless noted under "Done"):
+
+1. Illustrative room interior for the selected room (walls + seat rows), clearly labelled illustrative.
+2. Terrain from open elevation tiles (large change: everything has to be draped).
+3. Course-level catalogue (titles for course codes) from the University Calendar.
+4. Remote campuses in 3D (building data exists; no OSM context fetched for them).
+
+## Acceptance criteria (GOAL §2): status and evidence
+
+Verified 2026-10-13 against https://pengqianhan.github.io/UoA-world-model/ at commit `484e2bc` with
+`E2E_BASE_URL=... npm run e2e` (11/11 passed) plus screenshots read by eye.
+
+| # | Criterion | Status | Evidence |
+| --- | --- | --- | --- |
+| 1 | 3D City Campus, labelled buildings, rotate and zoom | Met | e2e "1."; canvas sampled for a real picture; `docs/campus-day.jpg` |
+| 2 | Click a building, switch floors, see rooms, room shows classes at the selected time | Met for buildings, floors and rooms. **Classes: not met with real data** (no public timetable); the room card says so. The class display itself works, shown with a fixture | e2e "2." and "timetable features…"; `docs/room.jpg` |
+| 3 | Search by course code, room number, building name; camera goes there | Met for rooms and buildings. **Course codes: partly** — only the subject is recognised (e.g. COMPSCI 101 -> Computer Science) with a note that class times are not public; there is no room to fly to | e2e "3." |
+| 4 | Now (Pacific/Auckland) and Preview; non-teaching periods explained | Met | e2e "4.", "4b."; unit tests for daylight-saving days |
+| 5 | URL restores building, floor, room and time | Met | e2e "5." |
+| 6 | 390 px phone: search, building and class info | Met (class info = the "not shown" note) | e2e "6." (mobile project) |
+| 7 | About: unofficial notice, sources with links and snapshot dates, OSM attribution, limitations | Met | e2e "7." |
+| 8 | All text from locale files; `?lang=`; a new language is one new file | Met | e2e "8."; `tests/i18n.test.ts` |
+| 9 | Repo pushed, CI green on `main`, README covers running, refreshing data, adding a language | Met | run 38248478054: build, e2e, deploy all success |
+| 10 | Coverage numbers in the final report | See "Coverage" | `public/data/meta.json` |
+
+## Coverage (snapshot 2026-10-13)
+
+- Courses with timetable data: **0**. Scheduled classes: **0**. Share located to building / floor /
+  room: **not applicable** (nothing to locate).
+- What is covered instead: 194 buildings (139 on the 3D map); 786 learning spaces with outlines, every
+  one tied to a building and a floor from the official campus map; 4,668 further rooms locatable as a
+  point on their floor; 251 subject codes; the 2026 academic calendar.
 
 ## Done (with evidence)
 
@@ -36,9 +62,12 @@ Step 4-5 of GOAL §10: README, About verification on the live site, then polish 
 - App: three.js orthographic campus, building cut-away with floors and rooms, search, Now/Preview time
   panel, About, status strip, URL state, English locale file, phone layout, day/night lighting,
   Open-Meteo temperature in the time chip.
-- Tests: 66 unit tests (`npm test`), 10 Playwright tests (`npm run e2e`, 9 desktop + 1 phone) all green
-  locally on the real GPU and on SwiftShader (`E2E_GL=swiftshader`). Screenshots were inspected by eye:
-  the canvas shows the campus, the floor view, the pin for outline-less rooms, the phone layout.
+- Tests: 66 unit tests (`npm test`), 11 Playwright tests (`npm run e2e`, 10 desktop + 1 phone) green
+  locally on the real GPU, on SwiftShader (`E2E_GL=swiftshader`), in CI, and against the live site.
+  Screenshots were inspected by eye: the canvas shows the campus, the floor view, the pin for
+  outline-less rooms, the phone layout.
+- README written (running, refreshing data, adding the timetable, adding a language, licences).
+- `scripts/fetch-classes.ts` written from the OpenAPI document; untested against the live API.
 - Looked at the reference site with Playwright (campus + classroom screenshots, local only).
 
 ## Data sources: what exists and what does not (researched 2026-10-13)
@@ -122,6 +151,9 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   Replaced by sinking them to footprints.
 - One CI run failed (commit 4d97b04) because scripts imported `./x.ts` before
   `allowImportingTsExtensions` was set. Always run `npm run typecheck && npm test` before pushing.
+- The first CI e2e run failed on the phone test: the floor strip used `row-reverse` with
+  `justify-content: flex-end`, which put the higher floors in overflow that cannot be scrolled to. It
+  only showed up with Linux's wider fonts. Fixed (plain `row`), and the phone test now taps floor 7.
 
 ## Needs the user
 
