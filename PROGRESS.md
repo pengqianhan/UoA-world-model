@@ -18,7 +18,11 @@ item below or, if the user has added a timetable snapshot, follow README "Adding
 Bonus ideas not done, in rough order of value:
 
 1. Terrain from open elevation tiles (large change: everything has to be draped over it).
-2. Course-level catalogue (titles for course codes) from the University Calendar.
+2. Course-level catalogue (titles for course codes). Checked 2026-10-13: the 2026 Calendar no longer
+   prints course prescriptions (its "Course codes by faculty" page points to the Curriculum
+   Catalogue), so the only source is the APEX app at `study.auckland.ac.nz`, whose lists are
+   lazy-loaded and whose course pages are about 240 KB each. Not worth thousands of requests while
+   there is no timetable to attach the courses to.
 3. Remote campuses in 3D (building data exists; no OSM context fetched for them).
 4. Seasons and weather effects in the scene.
 
