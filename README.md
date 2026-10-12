@@ -97,13 +97,16 @@ The official source is the University's **Classes API v2**
 meeting patterns with day, start and end time, date range and room: exactly what this site needs. It
 requires credentials that only someone with a University account can obtain, so this step is yours:
 
-1. Sign in at <https://developer.auckland.ac.nz/prd>, create an application client and subscribe it to
-   "Classes Api V2" (the portal's guides *Creating application client* and *Calling API using Client
-   Credential flow* walk through it). Check the portal's terms before republishing class times.
-2. Fetch and rebuild, with the credentials in the environment (never in a file that gets committed):
+1. Get an **API key** for "Classes Api V2". Keys are not self-service: the Developer Portal dashboard
+   (<https://developer.auckland.ac.nz/prd/dashboard>) sends you to the University's internal Athena
+   tool, where the team that owns the API (the API document names Student Recruitment) approves the
+   request. Say in the request that the class times will be republished on a public site.
+   The portal's self-service OAuth credentials do not work for this API: a token is issued, but the
+   class search still answers 401 (checked 2026-10-13).
+2. Fetch and rebuild, with the key in the environment (never in a file that gets committed):
 
    ```bash
-   UOA_CLIENT_ID=... UOA_CLIENT_SECRET=... UOA_SCOPE=... npx tsx scripts/fetch-classes.ts
+   UOA_API_KEY=... npx tsx scripts/fetch-classes.ts
    npm run data:build
    npm test && npm run build
    ```
@@ -112,8 +115,9 @@ requires credentials that only someone with a University account can obtain, so 
    show a count of classes in progress, and courses become searchable.
 
 `scripts/fetch-classes.ts` was written from the published OpenAPI document and has **not** been run
-against the live API (the project was built without credentials), so the OAuth scope or the paging
-parameters may need a small adjustment on first use. The part that turns API records into the
+against the live API (the project was built without a key), so the key header (`apikey`, which the
+API document does not spell out) or the paging parameters may need a small adjustment on first use.
+The part that turns API records into the
 published timetable (`scripts/lib/classes.ts`) is unit-tested, and the interface is tested end to end
 with a fixture timetable that exists only inside the test browser.
 
