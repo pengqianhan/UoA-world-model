@@ -38,7 +38,8 @@ function FloorList({ d, b }: { d: AppData; b: Building }) {
     <nav class="floors" aria-label={t("building.floorList")}>
       <span class="floors-title">{t("building.floorList")}</span>
       <ol>
-        {[...b.floors].reverse().map((f) => {
+        {/* Lowest floor first in the document; CSS stacks the list bottom-up on wide screens. */}
+        {b.floors.map((f) => {
           const count = counts.get(f.i) ?? 0;
           const on = f.i === selFloor.value;
           return (
@@ -160,6 +161,7 @@ export function BuildingView() {
   const onFloor = rooms.filter((r) => r.f === selFloor.value);
   const title = buildingTitle(b);
   const floorsWithRooms = b.floors.filter((f) => rooms.some((r) => r.f === f.i));
+  const kinds = [...new Set(rooms.map((r) => r.kind))];
 
   return (
     <>
@@ -201,6 +203,16 @@ export function BuildingView() {
             </label>
           ) : (
             <p class="bar-note">{t("building.noRooms")}</p>
+          )}
+          {kinds.length > 0 && (
+            <ul class="legend" aria-label={t("building.legend")}>
+              {kinds.map((k) => (
+                <li>
+                  <span class={`kind-dot kind-${k}`} aria-hidden="true" />
+                  {t(`room.kind.${k}`)}
+                </li>
+              ))}
+            </ul>
           )}
           {rooms.length > 0 && onFloor.length === 0 && !marker.value && <p class="bar-note">{t("building.noRoomsOnFloor")}</p>}
           {b.offMap && <p class="bar-note">{t("building.offMap")}</p>}

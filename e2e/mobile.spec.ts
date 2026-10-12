@@ -39,6 +39,14 @@ test("6. phone: search for a room and see the building and class information", a
   await settle(page);
   expect(params(page).get("floor")).toBe("1");
   await shot(page, "06-mobile-floor");
+  // Every floor of a tall building must be reachable by scrolling the strip, not just the first few.
+  const top = page.locator('.floor[data-floor="7"]');
+  await top.scrollIntoViewIfNeeded();
+  await expect(top).toBeInViewport();
+  await top.tap();
+  await settle(page);
+  expect(params(page).get("floor")).toBe("7");
+  await expect(page.locator(".floor.on")).toBeInViewport();
 
   // Building search works too.
   await page.locator("#search-button").tap();

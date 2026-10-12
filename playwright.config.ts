@@ -37,7 +37,8 @@ export default defineConfig({
     },
     {
       name: "mobile",
-      use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 } },
+      // CI renders in software, so it gets a 1x screen; locally the phone's real pixel density is used.
+      use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 }, ...(process.env.CI ? { deviceScaleFactor: 1 } : {}) },
       testMatch: /mobile\.spec\.ts/,
     },
   ],

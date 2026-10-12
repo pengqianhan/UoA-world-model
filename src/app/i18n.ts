@@ -73,9 +73,17 @@ export function pick(text: LocalizedText | undefined): string {
   return text[lang.value] ?? text.en;
 }
 
+/**
+ * The locale to hand to Intl for dates and numbers. A locale file can name a regional variant in
+ * _meta.intl (English uses en-NZ so dates read "Tue 13 Oct", not "Tue, Oct 13").
+ */
+export function intlLocale(): string {
+  return String((locales[lang.value]?._meta as Dict | undefined)?.intl ?? lang.value);
+}
+
 /** Formats an ISO date for display in the current language, without time-zone shifts. */
 export function formatDate(date: string, opts: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" }): string {
   const [y, m, d] = date.split("-").map(Number);
   if (!y || !m || !d) return date;
-  return new Intl.DateTimeFormat(lang.value, { ...opts, timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d)));
+  return new Intl.DateTimeFormat(intlLocale(), { ...opts, timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d)));
 }

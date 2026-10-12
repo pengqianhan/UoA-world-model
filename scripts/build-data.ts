@@ -171,7 +171,11 @@ function polygons(g: MiGeometry, tolerance: number): Ring[][] {
 }
 
 function buildingName(raw: string, id: string): string {
-  let n = raw
+  // Source names repeat the building id as a prefix ("B303 Science Centre", "B6WA A Block")
+  // or as a suffix in brackets ("Med School Hospital Underpass (595)").
+  const prefix = `B${id}`;
+  const unprefixed = raw.startsWith(`${prefix} `) || raw === prefix ? raw.slice(prefix.length) : raw;
+  let n = unprefixed
     .replace(/^B\d{3}[A-Z]?\b\s*/, "")
     .replace(/\s*\(\d{3}[A-Z]?\)\s*$/, "")
     .replace(/\s+/g, " ")

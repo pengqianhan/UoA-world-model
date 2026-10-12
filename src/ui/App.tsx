@@ -1,7 +1,7 @@
 // Page layout and the pieces that are always present.
 import { useEffect } from "preact/hooks";
-import { t, tn } from "../app/i18n.ts";
-import { data, goHome, loadError, marker, night, panel, selBuilding, selRoom, sessionsNow, busyBuildings, webglFailed } from "../app/state.ts";
+import { pick, t, tn } from "../app/i18n.ts";
+import { busyBuildings, data, goHome, loadError, marker, night, panel, selBuilding, selCampus, selRoom, sessionsNow, webglFailed } from "../app/state.ts";
 import { AboutPanel } from "./AboutPanel.tsx";
 import { BuildingView } from "./BuildingView.tsx";
 import { SceneHost } from "./SceneHost.tsx";
@@ -40,6 +40,15 @@ function StatusStrip() {
         </p>
       )}
       <p class="status-hint">{t("status.hintCampus")}</p>
+      <div class="campus-tabs" role="group" aria-label={t("campus.label")}>
+        {d.campus.campuses
+          .filter((c) => c.onMap)
+          .map((c) => (
+            <button type="button" class={c.id === selCampus.value ? "on" : ""} aria-pressed={c.id === selCampus.value} data-campus={c.id} onClick={() => goHome(c.id)}>
+              {pick(c.name)}
+            </button>
+          ))}
+      </div>
     </section>
   );
 }

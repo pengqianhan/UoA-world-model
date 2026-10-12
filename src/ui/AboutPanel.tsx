@@ -1,6 +1,6 @@
 // About: the unofficial notice, data sources with snapshot dates, coverage, and known limitations.
 import { useEffect, useRef } from "preact/hooks";
-import { formatDate, lang, languages, setLang, t } from "../app/i18n.ts";
+import { formatDate, intlLocale, lang, languages, setLang, t } from "../app/i18n.ts";
 import { data, panel } from "../app/state.ts";
 import { aucklandWallTime } from "../shared/time.ts";
 import { IconButton, Section } from "./common.tsx";
@@ -14,7 +14,7 @@ export function AboutPanel() {
   useEffect(() => heading.current?.focus(), []);
   if (!d) return null;
   const c = d.meta.coverage;
-  const n = (x: number) => x.toLocaleString(lang.value);
+  const n = (x: number) => x.toLocaleString(intlLocale());
   const pct = (x: number) => (c.sessions ? ` (${Math.round((x / c.sessions) * 100)}%)` : "");
   const available = d.schedule.available;
 
@@ -34,7 +34,7 @@ export function AboutPanel() {
           </div>
 
           <Section title={t("about.whatTitle")}>
-            <p>{t("about.what")}</p>
+            <p>{available ? t("about.what") : t("about.whatNoTimetable")}</p>
           </Section>
           <Section title={t("about.howTitle")}>
             <p>{t("about.how")}</p>

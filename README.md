@@ -1,17 +1,185 @@
 # UoA World Model
 
-An **unofficial**, student-made 3D map of University of Auckland teaching rooms and timetabled classes.
-Not affiliated with, endorsed by, or maintained by the University of Auckland.
+An **unofficial**, student-made 3D map of University of Auckland buildings, floors and teaching rooms.
+It is not affiliated with, endorsed by or maintained by the University of Auckland, and uses no
+University logos or branding.
 
-Live site: https://pengqianhan.github.io/UoA-world-model/
+**Live site: https://pengqianhan.github.io/UoA-world-model/**
 
-This README is a stub while the first version is being built; see `PROGRESS.md` for the current state.
+It is built to answer two questions a student actually has:
 
-## Run locally
+1. *Which building and floor is my room in?* Type a room code such as `303-G23`, a building name or
+   number, and the camera flies to it. Click any building to step inside and browse floors and rooms.
+2. *Is a class timetabled in this room right now?* The whole feature is built and tested, but the
+   published site has **no class times yet**, because the University's timetable can no longer be read
+   without signing in. See [Adding the class timetable](#adding-the-class-timetable). Nothing is made up
+   to fill the gap.
+
+## What you get
+
+- A rotatable miniature of the City, Grafton and Newmarket campuses: 139 University buildings on a base
+  of OpenStreetMap streets, parks, trees and surrounding buildings.
+- A cut-away view of every building: pick a floor, see its learning spaces (lecture theatres, teaching
+  rooms, labs, studios, study spaces) drawn from the outlines on the official campus map.
+- Search over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings and 251
+  subject codes. Māori names match with or without macrons (`Maori` finds `Māori`).
+- "Now" (Auckland time, daylight saving included) and "Preview" (any day and time), with the academic
+  calendar: teaching week, breaks, study break, exams, public holidays.
+- Every view is a link: building, floor, room, time and language are all in the URL.
+- A phone layout.
+- All interface text in one locale file, ready for more languages.
+
+## Run it locally
+
+Requires Node 22.12 or newer (developed and built in CI on Node 24).
 
 ```bash
 npm ci
-npm run dev      # http://localhost:5273/UoA-world-model/
-npm test         # unit tests
-npm run build    # production build into dist/
+npm run dev        # http://localhost:5273/UoA-world-model/
 ```
+
+Other commands:
+
+| Command | What it does |
+| --- | --- |
+| `npm test` | Unit tests (room codes, floors, Auckland time and daylight saving, calendar, search, data checks) |
+| `npm run typecheck` | TypeScript check |
+| `npm run build` | Production build into `dist/` |
+| `npm run preview` | Serve `dist/` at http://localhost:4273/UoA-world-model/ |
+| `npm run e2e` | Playwright tests against the preview build (run `npx playwright install chromium` once) |
+| `npm run data:fetch` | Download any data snapshot that is not cached yet |
+| `npm run data:build` | Rebuild `public/data/*.json` from the cached snapshots |
+
+To test a deployed copy instead of a local build:
+
+```bash
+E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e
+```
+
+The site is static. Pushing to `main` runs `.github/workflows/deploy.yml`, which type-checks, tests,
+builds and publishes to GitHub Pages. The Vite `base` is `/UoA-world-model/`; set `BASE_PATH=/` to
+host at a domain root.
+
+## Updating the data snapshot
+
+Data is fetched once, cached as raw snapshots under `data/raw/`, and every later build reads the cache.
+`data/sources.json` records the URL, fetch time, size and SHA-256 of each snapshot.
+
+```bash
+npm run data:fetch                         # fetches only what is missing
+npx tsx scripts/fetch-mapsindoors.ts --refresh   # re-download the campus map (4 requests)
+npx tsx scripts/fetch-osm.ts --refresh           # re-download OpenStreetMap context (1 request)
+npx tsx scripts/fetch-calendar.ts --refresh      # re-download the Calendar pages (3 requests)
+npm run data:build                         # rebuild public/data from the snapshots
+npm test                                   # the data consistency tests must still pass
+```
+
+Then commit `public/data/`, `data/sources.json` and (if refreshed) `data/raw/osm/`.
+
+Rules the fetch scripts follow, and that any new one should too (`scripts/lib/snapshot.ts` enforces
+them): only public pages that need no login; at most one request per second; each URL fetched once and
+cached; an honest User-Agent that links to this repository. Raw snapshots of University data stay out
+of the repository (`data/raw/` is gitignored); OpenStreetMap data is openly licensed and is committed.
+
+When a new academic year starts, `data/academic-calendar.json` has to be re-transcribed by hand from
+the University Calendar's key-dates page (the source URL is in the file).
+
+## Adding the class timetable
+
+The official source is the University's **Classes API v2**
+(<https://developer.auckland.ac.nz/prd/documentation/api-classes-v2>). It returns, for each class, the
+meeting patterns with day, start and end time, date range and room: exactly what this site needs. It
+requires credentials that only someone with a University account can obtain, so this step is yours:
+
+1. Sign in at <https://developer.auckland.ac.nz/prd>, create an application client and subscribe it to
+   "Classes Api V2" (the portal's guides *Creating application client* and *Calling API using Client
+   Credential flow* walk through it). Check the portal's terms before republishing class times.
+2. Fetch and rebuild, with the credentials in the environment (never in a file that gets committed):
+
+   ```bash
+   UOA_CLIENT_ID=... UOA_CLIENT_SECRET=... UOA_SCOPE=... npx tsx scripts/fetch-classes.ts
+   npm run data:build
+   npm test && npm run build
+   ```
+
+3. Commit `public/data/` and push. Rooms then show what is timetabled at the selected time, buildings
+   show a count of classes in progress, and courses become searchable.
+
+`scripts/fetch-classes.ts` was written from the published OpenAPI document and has **not** been run
+against the live API (the project was built without credentials), so the OAuth scope or the paging
+parameters may need a small adjustment on first use. The part that turns API records into the
+published timetable (`scripts/lib/classes.ts`) is unit-tested, and the interface is tested end to end
+with a fixture timetable that exists only inside the test browser.
+
+What the pipeline keeps for every class: course code and title, class type and section, day, times,
+date range, the original location text, and how precisely it could be located (room, floor or
+building). Records it cannot use are kept in an `exclusions` list with the reason. Staff names are
+never read or published.
+
+## Adding a language
+
+1. Copy `src/i18n/locales/en.json` to `src/i18n/locales/<code>.json` (for example `mi.json`,
+   `zh.json`).
+2. Translate the values. Keep the keys and the `{placeholders}`. Set `_meta.name` to the language's own
+   name; that is what the language menu shows.
+3. That is all. The file is picked up automatically, the language appears in the menu in About, and
+   `?lang=<code>` selects it. Missing keys fall back to English.
+
+Names in the data are language-keyed too (`"name": { "en": "…" }`), so a translation of a building or
+term name is one more key next to `en` (the calendar already carries a few `mi` names). The pipeline
+writes only `en` today because that is all the sources provide.
+
+`npm test` checks that every key used in the code exists in `en.json` and that components contain no
+hard-coded interface text.
+
+## How it is put together
+
+```
+scripts/            data pipeline (Node + TypeScript, run with tsx)
+  lib/snapshot.ts     polite, cache-first fetcher
+  fetch-*.ts          one script per source
+  build-data.ts       snapshots -> public/data/*.json
+data/
+  sources.json        provenance of every snapshot
+  academic-calendar.json   hand-transcribed key dates
+  raw/                snapshots (gitignored except OpenStreetMap)
+public/data/        published data: campus, context, rooms-index, subjects, calendar, schedule, meta
+src/shared/         pure logic shared by pipeline and app: geometry, room codes, Auckland time,
+                    calendar, schedule, search
+src/scene/          three.js scene
+src/app/            state, URL, data loading, translations
+src/ui/             Preact components and styles
+src/i18n/locales/   interface text
+tests/              unit tests (Vitest)
+e2e/                browser tests (Playwright), numbered after the acceptance criteria
+```
+
+Accuracy is labelled wherever it matters. A room drawn with an outline comes from the campus map. A
+room shown as a pin is known to the campus map but its outline is not published here. A room that the
+map does not know is placed on a floor inferred from its number and marked as inferred. Building
+heights are estimates from the number of floors.
+
+## Data sources and licences
+
+| Source | Used for | Terms |
+| --- | --- | --- |
+| [University of Auckland campus maps](https://maps.auckland.ac.nz/) (the public map, served by MapsIndoors) | Buildings, floors, room codes, room types and positions | © University of Auckland. Only derived facts are published here: learning spaces with simplified outlines, other searchable rooms as a code, floor and point. Residential rooms, parking, plant and anything the map marks as not searchable are left out. |
+| [OpenStreetMap](https://www.openstreetmap.org/copyright) via the Overpass API | Surrounding buildings, streets, paths, parks, trees | © OpenStreetMap contributors, [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The snapshot in `data/raw/osm/` and the derived `public/data/context.json` are under the same licence. |
+| [University of Auckland Calendar 2026](https://www.auckland.ac.nz/en/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar.html) | Semester dates, breaks, holidays; list of subject codes | © University of Auckland. Dates and codes are quoted as facts with a link to the source. |
+| [Open-Meteo](https://open-meteo.com/) | Current temperature in Auckland, fetched by the visitor's browser | [CC BY 4.0](https://open-meteo.com/en/licence) |
+
+Snapshot dates are shown in the site's About panel and recorded in `public/data/meta.json`.
+
+The **code** is under the MIT licence (see `LICENSE`). That licence does not cover the data above.
+
+If you represent the University and would like something changed or removed, please open an issue.
+
+## Known limitations
+
+- No class times until a timetable snapshot is added (see above).
+- A timetabled class is not the same as an occupied room.
+- Heights are estimated and the ground is flat, although the City Campus sits on a ridge.
+- Only learning spaces have outlines; furniture is not shown.
+- Only the City, Grafton and Newmarket campuses are in 3D; other campuses' buildings appear in search,
+  marked as not on the map.
+- The academic calendar covers 2026 only.

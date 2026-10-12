@@ -320,3 +320,40 @@ test("timetable features work end to end when a schedule is present (fixture sch
   await page.locator("#preview-date").fill("2026-09-01");
   await expect(card.locator(".empty")).toContainText("Mid-semester break");
 });
+
+test("other campuses: Grafton and Newmarket are on the map; remote campuses are searchable and marked as not on the map", async ({ page }) => {
+  await open(page, "?light=day");
+  const city = await page.evaluate(() => window.__scene!.cameraState());
+
+  await page.locator('.campus-tabs [data-campus="grafton"]').click();
+  await settle(page);
+  expect(params(page).get("campus")).toBe("grafton");
+  const grafton = await page.evaluate(() => window.__scene!.cameraState());
+  // Grafton is about a kilometre south of the City Campus (south is +z in the scene).
+  expect(grafton.target[2] - city.target[2]).toBeGreaterThan(600);
+  await expectRealRender(page);
+  await shot(page, "10-grafton");
+
+  // A Grafton lecture theatre is drawn like any other room.
+  await page.locator("#search-button").click();
+  const input = page.locator("#search-input");
+  await input.fill("505-011");
+  await page.locator(".result-main").first().click();
+  await settle(page);
+  await expect(page.locator("#building-bar")).toContainText("Grafton Campus");
+  await expect(page.locator("#room-card")).toContainText("505-011");
+
+  // A campus that is not modelled: listed, labelled, and not placed anywhere on the map.
+  await page.locator("#search-button").click();
+  await input.fill("Tai Tonga");
+  const campus = page.locator(".result.type-campus").first();
+  await expect(campus).toContainText("Tai Tonga Campus");
+  await expect(campus).toContainText("only the City, Grafton and Newmarket campuses are modelled");
+  await input.fill("654-G01");
+  const room = page.locator(".result.type-room").first();
+  await expect(room).toContainText("654-G01");
+  await expect(room).toContainText("Not on the 3D map yet");
+  await room.locator(".result-main").click();
+  await expect(page.locator("#building-bar")).toContainText("outside the 3D map");
+  await expect(page.locator("#building-bar")).toContainText("Tai Tonga Campus");
+});

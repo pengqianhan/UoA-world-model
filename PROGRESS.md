@@ -3,36 +3,43 @@
 Handover notes for whoever (probably a future session of the same agent) picks this up next.
 Read `GOAL.md` (local only, not committed) first, then this file, then `git status` / `git log`.
 
-Last updated: 2026-10-13 (session 1)
+Last updated: 2026-10-13, about 01:15 NZDT (session 1)
 
 ## Now working on
 
-Step 3 of GOAL §10: spatial data pipeline (MapsIndoors + OSM -> `public/data/spatial.json`), then the
-3D campus.
+Step 4-5 of GOAL §10: README, About verification on the live site, then polish and bonus items.
 
 **Next concrete steps, in order:**
 
-1. `scripts/fetch-osm.ts`: one Overpass query for context (other buildings, roads, parks, water) around
-   City / Grafton / Newmarket. Snapshot goes to `data/raw/osm/` (ODbL, committed).
-2. `scripts/build-data.ts`: snapshots -> `public/data/spatial.json` (buildings, floors, learning-space
-   rooms, OSM context), `public/data/meta.json` (sources, snapshot dates, coverage numbers).
-3. Academic calendar JSON from the official 2026 key-dates PDF (URL in "Data sources" below).
-4. three.js campus scene, building/floor/room views, search, time panel, URL state, i18n, About.
+1. README: how to run, how to refresh the data snapshot, how to add a language, data sources and licences.
+2. `scripts/fetch-classes.ts` (reads `UOA_API_KEY` / client credentials from the environment, pages
+   through the Classes API into `data/raw/uoa-classes/`). `scripts/lib/classes.ts` already turns such
+   records into `schedule.json` and is unit-tested with a synthetic fixture.
+3. Run the e2e suite against the live site
+   (`E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e`) and look at the
+   screenshots in `e2e/screenshots/`.
+4. Polish / bonus (only after 1-3): favicon, terrain, room interiors, remote campuses in 3D.
+5. Final report (GOAL §13) and delete the cron job.
 
 ## Done (with evidence)
 
 - Local toolchain: Vite 8 + TypeScript 7 + Preact 11 + three 0.186 + Vitest 5 + Playwright 1.64.
-  `npm run typecheck`, `npm test`, `npm run build` pass locally (2026-10-13).
-- GitHub repo `pengqianhan/UoA-world-model` (public), Pages enabled with `build_type=workflow`.
-  First CI run green; https://pengqianhan.github.io/UoA-world-model/ returned HTTP 200 with the
-  placeholder page (checked with curl, 2026-10-13).
-- Cron job `17 */5 * * *` created in session 1 (id 233af833). It is session-only; re-check with
-  CronList on every wake-up and recreate if missing or older than 6 days.
-- Data feasibility research finished (see next section).
-- Looked at the reference site with Playwright (campus view + classroom view screenshots, local only):
-  isometric camera, dark miniature campus, pill labels on buildings, left "courses & spaces" panel,
-  top-right info / Search / time+weather, right-hand floor list, bottom building name + room select,
-  "‹ Campus" back button, per-session precision note.
+- GitHub repo `pengqianhan/UoA-world-model` (public), Pages enabled with `build_type=workflow`,
+  workflow `.github/workflows/deploy.yml` (typecheck, unit tests, build, deploy; separate e2e job).
+- Cron job `17 */5 * * *` created in session 1 (id 233af833). Session-only; re-check with CronList on
+  every wake-up and recreate if missing or older than 6 days.
+- Data feasibility research finished (see "Data sources").
+- Data pipeline (`npm run data:fetch`, `npm run data:build`) writes `public/data/*.json`:
+  194 buildings (139 on the 3D map), 786 learning spaces with outlines, 4,668 further rooms in a lazy
+  index, 251 subject codes, the 2026 academic calendar, OSM context (2,525 buildings, 4,380 road
+  segments, 563 green/water areas, 1,819 trees). Schedule is empty (`available: false`).
+- App: three.js orthographic campus, building cut-away with floors and rooms, search, Now/Preview time
+  panel, About, status strip, URL state, English locale file, phone layout, day/night lighting,
+  Open-Meteo temperature in the time chip.
+- Tests: 66 unit tests (`npm test`), 10 Playwright tests (`npm run e2e`, 9 desktop + 1 phone) all green
+  locally on the real GPU and on SwiftShader (`E2E_GL=swiftshader`). Screenshots were inspected by eye:
+  the canvas shows the campus, the floor view, the pin for outline-less rooms, the phone layout.
+- Looked at the reference site with Playwright (campus + classroom screenshots, local only).
 
 ## Data sources: what exists and what does not (researched 2026-10-13)
 
@@ -49,81 +56,78 @@ Every route was checked once, politely, with an honest User-Agent:
 | `courseoutline.auckland.ac.nz` | Redirects to the SSO login. |
 | `study.auckland.ac.nz` (Curriculum Catalogue, Oracle APEX) | Public. Has course code, title, points, prescription, campus and terms offered. **No class times or rooms.** |
 
-**Decision:** follow GOAL §12. Ship with real buildings/rooms and no fabricated classes; build the whole
-timetable pipeline and UI so that it lights up the moment a Classes API key is supplied
-(`UOA_API_KEY=... npm run data:classes`). See "Needs the user".
+**Decision:** follow GOAL §12. Ship with real buildings/rooms and no fabricated classes; the whole
+timetable pipeline and UI exist and are tested with a fixture, so they light up the moment a real
+snapshot is supplied. See "Needs the user".
 
 Do not retry the dead routes; do not try to get around the reset/401 (they are deliberate).
 
-### Buildings, floors, rooms: official public campus map (works, snapshot taken)
+### Buildings, floors, rooms: official public campus map
 
 `maps.auckland.ac.nz` is a public MapsIndoors app (solution id `auckland`). The same anonymous JSON
-requests the page makes give:
-
-- `sync/venues` — 8 campuses (City, Grafton, Newmarket, Leigh, Ardmore, Tai Tokerau, Tai Tonga, Waiheke)
-- `sync/buildings` — 209 buildings: `administrativeId` (the 3-digit building number, e.g. `303`, `105S`),
-  name (`B102 Old Government House`), footprint polygon, and per-floor outline polygons keyed by floor
-  index ×10 (`-10` = B, `0` = G, `10` = 1 …) with display names.
-- `sync/locations` — 26,521 locations (20 MB). Each room has `externalId` = the room code
-  (`303-G23`, `109-B10`, `105S-039`), `building`, `floor` index, `floorName`, `type`, polygon geometry.
-  Learning-space types: Lecture theatres 54, Teaching spaces 369, Computer labs 72, Laboratories 244,
-  Lab-Undergrad 51, Study spaces 8, Library 2, Student hubs 9 …
-
+requests the page makes give venues (8 campuses), buildings (209, with per-floor outlines) and
+locations (26,521 rooms with `externalId` = room code, floor, type, polygon).
 Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/sources.json`).
-Fetch script: `npx tsx scripts/fetch-mapsindoors.ts` (cache-first; `--refresh` to re-download).
 
-**Decision:** publish only derived facts for learning-relevant rooms (code, type, floor, simplified
-outline) plus building footprints and floor outlines. Offices, residences, plant rooms etc. are not
-published (irrelevant to students finding a class, bulky, and more sensitive). Attribute the
-University's public campus map in About.
-
-This also settles GOAL §5's question about room numbering: codes are `<building>-<room>`, and the true
-floor comes from the map's `floorName`. The "first character of the room number = floor" rule is kept
-only as a fallback for room codes that are not in the map, and is labelled "inferred".
+**Decisions:**
+- Publish outlines only for learning-space types (lecture theatres, teaching spaces, computer labs,
+  laboratories, study spaces, library, student hubs). Other searchable rooms go into
+  `rooms-index.json` as code + floor + one point. Residential rooms, parking, plant, toilets, lifts and
+  anything the source marks non-searchable (`status != 3`) are not published at all.
+- Room codes are `<building>-<room>`; the true floor comes from the map. Inference from the room
+  number (agrees with the map for >85% of rooms, see `tests/roomcode.test.ts`) is only the fallback
+  for unknown codes and is labelled "inferred" in the UI.
+- Building height = (levels at or above index 0) × 3.6 m. Not surveyed; said so in About.
 
 ### Other sources
 
-- Academic calendar: official PDF
-  `https://www.auckland.ac.nz/assets/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar/2026-calendar-parts/2026-calendar-key-dates.pdf`
-  (Semester Two 2026: Mon 20 July – lectures end Fri 23 Oct; Labour Day Mon 26 Oct.) Not yet transcribed.
-- Subject list: `…/university-calendar/current-calendar/courses.html` lists every subject code with its
-  name by faculty (one page). Course-level catalogue would need the APEX app's lazy-loaded browse pages
-  (many requests) — deferred; low value while there is no timetable.
-- Context geometry: OpenStreetMap via Overpass (not fetched yet).
-- Terrain (bonus): AWS open "terrarium" elevation tiles need no key. Not started.
-- `www.auckland.ac.nz/robots.txt`: `Allow: /`. `api.mapsindoors.com/robots.txt`: 404 (none).
+- Academic calendar: hand-transcribed into `data/academic-calendar.json` from the official 2026
+  key-dates PDF (snapshot `data/raw/uoa-calendar/2026-key-dates.pdf`). 2027 only had start dates.
+- Subject list: parsed from the Calendar's "course codes by faculty" page (251 subjects).
+- Context: OpenStreetMap via one Overpass query (`data/raw/osm/context.json`, committed, ODbL).
+- Weather: Open-Meteo, fetched by the visitor's browser in Now mode; optional.
+- Not done: course-level catalogue (the Curriculum Catalogue's lists are lazy-loaded APEX regions;
+  many requests for little value while there is no timetable). Terrain (AWS open "terrarium" tiles
+  need no key) is a possible bonus.
 
 ## Decisions (and why) — do not re-litigate without new information
 
-- **GOAL.md is gitignored.** It contains the local working-directory path (with a username), and
-  GOAL §8 forbids committing personal info from local paths. It stays in the working folder.
-- **Stack: Vite + TypeScript + three.js + Preact (+ signals) for UI.** Static only, small runtime,
-  matches the reference site's architecture. Data pipeline is Node/TS scripts run with `tsx`; unit
-  tests with Vitest; e2e with Playwright.
-- **Vite `base` is `/UoA-world-model/`** (override with `BASE_PATH`). Needed for the Pages subpath.
-- **Line endings:** `.gitattributes` forces LF; local `core.autocrlf=false`.
-- **Raw snapshots:** `data/raw/` is gitignored except `data/raw/osm/`. Provenance in `data/sources.json`.
+- **GOAL.md is gitignored.** It contains the local working-directory path (with a username).
+- **Stack:** Vite + TypeScript + three.js + Preact (+ signals). Shared pure-TS modules in
+  `src/shared` are used by both the pipeline and the app.
+- **Ports:** dev server 5273, preview 4273 (`vite.config.ts`). Port 5173 on this machine belongs to
+  another project of the user's; never touch that process.
+- **Vite `base` is `/UoA-world-model/`** (override with `BASE_PATH`).
 - **All network fetching goes through `scripts/lib/snapshot.ts`** (cache-first, ≥1.1 s between
   requests, honest User-Agent). Never fetch a URL that already has a snapshot unless `--refresh`.
-- **Playwright on this Windows machine:** launch Chromium with
-  `--use-angle=d3d11 --enable-gpu --ignore-gpu-blocklist` to get the real GPU; the default headless
-  shell falls back to SwiftShader, which is too slow for heavy scenes (the reference site timed out)
-  but is fine for ours and is what Linux CI will use.
-- **Python on this machine:** use `python -I -X utf8` for ad-hoc inspection (console is cp1252).
+- **Labels are HTML, hit-tested by the scene** (`pointer-events: none`) so that a drag starting on a
+  label still rotates the map.
+- **Building view = cut-away:** floors above the selected one are hidden, floors below are a solid
+  base, neighbours sink to footprints. The stack is lifted so the lowest floor sits on the ground.
+- **Timetable features are tested with a fixture served only inside Playwright**
+  (`e2e/helpers.ts`, courses named "TESTFIX … (not a real course)"). Nothing synthetic is ever
+  written to `public/data`; `tests/search-classes-data.test.ts` asserts the published schedule is
+  empty unless a real snapshot produced it.
+- **Playwright on this Windows machine:** Chromium flags `--use-angle=d3d11 --enable-gpu
+  --ignore-gpu-blocklist` give the real GPU; CI uses SwiftShader. `E2E_GL=swiftshader` reproduces CI.
+- **Shell quirks here:** Git Bash heredocs break on non-ASCII text, so write source files with the
+  Write tool; use `python -I -X utf8` for ad-hoc scripts; Python `\b` in a non-raw string is a
+  backspace (it corrupted a regex once).
 
 ## Tried and did not work
 
-- Screenshotting the reference site with SwiftShader: `page.screenshot` timed out. Fixed by using the
-  real GPU (flags above).
-- `study.auckland.ac.nz` browse pages via plain HTTP: the course lists are lazy-loaded by APEX AJAX, so
-  the HTML has no course codes. Would need a browser session; deferred.
+- Screenshotting the reference site with SwiftShader: timed out. The real GPU works.
+- `study.auckland.ac.nz` browse pages via plain HTTP: course lists are lazy-loaded, HTML has none.
+- "Ghosting" neighbouring buildings (transparent) in building view: they overlapped the open floor.
+  Replaced by sinking them to footprints.
+- One CI run failed (commit 4d97b04) because scripts imported `./x.ts` before
+  `allowImportingTsExtensions` was set. Always run `npm run typecheck && npm test` before pushing.
 
 ## Needs the user
 
-1. **A Classes API key (this is what unlocks "which class is in this room now").**
+1. **A Classes API key: this is what unlocks "which class is in this room now".**
    Sign in at https://developer.auckland.ac.nz/prd with your UoA account, create an application
-   client and subscribe it to "Classes Api V2" (guides: *Creating application client*,
-   *Calling API using Client Credential flow* on that portal). Then run the classes fetch with the
-   credential in an environment variable (exact command will be documented in README once the
-   script exists). Nothing else is required; the site rebuilds from the snapshot.
-   Note: check the portal's terms for whether republishing class times on a public site is allowed.
+   client and subscribe it to "Classes Api V2" (guides on that portal: *Creating application client*,
+   *Calling API using Client Credential flow*). Then follow the README section "Adding the class
+   timetable". Check the portal's terms for whether republishing class times on a public site is
+   allowed before doing so.

@@ -3,15 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0e1a24" />
+    <meta name="theme-color" content="#0f1b25" />
     <meta
       name="description"
-      content="Unofficial student-made 3D map of University of Auckland teaching rooms and timetabled classes. Not affiliated with the University of Auckland."
+      content="Unofficial student-made 3D map of University of Auckland buildings and teaching rooms. Not affiliated with the University of Auckland."
     />
-    <title>UoA World Model (unofficial)</title>
+    <meta property="og:title" content="UoA World Model (unofficial student project)" />
+    <meta
+      property="og:description"
+      content="Find which building and floor a University of Auckland room is in, on a 3D model of the campus. Unofficial; not affiliated with the University."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <title>UoA World Model (unofficial student project)</title>
   </head>
   <body>
     <div id="app"></div>
+    <noscript>
+      <p style="max-width: 36rem; margin: 20vh auto; padding: 0 1rem; font: 16px/1.5 system-ui, sans-serif; color: #14222e">
+        UoA World Model is an unofficial 3D map of University of Auckland buildings and teaching rooms. It needs JavaScript and WebGL to
+        run. It is not affiliated with the University of Auckland.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1,13 +1,14 @@
 {
   "_meta": {
     "name": "English",
-    "dir": "ltr"
+    "dir": "ltr",
+    "intl": "en-NZ"
   },
   "app": {
     "title": "UoA World Model",
     "tagline": "Unofficial",
     "documentTitle": "UoA World Model (unofficial student project)",
-    "description": "Unofficial student-made 3D map of University of Auckland teaching rooms and timetabled classes. Not affiliated with the University of Auckland.",
+    "description": "Unofficial student-made 3D map of University of Auckland buildings and teaching rooms. Not affiliated with the University of Auckland.",
     "loading": "Loading the campus…",
     "loadError": "The campus data could not be loaded. Check your connection and reload the page.",
     "noWebgl": "This browser could not start WebGL, so the 3D map is not shown. Search and room details still work.",
@@ -76,7 +77,8 @@
     "floorHasRooms_other": "{count} learning spaces on this floor",
     "roomSelect": "Room",
     "heightNote": "Building heights are estimated from the number of floors.",
-    "offMap": "This building is outside the 3D map."
+    "offMap": "This building is outside the 3D map.",
+    "legend": "Room types in this building"
   },
   "room": {
     "area": "about {area} m²",
@@ -142,10 +144,10 @@
     },
     "jumpToTeaching": "Preview a teaching day",
     "light": "Lighting",
-    "lightAuto": "Follow the time",
+    "lightAuto": "Auto",
     "lightDay": "Day",
     "lightNight": "Night",
-    "lightNote": "Daylight is approximate.",
+    "lightNote": "Auto follows the time shown. Daylight is approximate.",
     "days": {
       "mon": "Mon",
       "tue": "Tue",
@@ -190,6 +192,7 @@
     "unofficial": "UoA World Model is made by a student for students. It is not affiliated with, endorsed by or maintained by the University of Auckland, and it uses no University logos or branding. For anything that matters, check the University's own campus maps and your own timetable in Student Services Online.",
     "whatTitle": "What it does",
     "what": "It answers two questions: which building and floor is my room in, and is a class timetabled in this room right now. Type a room code, a building or a course into Search, or click a building to step inside and browse floors and rooms.",
+    "whatNoTimetable": "It answers one question today: which building and floor is my room in. Type a room code from your timetable or a building name into Search, or click a building to step inside and browse floors and rooms. It is also built to show what is timetabled in a room at any moment, but class times are not available yet; see Known limitations below.",
     "howTitle": "Getting around",
     "how": "Drag to rotate. Scroll or pinch to zoom. Right-drag, Shift-drag or use two fingers to move. Click a building to open it, then pick a floor and a room. The address bar always holds a link to exactly what you are looking at.",
     "sourcesTitle": "Data sources",

@@ -13,7 +13,8 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "data:fetch": "tsx scripts/fetch-mapsindoors.ts && tsx scripts/fetch-osm.ts && tsx scripts/fetch-calendar.ts",
-    "data:build": "tsx scripts/build-data.ts"
+    "data:build": "tsx scripts/build-data.ts",
+    "data:classes": "tsx scripts/fetch-classes.ts"
   },
   "dependencies": {
     "@preact/signals": "^2.11.3",
@@ -29,5 +30,8 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

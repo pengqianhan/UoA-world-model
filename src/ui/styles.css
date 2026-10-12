@@ -874,6 +874,33 @@ select optgroup {
   font-size: 12px;
 }
 
+.campus-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.campus-tabs button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.campus-tabs button:hover {
+  color: var(--text);
+}
+
+.campus-tabs button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ---- Building view ------------------------------------------------------------------------ */
 
 .floors {
@@ -902,9 +929,10 @@ select optgroup {
   text-transform: uppercase;
 }
 
+/* Lowest floor at the bottom, like the building. Overflow scrolls upwards. */
 .floors ol {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 2px;
   overflow-y: auto;
   scrollbar-width: none;
@@ -1020,6 +1048,21 @@ select optgroup {
 
 .room-select select {
   width: 100%;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .bar-note {
@@ -1314,9 +1357,11 @@ select optgroup {
     padding: 0 8px 0 4px;
   }
 
+  /* Lowest floor on the left; higher floors scroll in from the right. */
   .floors ol {
-    flex-direction: row-reverse;
-    justify-content: flex-end;
+    flex: 1;
+    min-width: 0;
+    flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
   }
@@ -1337,6 +1382,10 @@ select optgroup {
   }
 
   .room-schedule.none p {
+    display: none;
+  }
+
+  .in-building .legend {
     display: none;
   }
 
