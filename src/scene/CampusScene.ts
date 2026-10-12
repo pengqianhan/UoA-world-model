@@ -35,6 +35,7 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, Room } from "../shared/types.ts";
 import { MeshBuilder, ringsBounds } from "./geometry.ts";
+import { WALL_HEIGHT, buildInterior, disposeGroup } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
 
@@ -126,6 +127,7 @@ export class CampusScene {
   private buildingEdges = new Map<string, LineSegments>();
   private roomMeshes = new Map<string, Mesh>();
   private selectedOutline?: LineLoop;
+  private interior?: Group;
   private pin?: PinSpec;
   private pinGroup = new Group();
 
@@ -412,6 +414,7 @@ export class CampusScene {
     if (floorChanged) this.rebuildDetail();
     else this.styleRooms();
     this.rebuildPin();
+    if (buildingChanged) this.fitShadow();
     this.applyFocusStyle(animate);
     this.rebuildLabels();
     if (buildingChanged || floorChanged || prev.room !== sel.room) this.frameSelection(animate);
@@ -481,12 +484,39 @@ export class CampusScene {
     const az = (p.sunAzimuth * Math.PI) / 180;
     const el = (p.sunElevation * Math.PI) / 180;
     const t = this.sun.target.position;
-    // Keep the shadow frustum centred on the central campuses.
-    t.set(130, 0, 500);
+    t.copy(this.shadowCentre);
     const d = 3000;
     this.sun.position.set(t.x + Math.sin(az) * Math.cos(el) * d, Math.sin(el) * d, t.z - Math.cos(az) * Math.cos(el) * d);
     this.sun.target.updateMatrixWorld();
   }
+
+  /**
+   * Fits the shadow map to what is being looked at: the three central campuses in campus view,
+   * or just the open building, where the same texture then gives crisp shadows up close.
+   */
+  private fitShadow(): void {
+    const cur = this.currentFloor();
+    const sc = this.sun.shadow.camera;
+    if (cur) {
+      const [x0, z0, x1, z1] = ringsBounds(cur.b.outline);
+      const half = Math.max(110, Math.hypot(x1 - x0, z1 - z0) * 1.1);
+      this.shadowCentre.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
+      sc.left = -half;
+      sc.right = half;
+      sc.top = half;
+      sc.bottom = -half;
+    } else {
+      this.shadowCentre.set(130, 0, 500);
+      sc.left = -1300;
+      sc.right = 1300;
+      sc.top = 1500;
+      sc.bottom = -1500;
+    }
+    sc.updateProjectionMatrix();
+    this.placeSun();
+    this.needsShadow = true;
+  }
+  private shadowCentre = new Vector3(130, 0, 500);
 
   /** Colours of the University building masses, depending on hover and whether they hold learning spaces. */
   private restyle(): void {
@@ -591,6 +621,8 @@ export class CampusScene {
       if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
       else mat?.dispose();
     }
+    if (this.interior) disposeGroup(this.interior);
+    this.interior = undefined;
     this.detailGroup.clear();
     this.roomMeshes.clear();
     this.selectedOutline = undefined;
@@ -668,27 +700,37 @@ export class CampusScene {
       this.selectedOutline.geometry.dispose();
       this.selectedOutline = undefined;
     }
+    if (this.interior) {
+      this.detailGroup.remove(this.interior);
+      disposeGroup(this.interior);
+      this.interior = undefined;
+    }
     for (const [code, mesh] of this.roomMeshes) {
       const room = this.roomsByCode.get(code)!;
       const selected = this.selection.room === code;
       const hovered = this.hovered?.type === "room" && this.hovered.code === code;
       const busy = (this.busy.get(code) ?? 0) > 0;
       const [day, night] = ROOM_COLOURS[room.kind];
-      let colour = lerpColour(day, night, this.night);
+      const kindColour = lerpColour(day, night, this.night);
+      let colour = kindColour;
       // Rooms with a class in progress are saturated; free rooms are washed towards the slab colour.
       if (this.busy.size > 0 && !busy) colour = lerpColour(colour, p.slab, 0.55);
       if (hovered) colour = lerpColour(colour, 0xffffff, 0.3);
       if (selected) colour = p.accent;
       (mesh.material as MeshLambertMaterial).color.setHex(colour);
       mesh.scale.y = selected ? ROOM_HEIGHT_SELECTED : busy ? ROOM_HEIGHT * 1.35 : ROOM_HEIGHT;
+      // The selected room opens up: its block is replaced by low walls and illustrative furniture.
+      mesh.visible = !selected;
 
       if (selected && cur) {
+        this.interior = buildInterior(room, mesh.position.y, kindColour, p.slab);
+        this.detailGroup.add(this.interior);
         const pts: number[] = [];
-        const top = mesh.position.y + ROOM_HEIGHT_SELECTED + 0.05;
+        const top = mesh.position.y + WALL_HEIGHT + 0.04;
         for (let i = 0; i + 1 < room.poly.length; i += 2) pts.push(room.poly[i]! / 10, top, -room.poly[i + 1]! / 10);
         const g = new BufferGeometry();
         g.setAttribute("position", new Float32BufferAttribute(pts, 3));
-        this.selectedOutline = new LineLoop(g, new LineBasicMaterial({ color: p.roomEdge }));
+        this.selectedOutline = new LineLoop(g, new LineBasicMaterial({ color: p.accent }));
         this.selectedOutline.userData.noPick = true;
         this.detailGroup.add(this.selectedOutline);
       }
@@ -716,7 +758,7 @@ export class CampusScene {
         specs.push({
           id: `room:${r.code}`,
           x: r.c[0],
-          y: y + (selected ? ROOM_HEIGHT_SELECTED : ROOM_HEIGHT) + 0.4,
+          y: y + (selected ? WALL_HEIGHT + 1.2 : ROOM_HEIGHT) + 0.4,
           z: -r.c[1],
           text: l.text,
           title: l.title,
@@ -867,9 +909,9 @@ export class CampusScene {
       const [x0, z0, x1, z1] = ringsBounds([room.poly]);
       // Zoom in on the room but keep enough of the floor in view to stay oriented.
       const [bx0, bz0, bx1, bz1] = ringsBounds(this.floorOutline(b, floor.i).flat());
-      const roomZoom = this.zoomToFit(x1 - x0, z1 - z0, 0.3);
+      const roomZoom = this.zoomToFit(x1 - x0, z1 - z0, 0.42);
       const floorZoom = this.zoomToFit(bx1 - bx0, bz1 - bz0, 0.7);
-      this.flyTo(new Vector3(room.c[0], y, -room.c[1]), Math.max(floorZoom, Math.min(roomZoom, floorZoom * 3.2)), animate);
+      this.flyTo(new Vector3(room.c[0], y, -room.c[1]), Math.max(floorZoom, Math.min(roomZoom, floorZoom * 5)), animate);
       return;
     }
     const [x0, z0, x1, z1] = ringsBounds(this.floorOutline(b, floor.i).flat());

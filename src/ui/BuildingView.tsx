@@ -147,6 +147,7 @@ function RoomCard({ d, b }: { d: AppData; b: Building }) {
       </p>
       <p class={`precision precision-${precision}`} id="precision-note">
         {t(`room.precision.${precision}`)}
+        {room && !b.offMap && <span class="precision-extra"> {t("room.furnitureNote")}</span>}
       </p>
       <RoomSchedule d={d} code={code} />
     </section>

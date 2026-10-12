@@ -1123,6 +1123,12 @@ select optgroup {
   font-size: 12px;
 }
 
+.precision-extra {
+  display: block;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
 .precision-floor,
 .precision-building,
 .precision-indexed {

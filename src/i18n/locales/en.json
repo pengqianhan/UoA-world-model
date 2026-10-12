@@ -108,7 +108,8 @@
       "library": "Library",
       "studentHub": "Student hub",
       "other": "Room"
-    }
+    },
+    "furnitureNote": "Furniture in the 3D view is illustrative, not a seating plan."
   },
   "time": {
     "now": "Now",
@@ -219,7 +220,7 @@
       "timetableLoaded": "Class times come from a snapshot of the timetable taken on {date}. Rooms and times change during the semester; your own timetable is the authority.",
       "scheduled": "A timetabled class is not the same as an occupied room. Classes are cancelled, moved and recorded online, and rooms are used for things that are not on the timetable.",
       "heights": "Building heights are not surveyed. Each building is drawn as its footprint raised by its number of floors at {height} m per floor, and the ground is drawn flat although the campus sits on a ridge.",
-      "rooms": "Room outlines are simplified from the official campus map and only learning spaces (lecture theatres, teaching rooms, labs, studios, study spaces) are drawn. Other rooms can be found by code and are shown as a point. Furniture is not shown.",
+      "rooms": "Room outlines are simplified from the official campus map and only learning spaces (lecture theatres, teaching rooms, labs, studios, study spaces) are drawn. Other rooms can be found by code and are shown as a point. The furniture drawn in a selected room is decoration laid out by rule; it is not a seating plan and says nothing about capacity.",
       "campuses": "Only the City, Grafton and Newmarket campuses are modelled in 3D. Buildings on other campuses appear in search and are marked as not on the map.",
       "context": "Surrounding buildings, streets and trees come from OpenStreetMap. Where a height is not mapped, a default is used. Trees inside woodland areas are scattered for decoration.",
       "calendar": "Semester dates are transcribed by hand from the 2026 University Calendar. Dates for 2027 were not fully published when this was built.",
