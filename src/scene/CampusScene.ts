@@ -159,7 +159,7 @@ export class CampusScene {
     this.renderer.shadowMap.type = PCFShadowMap;
     this.renderer.shadowMap.autoUpdate = false;
     container.appendChild(this.renderer.domElement);
-    this.renderer.domElement.setAttribute("aria-label", "3D campus map");
+    // The accessible name is set by the host from the locale file.
     this.renderer.domElement.setAttribute("role", "img");
 
     this.camera = new OrthographicCamera(-500, 500, 500, -500, 10, 9000);
@@ -810,6 +810,39 @@ export class CampusScene {
   }
   private cameraStep?: (k: number) => void;
 
+  /**
+   * Shifts the picture inside the viewport so the point of interest is not hidden behind the
+   * panels: fractions of the viewport, +x moves the map right and +y moves it up.
+   */
+  setViewShift(x: number, y: number, animate = true): void {
+    const from = this.shift.clone();
+    const to = new Vector2(x, y);
+    if (from.equals(to)) return;
+    const step = (k: number) => {
+      this.shift.lerpVectors(from, to, easeInOut(k));
+      this.applyViewShift();
+    };
+    this.tweens = this.tweens.filter((tw) => tw.step !== this.shiftStep);
+    if (!animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      step(1);
+      return;
+    }
+    this.shiftStep = step;
+    this.tweens.push({ start: performance.now(), duration: 600, step });
+  }
+  private shift = new Vector2(0, 0);
+  private shiftStep?: (k: number) => void;
+
+  private applyViewShift(): void {
+    const w = this.width;
+    const h = this.height;
+    if (this.shift.x === 0 && this.shift.y === 0) this.camera.clearViewOffset();
+    else this.camera.setViewOffset(w, h, -this.shift.x * w, this.shift.y * h, w, h);
+    this.camera.updateProjectionMatrix();
+    this.needsRender = true;
+    this.needsLabels = true;
+  }
+
   /** Zoom at which a box of the given size (metres) fills `fill` of the viewport. */
   private zoomToFit(w: number, d: number, fill: number): number {
     const aspect = this.width / this.height;
@@ -846,8 +879,9 @@ export class CampusScene {
   /** Shows a whole campus. `center` is [east, north] in metres. */
   showCampus(center: [number, number], span: number, animate = true): void {
     // The ground is foreshortened by the tilted camera, so height is the looser constraint.
+    // On a portrait phone the campus cannot fit across, so frame its central strip instead.
     const aspect = this.width / this.height;
-    const zoom = Math.min((VIEW_HEIGHT * aspect) / span, VIEW_HEIGHT / (span * 0.72));
+    const zoom = Math.min((VIEW_HEIGHT * aspect) / (span * 0.56), VIEW_HEIGHT / (span * 0.72));
     this.flyTo(new Vector3(center[0], 0, -center[1]), zoom, animate);
   }
 
@@ -877,9 +911,19 @@ export class CampusScene {
     this.pointerDown = undefined;
     if (!d || e.button !== 0) return;
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6 || performance.now() - d.t > 600) return;
+    const label = this.labelAt(e.clientX, e.clientY);
+    if (label?.onClick) {
+      label.onClick();
+      return;
+    }
     const pick = this.pickAt(e.clientX, e.clientY);
     if (pick) this.onPick?.(pick);
   };
+
+  private labelAt(clientX: number, clientY: number): LabelSpec | undefined {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return this.labels.hit(clientX - rect.left, clientY - rect.top);
+  }
 
   private lastHoverCheck = 0;
   private onPointerMove = (e: PointerEvent): void => {
@@ -887,12 +931,23 @@ export class CampusScene {
     const now = performance.now();
     if (now - this.lastHoverCheck < 40) return;
     this.lastHoverCheck = now;
+    const label = this.labelAt(e.clientX, e.clientY);
+    this.labels.setHot(label?.onClick ? label.id : undefined);
+    if (label?.onClick) {
+      this.setHovered(null);
+      this.renderer.domElement.style.cursor = "pointer";
+      return;
+    }
     this.setHovered(this.pickAt(e.clientX, e.clientY));
   };
 
-  private onPointerLeave = (): void => this.setHovered(null);
+  private onPointerLeave = (): void => {
+    this.labels.setHot(undefined);
+    this.setHovered(null);
+  };
 
   private setHovered(pick: Pick): void {
+    this.renderer.domElement.style.cursor = pick ? "pointer" : "";
     const same =
       (pick === null && this.hovered === null) ||
       (pick?.type === "building" && this.hovered?.type === "building" && pick.id === this.hovered.id) ||
@@ -920,8 +975,8 @@ export class CampusScene {
     this.camera.right = (VIEW_HEIGHT * aspect) / 2;
     this.camera.top = VIEW_HEIGHT / 2;
     this.camera.bottom = -VIEW_HEIGHT / 2;
-    this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.applyViewShift();
     this.needsRender = true;
     this.needsLabels = true;
   }
@@ -954,6 +1009,81 @@ export class CampusScene {
 
   /** Number of frames drawn so far; lets tests wait for a real render. */
   frames = 0;
+
+  /** True while a camera or focus animation is running. */
+  get animating(): boolean {
+    return this.tweens.length > 0;
+  }
+
+  /**
+   * Renders a frame and samples it, so tests can tell a real 3D picture from a blank canvas
+   * (headless browsers can report success while drawing nothing).
+   */
+  probe(): { width: number; height: number; distinctColours: number; samples: number } {
+    this.renderer.render(this.scene, this.camera);
+    const gl = this.renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const px = new Uint8Array(4);
+    const seen = new Set<number>();
+    const n = 24;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        gl.readPixels(Math.floor(((i + 0.5) * w) / n), Math.floor(((j + 0.5) * h) / n), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        // Quantise a little so anti-aliasing noise does not count as distinct colours.
+        seen.add(((px[0]! >> 3) << 10) | ((px[1]! >> 3) << 5) | (px[2]! >> 3));
+      }
+    }
+    return { width: w, height: h, distinctColours: seen.size, samples: n * n };
+  }
+
+  /** Where a building's roof centre or a room's centre is on the page, in CSS pixels. For tests. */
+  screenPoint(kind: "building" | "room", id: string): { x: number; y: number } | undefined {
+    const v = new Vector3();
+    const rect0 = this.renderer.domElement.getBoundingClientRect();
+    const toPage = (p: Vector3) => {
+      p.project(this.camera);
+      return { x: rect0.left + (p.x * 0.5 + 0.5) * rect0.width, y: rect0.top + (-p.y * 0.5 + 0.5) * rect0.height };
+    };
+    if (kind === "building") {
+      const b = this.buildings.get(id);
+      const mesh = this.buildingMeshes.get(id);
+      if (!b || !mesh) return undefined;
+      // Another building may stand in front of the roof centre, so try several roof points and
+      // return the first one where a click really lands on this building and not on a label.
+      const top = b.height * mesh.scale.y;
+      const ring = b.outline[0]!;
+      const candidates: [number, number][] = [b.center];
+      for (let i = 0; i + 1 < ring.length; i += 2) {
+        candidates.push([(ring[i]! / 10) * 0.8 + b.center[0] * 0.2, (ring[i + 1]! / 10) * 0.8 + b.center[1] * 0.2]);
+      }
+      for (const [x, y] of candidates) {
+        const p = toPage(v.set(x, top, -y));
+        const hit = this.pickAt(p.x, p.y);
+        if (hit?.type === "building" && hit.id === id && !this.labelAt(p.x, p.y)) return p;
+      }
+      return undefined;
+    } else {
+      const r = this.roomsByCode.get(id);
+      const mesh = this.roomMeshes.get(id);
+      if (!r || !mesh) return undefined;
+      v.set(r.c[0], mesh.position.y + mesh.scale.y, -r.c[1]);
+    }
+    v.project(this.camera);
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
+  }
+
+  /** Camera pose for tests and debugging: angles in degrees, target in metres. */
+  cameraState(): { azimuth: number; polar: number; zoom: number; target: [number, number, number] } {
+    const t = this.controls.target;
+    return {
+      azimuth: (this.controls.getAzimuthalAngle() * 180) / Math.PI,
+      polar: (this.controls.getPolarAngle() * 180) / Math.PI,
+      zoom: this.camera.zoom,
+      target: [t.x, t.y, t.z],
+    };
+  }
 
   /** True once WebGL produced a context. */
   get ok(): boolean {

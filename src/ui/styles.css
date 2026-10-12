@@ -136,9 +136,10 @@ a {
   will-change: transform;
 }
 
+/* Labels never take pointer events: the scene hit-tests them, so drags that start on a label
+   still rotate the map. */
 .lbl.on {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .lbl b {
@@ -173,9 +174,8 @@ a {
   font-weight: 500;
 }
 
-.lbl-building:hover,
 .lbl-building.hot,
-.lbl-room:hover {
+.lbl-room.hot {
   border-color: var(--accent);
   background: rgba(15, 27, 37, 0.97);
 }
@@ -342,6 +342,7 @@ a {
   display: inline-flex;
   align-items: baseline;
   gap: 9px;
+  white-space: nowrap;
   height: 40px;
   padding: 0 14px;
   border: 1px solid var(--line);
@@ -1230,9 +1231,13 @@ select optgroup {
   }
 
   .hide-text-xs .btn-text,
-  .back span,
   .chip-date,
   .chip-mode {
+    display: none;
+  }
+
+  /* Inside a building the Campus button takes the place of the site name. */
+  .in-building .brand {
     display: none;
   }
 
@@ -1327,7 +1332,26 @@ select optgroup {
   .dock {
     right: var(--gap);
     width: auto;
-    max-height: 52%;
+    max-height: 46%;
+    gap: 6px;
+  }
+
+  .room-schedule.none p {
+    display: none;
+  }
+
+  .room-schedule.none strong {
+    margin-right: 8px;
+  }
+
+  .precision {
+    margin-top: 6px;
+    padding: 5px 8px;
+  }
+
+  .room-schedule {
+    margin-top: 8px;
+    padding-top: 8px;
   }
 
   .building-bar,

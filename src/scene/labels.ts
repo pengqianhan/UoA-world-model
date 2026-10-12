@@ -29,6 +29,9 @@ interface Entry {
   w: number;
   h: number;
   shown: boolean;
+  /** Top-left corner on screen when shown. */
+  x: number;
+  y: number;
 }
 
 export class LabelLayer {
@@ -51,15 +54,16 @@ export class LabelLayer {
         el.type = "button";
         el.dataset.label = spec.id;
         this.root.appendChild(el);
-        e = { spec, el, w: 0, h: 0, shown: false };
-        el.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          this.entries.get(el.dataset.label!)?.spec.onClick?.();
-        });
+        e = { spec, el, w: 0, h: 0, shown: false, x: 0, y: 0 };
+        // Labels do not take pointer events (so a drag that starts on one still rotates the map);
+        // pointer clicks are hit-tested by the scene. Keyboard and assistive-technology activation
+        // still arrives here as a click event.
+        el.addEventListener("click", () => this.entries.get(el.dataset.label!)?.spec.onClick?.());
       }
       const prev = e.spec;
       if (e.w === 0 || prev.text !== spec.text || prev.sub !== spec.sub || prev.className !== spec.className || prev.badge !== spec.badge) {
-        e.el.className = `lbl ${spec.className ?? ""}`;
+        // Rewriting the class list must not drop the visibility state the layout pass maintains.
+        e.el.className = `lbl ${spec.className ?? ""}${e.shown ? " on" : ""}${this.hot === spec.id ? " hot" : ""}`;
         e.el.replaceChildren();
         const b = document.createElement("b");
         b.textContent = spec.text;
@@ -118,7 +122,9 @@ export class LabelLayer {
       }
       if (visible) {
         taken.push([x0, y0, x1, y1]);
-        e.el.style.transform = `translate(${Math.round(x0)}px, ${Math.round(y0)}px)`;
+        e.x = Math.round(x0);
+        e.y = Math.round(y0);
+        e.el.style.transform = `translate(${e.x}px, ${e.y}px)`;
       }
       if (visible !== e.shown) {
         e.shown = visible;
@@ -126,6 +132,23 @@ export class LabelLayer {
       }
     }
   }
+
+  /** The visible label under a point (in the layer's own pixel coordinates), if any. */
+  hit(x: number, y: number): LabelSpec | undefined {
+    for (const e of this.order) {
+      if (e.shown && x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h) return e.spec;
+    }
+    return undefined;
+  }
+
+  /** Marks one label as hovered (or none). */
+  setHot(id: string | undefined): void {
+    if (id === this.hot) return;
+    if (this.hot) this.entries.get(this.hot)?.el.classList.remove("hot");
+    this.hot = id;
+    if (id) this.entries.get(id)?.el.classList.add("hot");
+  }
+  private hot?: string;
 
   clear(): void {
     this.set([]);

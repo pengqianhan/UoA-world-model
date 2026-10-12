@@ -89,6 +89,14 @@ export function SceneHost() {
         frameRequest.value;
         if (data.value && !selBuilding.value) showCampus(!first);
       }),
+      effect(() => {
+        // Keep the point of interest clear of the panels: the dock sits bottom-left on wide
+        // screens and across the bottom on phones.
+        const inBuilding = !!selBuilding.value;
+        const hasCard = !!selRoom.value;
+        if (window.matchMedia("(max-width: 720px)").matches) scene.setViewShift(0, inBuilding ? (hasCard ? 0.2 : 0.07) : 0.03, !first);
+        else scene.setViewShift(inBuilding ? 0.12 : 0, 0, !first);
+      }),
       effect(() => scene.setBusyRooms(busyRooms.value)),
       effect(() => scene.setBuildingBadges(busyBuildings.value)),
       effect(() => scene.setNight(night.value)),

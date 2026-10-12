@@ -1,5 +1,6 @@
 // Controls shown while a building is open: the floor list, the building bar with the room
 // selector, and the card describing the selected room and what is timetabled in it.
+import { useEffect } from "preact/hooks";
 import type { AppData } from "../app/data.ts";
 import { formatDate, pick, t, tn } from "../app/i18n.ts";
 import {
@@ -28,6 +29,11 @@ function FloorList({ d, b }: { d: AppData; b: Building }) {
   for (const r of rooms) counts.set(r.f, (counts.get(r.f) ?? 0) + 1);
   const busyOn = new Map<number, number>();
   for (const r of rooms) if (busyRooms.value.has(r.code)) busyOn.set(r.f, (busyOn.get(r.f) ?? 0) + 1);
+  const current = selFloor.value;
+  // Tall buildings have more floors than fit; keep the current one in view.
+  useEffect(() => {
+    document.querySelector(".floor.on")?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [b.id, current]);
   return (
     <nav class="floors" aria-label={t("building.floorList")}>
       <span class="floors-title">{t("building.floorList")}</span>
