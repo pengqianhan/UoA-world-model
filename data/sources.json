@@ -1,0 +1,37 @@
+{
+  "note": "Provenance of every raw snapshot used to build public/data. Raw files are local-only unless openly licensed.",
+  "snapshots": [
+    {
+      "file": "mapsindoors/buildings.json",
+      "url": "https://api.mapsindoors.com/sync/buildings?solutionId=auckland&v=5",
+      "fetchedAt": "2026-10-12T11:11:20.383Z",
+      "bytes": 1292216,
+      "sha256": "2ac25a190fc4922d33078f9b6eac4e525463218c5923f4ec76c781b2725c1a5f",
+      "source": "mapsindoors"
+    },
+    {
+      "file": "mapsindoors/categories.json",
+      "url": "https://api.mapsindoors.com/sync/categories?solutionId=auckland&v=5",
+      "fetchedAt": "2026-10-12T11:11:21.284Z",
+      "bytes": 842,
+      "sha256": "93bb546a01e4e1ba839dae52ea553918e9d828b2dc14c9fc6d5f567e6ec526e9",
+      "source": "mapsindoors"
+    },
+    {
+      "file": "mapsindoors/locations.json",
+      "url": "https://api.mapsindoors.com/sync/locations?solutionId=auckland&v=5",
+      "fetchedAt": "2026-10-12T11:11:28.412Z",
+      "bytes": 20839896,
+      "sha256": "2865551988c05e8c833df09f14ebfff86a223541f7a000dadfd74c17318f0dbe",
+      "source": "mapsindoors"
+    },
+    {
+      "file": "mapsindoors/venues.json",
+      "url": "https://api.mapsindoors.com/sync/venues?solutionId=auckland&v=5",
+      "fetchedAt": "2026-10-12T11:11:19.248Z",
+      "bytes": 19750,
+      "sha256": "179d527912196e8c875a2f2db1650c8d223eb08eac3d96e9a214f750b846ae90",
+      "source": "mapsindoors"
+    }
+  ]
+}
