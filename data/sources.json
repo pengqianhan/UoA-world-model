@@ -32,6 +32,38 @@
       "bytes": 19750,
       "sha256": "179d527912196e8c875a2f2db1650c8d223eb08eac3d96e9a214f750b846ae90",
       "source": "mapsindoors"
+    },
+    {
+      "file": "osm/context.json",
+      "url": "https://overpass.kumi.systems/api/interpreter",
+      "fetchedAt": "2026-10-12T11:27:35.460Z",
+      "bytes": 8997861,
+      "sha256": "e9ba401ae620e1454523e7f97c10395bbac49a805eb09d264e91a170695f53b8",
+      "source": "osm"
+    },
+    {
+      "file": "uoa-calendar/2026-key-dates.pdf",
+      "url": "https://www.auckland.ac.nz/assets/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar/2026-calendar-parts/2026-calendar-key-dates.pdf",
+      "fetchedAt": "2026-10-12T11:28:54.766Z",
+      "bytes": 88853,
+      "sha256": "ba12fceba7dffa1b6c4a53945602a6d854180e56e8e0b7cf06c1a4d0666173f7",
+      "source": "uoa-calendar"
+    },
+    {
+      "file": "uoa-calendar/courses.html",
+      "url": "https://www.auckland.ac.nz/en/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar/courses.html",
+      "fetchedAt": "2026-10-12T11:28:55.971Z",
+      "bytes": 191488,
+      "sha256": "e87bbae4adb37ef0a2abc3fbc911a7b8a40dfb3fd924f4c330d9d585bd2afc0e",
+      "source": "uoa-calendar"
+    },
+    {
+      "file": "uoa-calendar/key-university-dates.html",
+      "url": "https://www.auckland.ac.nz/en/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar/key-university-dates.html",
+      "fetchedAt": "2026-10-12T11:28:56.966Z",
+      "bytes": 185680,
+      "sha256": "401264e73e0aaacbfba669671cd2e7ca1337537ac55b9841853710b7ebc8f49f",
+      "source": "uoa-calendar"
     }
   ]
 }

@@ -1,0 +1,718 @@
+// Builds the published data files in public/data from the raw snapshots in data/raw.
+// Never touches the network: run the fetch-*.ts scripts first (they are cache-first).
+//
+//   npx tsx scripts/build-data.ts
+import fs from "node:fs";
+import path from "node:path";
+import {
+  bbox,
+  cleanRing,
+  encodeRing,
+  interiorPoint,
+  makeProjector,
+  pointInRing,
+  ringArea,
+  ringCentroid,
+  simplifyLine,
+  simplifyRing,
+  type Pt,
+  type Ring,
+} from "../src/shared/geo.ts";
+import { aucklandWallTime } from "../src/shared/time.ts";
+import type {
+  AcademicCalendar,
+  AreaClass,
+  Building,
+  Campus,
+  CampusData,
+  ContextData,
+  Coverage,
+  FlatRing,
+  Floor,
+  Meta,
+  RoadClass,
+  Room,
+  RoomIndex,
+  RoomKind,
+  Schedule,
+  SourceInfo,
+  Subject,
+} from "../src/shared/types.ts";
+import { buildSchedule, loadClassSnapshots } from "./lib/classes.ts";
+import { hasSnapshot, manifest, readSnapshot } from "./lib/snapshot.ts";
+
+const ROOT = path.resolve(import.meta.dirname, "..");
+const OUT = path.join(ROOT, "public", "data");
+
+/** Origin of the local metric frame: roughly the middle of the City Campus. */
+const ORIGIN = { lat: -36.8523, lon: 174.7691 };
+/** Display convention for stacking floors; the source has no heights. */
+const FLOOR_HEIGHT = 3.6;
+/** south, west, north, east of the 3D scene; must match scripts/fetch-osm.ts. */
+const SCENE_BBOX = [-36.8689, 174.7608, -36.8441, 174.7797] as const;
+
+const project = makeProjector(ORIGIN);
+const [sx0, sy0] = project(SCENE_BBOX[1], SCENE_BBOX[0]);
+const [sx1, sy1] = project(SCENE_BBOX[3], SCENE_BBOX[2]);
+const inScene = (p: Pt, margin = 0) =>
+  p[0] >= sx0 - margin && p[0] <= sx1 + margin && p[1] >= sy0 - margin && p[1] <= sy1 + margin;
+
+const readJson = <T>(file: string): T => JSON.parse(readSnapshot(file).toString("utf8")) as T;
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+// ---------------------------------------------------------------------------------------------
+// Campus map (MapsIndoors)
+// ---------------------------------------------------------------------------------------------
+
+interface MiVenue {
+  id: string;
+  name: string;
+  venueInfo: { name: string };
+}
+interface MiGeometry {
+  type: "Polygon" | "MultiPolygon" | "Point";
+  coordinates: unknown;
+}
+interface MiFloor {
+  name: string;
+  geometry: MiGeometry;
+}
+interface MiBuilding {
+  administrativeId: string;
+  venueId: string;
+  buildingInfo: { name: string };
+  geometry: MiGeometry;
+  floors: Record<string, MiFloor>;
+}
+interface MiLocation {
+  geometry: MiGeometry;
+  properties: {
+    name: string;
+    type: string;
+    floor: string;
+    floorName: string;
+    building: string;
+    venue: string;
+    locationType: string;
+    status: number;
+    externalId: string | null;
+  };
+}
+
+const CAMPUS_IDS: Record<string, { id: string; onMap: boolean }> = {
+  CITY_CAMPUS: { id: "city", onMap: true },
+  GRAFTON_CAMPUS: { id: "grafton", onMap: true },
+  NEWMARKET_CAMPUS: { id: "newmarket", onMap: true },
+  LEIGH_CAMPUS: { id: "leigh", onMap: false },
+  ARDMORE_CAMPUS: { id: "ardmore", onMap: false },
+  TAI_TOKERAU_CAMPUS: { id: "tai-tokerau", onMap: false },
+  TAI_TONGA_CAMPUS: { id: "tai-tonga", onMap: false },
+  WAIHEKE_RESEARCH_STATION: { id: "waiheke", onMap: false },
+};
+
+/** Source room types that are published with an outline, and the kind they map to. */
+const LEARNING_TYPES: Record<string, RoomKind> = {
+  "Lecture theatres": "lectureTheatre",
+  "Teaching spaces": "teaching",
+  "Computer labs": "computerLab",
+  Laboratories: "lab",
+  "Lab-Undergrad": "lab",
+  "Study spaces": "study",
+  "Student spaces": "study",
+  Library: "library",
+  "Student hubs": "studentHub",
+};
+
+/** Source types left out of the lazy room index: private, non-rooms, or not something to navigate to. */
+const INDEX_EXCLUDED_TYPES = new Set([
+  "Stud Residential Accom",
+  "Accommodation Reception",
+  "Parking For Vehicles",
+  "Non Usable Area",
+  "Nonasgn Rentable",
+  "Ancillary Area",
+  "Void 2.0 test",
+  "Stairs",
+  "Elevator",
+  "Female",
+  "Male",
+  "Unisex",
+  "Accessible",
+  "Gender Diverse",
+  "Shower",
+  "Squat",
+  "Cages",
+  "Bike Store",
+  "Building",
+]);
+
+const CODE_RE = /^(\d{3}[A-Z]?)-([A-Z0-9]+)$/;
+
+function toRing(coords: number[][], tolerance: number): Ring {
+  return simplifyRing(cleanRing(coords.map((c) => project(c[0]!, c[1]!))), tolerance);
+}
+
+/** Geometry -> list of polygons, each a list of rings (outer first). */
+function polygons(g: MiGeometry, tolerance: number): Ring[][] {
+  const raw =
+    g.type === "Polygon"
+      ? [g.coordinates as number[][][]]
+      : g.type === "MultiPolygon"
+        ? (g.coordinates as number[][][][])
+        : [];
+  const out: Ring[][] = [];
+  for (const poly of raw) {
+    const rings = poly.map((r) => toRing(r, tolerance)).filter((r) => r.length >= 3);
+    const outer = rings[0];
+    if (!outer || ringArea(outer) < 2) continue;
+    out.push([outer, ...rings.slice(1).filter((r) => ringArea(r) >= 1)]);
+  }
+  return out;
+}
+
+function buildingName(raw: string, id: string): string {
+  let n = raw
+    .replace(/^B\d{3}[A-Z]?\b\s*/, "")
+    .replace(/\s*\(\d{3}[A-Z]?\)\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!n) n = `Building ${id}`;
+  return n;
+}
+
+function roomKind(sourceType: string, name: string): RoomKind {
+  const kind = LEARNING_TYPES[sourceType] ?? "other";
+  if (kind === "teaching" && /^studio/i.test(name)) return "studio";
+  if (kind === "teaching" && /^(informal|study)/i.test(name)) return "study";
+  return kind;
+}
+
+function buildCampus(): { data: CampusData; index: RoomIndex; stats: Record<string, number> } {
+  const venues = readJson<MiVenue[]>("mapsindoors/venues.json");
+  const miBuildings = readJson<MiBuilding[]>("mapsindoors/buildings.json");
+  const locations = readJson<MiLocation[]>("mapsindoors/locations.json");
+  const stats: Record<string, number> = {};
+  const bump = (k: string, n = 1) => (stats[k] = (stats[k] ?? 0) + n);
+
+  const venueById = new Map(venues.map((v) => [v.id, v]));
+  const venueCampus = (name: string) => CAMPUS_IDS[name]?.id ?? name.toLowerCase();
+
+  const buildings: Building[] = [];
+  for (const b of miBuildings) {
+    const venue = venueById.get(b.venueId);
+    if (!venue) continue;
+    const id = b.administrativeId;
+    if (/^Cage\b/i.test(b.buildingInfo.name)) {
+      bump("buildings.skipped.cage");
+      continue;
+    }
+    const outlinePolys = polygons(b.geometry, 0.25);
+    const outline = outlinePolys[0];
+    if (!outline) {
+      bump("buildings.skipped.noGeometry");
+      continue;
+    }
+    const center = ringCentroid(outline[0]!);
+
+    const floors: Floor[] = [];
+    let prevKey = "";
+    const sorted = Object.entries(b.floors)
+      .map(([k, f]) => ({ i: Number(k), f }))
+      .sort((a, z) => a.i - z.i);
+    for (const { i, f } of sorted) {
+      const polys = polygons(f.geometry, 0.25).map((poly) => poly.map(encodeRing));
+      const key = JSON.stringify(polys);
+      const floor: Floor = { i, name: f.name };
+      if (polys.length && key !== prevKey) floor.outline = polys;
+      if (polys.length) prevKey = key;
+      floors.push(floor);
+    }
+    const above = floors.filter((f) => f.i >= 0).map((f) => f.i);
+    const levels = above.length ? (Math.max(...above) - Math.min(...above)) / 10 + 1 : 0;
+    const height = levels > 0 ? round1(levels * FLOOR_HEIGHT) : 1.2;
+
+    buildings.push({
+      id,
+      campus: venueCampus(venue.name),
+      name: { en: buildingName(b.buildingInfo.name, id) },
+      sourceText: b.buildingInfo.name,
+      outline: outline.map(encodeRing),
+      center: [round1(center[0]), round1(center[1])],
+      floors,
+      height,
+      heightSource: "floor-count",
+      roomCount: 0,
+      ...(inScene(center) ? {} : { offMap: true }),
+    });
+  }
+  buildings.sort((a, z) => a.id.localeCompare(z.id, "en", { numeric: true }));
+  const byId = new Map(buildings.map((b) => [b.id, b]));
+
+  // Rooms. A code can appear more than once in the source; keep the largest outline.
+  const rooms = new Map<string, Room>();
+  const index: RoomIndex = {};
+  const indexed = new Set<string>();
+  for (const loc of locations) {
+    const p = loc.properties;
+    const code = p.externalId?.trim().toUpperCase();
+    if (!code) continue;
+    const m = CODE_RE.exec(code);
+    if (!m) {
+      bump("rooms.skipped.nonStandardCode");
+      continue;
+    }
+    if (p.status !== 3) {
+      bump("rooms.skipped.notSearchableInSource");
+      continue;
+    }
+    // Trust the code's own building prefix when that building exists; otherwise the source field.
+    const building = byId.get(m[1]!) ?? byId.get(p.building);
+    if (!building) {
+      bump("rooms.skipped.unknownBuilding");
+      continue;
+    }
+    const floorIndex = Number(p.floor);
+    if (!Number.isFinite(floorIndex) || !building.floors.some((f) => f.i === floorIndex)) {
+      bump("rooms.skipped.unknownFloor");
+      continue;
+    }
+    if (loc.geometry.type !== "Polygon") continue;
+    const ring = toRing((loc.geometry.coordinates as number[][][])[0]!, 0.15);
+    if (ring.length < 3) continue;
+    const area = ringArea(ring);
+    const c = interiorPoint(ring);
+    const roomPart = m[2]!;
+    const fullCode = `${building.id}-${roomPart}`;
+
+    const kind = LEARNING_TYPES[p.type] ? roomKind(p.type, p.name) : undefined;
+    if (kind) {
+      const existing = rooms.get(fullCode);
+      if (existing) bump("rooms.duplicateCodes");
+      if (!existing || existing.area < area) {
+        rooms.set(fullCode, {
+          code: fullCode,
+          b: building.id,
+          f: floorIndex,
+          name: { en: p.name.trim() || p.type },
+          kind,
+          sourceType: p.type,
+          poly: encodeRing(ring),
+          c: [round1(c[0]), round1(c[1])],
+          area: Math.round(area),
+        });
+      }
+    } else if (!INDEX_EXCLUDED_TYPES.has(p.type) && p.locationType === "room" && !indexed.has(fullCode)) {
+      indexed.add(fullCode);
+      (index[building.id] ??= []).push([roomPart, floorIndex, Math.round(c[0] * 10), Math.round(c[1] * 10)]);
+    } else {
+      bump("rooms.notPublished");
+    }
+  }
+  // A code published with an outline does not need an index entry as well.
+  for (const [bid, list] of Object.entries(index)) {
+    index[bid] = list.filter(([part]) => !rooms.has(`${bid}-${part}`)).sort((a, z) => a[0].localeCompare(z[0]));
+  }
+
+  const roomList = [...rooms.values()].sort((a, z) => a.code.localeCompare(z.code, "en", { numeric: true }));
+  for (const r of roomList) byId.get(r.b)!.roomCount++;
+
+  const campuses: Campus[] = venues
+    .map((v) => {
+      const id = venueCampus(v.name);
+      const own = buildings.filter((b) => b.campus === id);
+      // Median of building centres, so one far-away outlier does not drag the campus centre.
+      const xs = own.map((b) => b.center[0]).sort((a, z) => a - z);
+      const ys = own.map((b) => b.center[1]).sort((a, z) => a - z);
+      const mid = Math.floor(own.length / 2);
+      return {
+        id,
+        name: { en: v.venueInfo.name },
+        onMap: CAMPUS_IDS[v.name]?.onMap ?? false,
+        center: [round1(xs[mid] ?? 0), round1(ys[mid] ?? 0)] as [number, number],
+        buildingCount: own.length,
+      };
+    })
+    .sort((a, z) => Number(z.onMap) - Number(a.onMap) || z.buildingCount - a.buildingCount);
+
+  return {
+    data: {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      origin: ORIGIN,
+      floorHeight: FLOOR_HEIGHT,
+      campuses,
+      buildings,
+      rooms: roomList,
+    },
+    index,
+    stats,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// OpenStreetMap context
+// ---------------------------------------------------------------------------------------------
+
+interface OsmNodeRef {
+  lat: number;
+  lon: number;
+}
+interface OsmElement {
+  type: "node" | "way" | "relation";
+  id: number;
+  lat?: number;
+  lon?: number;
+  tags?: Record<string, string>;
+  geometry?: OsmNodeRef[];
+  members?: { type: string; role: string; geometry?: OsmNodeRef[] }[];
+}
+
+const ROAD_CLASS: Record<string, RoadClass> = {
+  motorway: "motorway",
+  motorway_link: "motorway",
+  trunk: "motorway",
+  trunk_link: "motorway",
+  primary: "major",
+  primary_link: "major",
+  secondary: "major",
+  secondary_link: "major",
+  tertiary: "major",
+  tertiary_link: "major",
+  residential: "street",
+  unclassified: "street",
+  living_street: "street",
+  busway: "street",
+  road: "street",
+  service: "service",
+  pedestrian: "path",
+  footway: "path",
+  path: "path",
+  cycleway: "path",
+  track: "path",
+  steps: "steps",
+};
+
+function areaClass(t: Record<string, string>): AreaClass | undefined {
+  if (t.natural === "water") return "water";
+  if (t.natural === "wood" || t.landuse === "forest") return "wood";
+  if (t.leisure === "pitch" || t.leisure === "track") return "pitch";
+  if (t.leisure === "park" || t.leisure === "garden" || t.leisure === "playground") return "park";
+  if (
+    t.landuse === "grass" ||
+    t.landuse === "village_green" ||
+    t.landuse === "recreation_ground" ||
+    t.landuse === "meadow" ||
+    t.landuse === "cemetery" ||
+    t.natural === "grassland" ||
+    t.natural === "scrub"
+  ) {
+    return "grass";
+  }
+  return undefined;
+}
+
+/** Splits a polyline into the runs that lie inside the scene (plus a margin). */
+function clipLine(line: Pt[], margin: number): Pt[][] {
+  const runs: Pt[][] = [];
+  let cur: Pt[] = [];
+  for (const p of line) {
+    if (inScene(p, margin)) cur.push(p);
+    else {
+      if (cur.length >= 2) runs.push(cur);
+      cur = [];
+    }
+  }
+  if (cur.length >= 2) runs.push(cur);
+  return runs;
+}
+
+/** Outer rings of a way or multipolygon relation. Unclosed member ways are stitched end to end. */
+function outerRings(e: OsmElement): Ring[] {
+  const toPts = (g: OsmNodeRef[]) => g.map((n) => project(n.lon, n.lat));
+  if (e.type === "way" && e.geometry) {
+    const pts = toPts(e.geometry);
+    const a = pts[0];
+    const z = pts[pts.length - 1];
+    if (!a || !z || Math.hypot(a[0] - z[0], a[1] - z[1]) > 0.5) return [];
+    return [cleanRing(pts)];
+  }
+  if (e.type !== "relation" || !e.members) return [];
+  const open: Pt[][] = [];
+  const rings: Ring[] = [];
+  const near = (p: Pt, q: Pt) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.5;
+  for (const m of e.members) {
+    if (m.type !== "way" || !m.geometry || (m.role && m.role !== "outer")) continue;
+    let seg = toPts(m.geometry);
+    if (seg.length < 2) continue;
+    if (near(seg[0]!, seg[seg.length - 1]!)) {
+      rings.push(cleanRing(seg));
+      continue;
+    }
+    // Stitch with any open chain that shares an endpoint.
+    for (let i = 0; i < open.length; i++) {
+      const chain = open[i]!;
+      const head = chain[0]!;
+      const tail = chain[chain.length - 1]!;
+      if (near(tail, seg[0]!)) seg = [...chain, ...seg.slice(1)];
+      else if (near(tail, seg[seg.length - 1]!)) seg = [...chain, ...seg.reverse().slice(1)];
+      else if (near(head, seg[seg.length - 1]!)) seg = [...seg, ...chain.slice(1)];
+      else if (near(head, seg[0]!)) seg = [...seg.reverse(), ...chain.slice(1)];
+      else continue;
+      open.splice(i, 1);
+      i = -1;
+    }
+    if (near(seg[0]!, seg[seg.length - 1]!)) rings.push(cleanRing(seg));
+    else open.push(seg);
+  }
+  return rings.filter((r) => r.length >= 3);
+}
+
+function buildContext(campus: CampusData): { data: ContextData; stats: Record<string, number> } {
+  const osm = readJson<{ elements: OsmElement[] }>("osm/context.json");
+  const stats: Record<string, number> = {};
+  const bump = (k: string, n = 1) => (stats[k] = (stats[k] ?? 0) + n);
+
+  // University footprints, to drop the OSM copies of the same buildings.
+  const uni = campus.buildings.map((b) => {
+    const ring: Ring = [];
+    const flat = b.outline[0]!;
+    for (let i = 0; i < flat.length; i += 2) ring.push([flat[i]! / 10, flat[i + 1]! / 10]);
+    return { ring, box: bbox(ring) };
+  });
+  const insideUni = (p: Pt) =>
+    uni.some((u) => p[0] >= u.box[0] && p[0] <= u.box[2] && p[1] >= u.box[1] && p[1] <= u.box[3] && pointInRing(p, u.ring));
+
+  const out: ContextData = {
+    version: 1,
+    origin: ORIGIN,
+    attribution: "© OpenStreetMap contributors, ODbL 1.0",
+    buildings: [],
+    roads: [],
+    areas: [],
+    rails: [],
+    trees: [],
+  };
+
+  for (const e of osm.elements) {
+    const t = e.tags ?? {};
+
+    if (e.type === "node") {
+      if (t.natural === "tree" && e.lat != null && e.lon != null) {
+        const p = project(e.lon, e.lat);
+        if (inScene(p) && !insideUni(p)) out.trees.push(Math.round(p[0] * 10), Math.round(p[1] * 10));
+      }
+      continue;
+    }
+
+    if (t.building && t.building !== "no") {
+      if (t.location === "underground" || Number(t.layer) < 0) continue;
+      for (const ring0 of outerRings(e)) {
+        const ring = simplifyRing(ring0, 0.5);
+        const area = ringArea(ring);
+        if (area < 12) continue;
+        const c = ringCentroid(ring);
+        if (!inScene(c, 30)) continue;
+        // Same building as a University footprint? Sample the outline and the centre.
+        const samples = [c, ...ring];
+        const hit = samples.filter(insideUni).length / samples.length;
+        const uniCentreInside = uni.some((u) => pointInRing(ringCentroid(u.ring), ring));
+        if (hit > 0.35 || uniCentreInside) {
+          bump("context.buildings.droppedAsUniversity");
+          continue;
+        }
+        let h = parseFloat(t.height ?? "");
+        if (!Number.isFinite(h)) {
+          const levels = parseFloat(t["building:levels"] ?? "");
+          if (Number.isFinite(levels)) h = levels * 3.3 + 1;
+        }
+        if (!Number.isFinite(h)) {
+          h = t.building === "roof" || t.building === "carport" || t.building === "shed" ? 3 : area > 900 ? 10 : 6.5;
+          bump("context.buildings.defaultHeight");
+        }
+        // Masts and observation towers are tagged with their full height on a podium-sized
+        // footprint; extruding that would draw a 300 m slab, so only the podium is kept.
+        if (h > 200 || t.man_made === "tower" || t.building === "tower") h = Math.min(h, 24);
+        out.buildings.push({ p: encodeRing(ring), h: round1(h) });
+      }
+      continue;
+    }
+
+    if (t.highway && e.type === "way" && e.geometry) {
+      const k = ROAD_CLASS[t.highway];
+      if (!k) continue;
+      if (t.tunnel && t.tunnel !== "no") continue;
+      if (t.indoor === "yes" || t.area === "yes" || t.access === "private") continue;
+      if ((k === "path" || k === "steps") && t.footway === "sidewalk") continue;
+      const line = e.geometry.map((n) => project(n.lon, n.lat));
+      for (const run of clipLine(line, 40)) {
+        const simple = simplifyLine(run, k === "path" || k === "steps" ? 0.6 : 0.4);
+        if (simple.length >= 2) out.roads.push({ k, p: encodeRing(simple) });
+      }
+      continue;
+    }
+
+    if (t.railway === "rail" && e.type === "way" && e.geometry) {
+      if (t.tunnel && t.tunnel !== "no") continue;
+      const line = e.geometry.map((n) => project(n.lon, n.lat));
+      for (const run of clipLine(line, 40)) out.rails.push(encodeRing(simplifyLine(run, 0.5)));
+      continue;
+    }
+
+    const k = areaClass(t);
+    if (k) {
+      for (const ring0 of outerRings(e)) {
+        const ring = simplifyRing(ring0, 0.6);
+        if (ringArea(ring) < 25) continue;
+        const [x0, y0, x1, y1] = bbox(ring);
+        if (x1 < sx0 || x0 > sx1 || y1 < sy0 || y0 > sy1) continue;
+        out.areas.push({ k, p: encodeRing(ring) });
+      }
+    }
+  }
+
+  // Largest areas first so small pitches and gardens draw on top of the parks that contain them.
+  out.areas.sort((a, z) => ringArea(decode(z.p)) - ringArea(decode(a.p)));
+  stats["context.buildings"] = out.buildings.length;
+  stats["context.roads"] = out.roads.length;
+  stats["context.areas"] = out.areas.length;
+  stats["context.trees"] = out.trees.length / 2;
+  return { data: out, stats };
+}
+
+function decode(flat: FlatRing): Ring {
+  const r: Ring = [];
+  for (let i = 0; i < flat.length; i += 2) r.push([flat[i]! / 10, flat[i + 1]! / 10]);
+  return r;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Subjects (University Calendar "course codes by faculty" page)
+// ---------------------------------------------------------------------------------------------
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&rsquo;|&#39;/g, "'")
+    .replace(/&ndash;/g, "–");
+}
+
+function buildSubjects(): Subject[] {
+  if (!hasSnapshot("uoa-calendar/courses.html")) return [];
+  const html = readSnapshot("uoa-calendar/courses.html").toString("utf8");
+  const subjects = new Map<string, Subject>();
+  const section = /<h2 id="[^"]*">([^<]+)<\/h2>\s*<\/div>\s*<div class="text section">([\s\S]*?)<\/div>/g;
+  for (let m = section.exec(html); m; m = section.exec(html)) {
+    const faculty = decodeEntities(m[1]!).trim();
+    const lines = m[2]!
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .split("\n");
+    for (const raw of lines) {
+      const line = decodeEntities(raw).replace(/\s+/g, " ").trim();
+      const s = /^([A-ZĀĒĪŌŪ]{2,10})\s+[–-]\s+(.+)$/u.exec(line);
+      if (!s) continue;
+      const code = s[1]!;
+      if (!subjects.has(code)) subjects.set(code, { code, name: { en: s[2]!.trim() }, faculty: { en: faculty } });
+    }
+  }
+  return [...subjects.values()].sort((a, z) => a.code.localeCompare(z.code));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------------------------
+
+function snapshotDate(source: string): string {
+  const times = manifest()
+    .filter((s) => s.source === source)
+    .map((s) => s.fetchedAt)
+    .sort();
+  const latest = times[times.length - 1];
+  return latest ? aucklandWallTime(new Date(latest)).date : "";
+}
+
+function write(name: string, value: unknown): number {
+  fs.mkdirSync(OUT, { recursive: true });
+  const text = JSON.stringify(value);
+  fs.writeFileSync(path.join(OUT, name), text + "\n");
+  return text.length;
+}
+
+const { data: campus, index, stats: campusStats } = buildCampus();
+const { data: context, stats: contextStats } = buildContext(campus);
+const subjects = buildSubjects();
+const calendar = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "academic-calendar.json"), "utf8")) as AcademicCalendar;
+
+const classSnapshots = loadClassSnapshots();
+const { schedule, stats: scheduleStats } = buildSchedule(classSnapshots, campus, index, snapshotDate("uoa-classes"));
+
+const count = (p: Schedule["sessions"][number]["precision"]) => schedule.sessions.filter((s) => s.precision === p).length;
+const coverage: Coverage = {
+  buildings: campus.buildings.length,
+  buildingsOnMap: campus.buildings.filter((b) => !b.offMap).length,
+  rooms: campus.rooms.length,
+  indexedRooms: Object.values(index).reduce((n, l) => n + l.length, 0),
+  subjects: subjects.length,
+  courses: schedule.courses.length,
+  sessions: schedule.sessions.length,
+  sessionsLocatedToRoom: count("room"),
+  sessionsLocatedToFloor: count("floor"),
+  sessionsLocatedToBuilding: count("building"),
+  sessionsExcluded: schedule.exclusions.length,
+};
+
+const sources: SourceInfo[] = [
+  {
+    id: "mapsindoors",
+    name: "University of Auckland campus maps (maps.auckland.ac.nz)",
+    url: "https://maps.auckland.ac.nz/",
+    licence: "© University of Auckland. Public campus map; building, floor and room positions derived from it, outlines simplified.",
+    snapshotDate: snapshotDate("mapsindoors"),
+    provides: "Buildings, floors, room codes, room types and room positions",
+  },
+  {
+    id: "osm",
+    name: "OpenStreetMap",
+    url: "https://www.openstreetmap.org/copyright",
+    licence: "© OpenStreetMap contributors, Open Database License (ODbL) 1.0",
+    snapshotDate: snapshotDate("osm"),
+    provides: "Surrounding buildings, streets, paths, parks and trees",
+  },
+  {
+    id: "uoa-calendar",
+    name: "University of Auckland Calendar 2026 (key dates and course codes)",
+    url: "https://www.auckland.ac.nz/en/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar.html",
+    licence: "© University of Auckland. Dates and subject codes are quoted as facts with a link to the source.",
+    snapshotDate: snapshotDate("uoa-calendar"),
+    provides: "Semester dates, breaks, holidays and the list of subject codes",
+  },
+];
+if (schedule.available) {
+  sources.push({
+    id: "uoa-classes",
+    name: "University of Auckland Classes API v2",
+    url: "https://developer.auckland.ac.nz/prd/documentation/api-classes-v2",
+    licence: "© University of Auckland. Retrieved with the site maintainer's own API credentials.",
+    snapshotDate: snapshotDate("uoa-classes"),
+    provides: "Timetabled classes: course, day, time, date range and room",
+  });
+}
+
+const meta: Meta = { version: 1, generatedAt: campus.generatedAt, sources, coverage };
+
+const sizes = {
+  "campus.json": write("campus.json", campus),
+  "context.json": write("context.json", context),
+  "rooms-index.json": write("rooms-index.json", index),
+  "subjects.json": write("subjects.json", subjects),
+  "calendar.json": write("calendar.json", calendar),
+  "schedule.json": write("schedule.json", schedule),
+  "meta.json": write("meta.json", meta),
+};
+
+console.log("coverage", coverage);
+console.log("stats", { ...campusStats, ...contextStats, ...scheduleStats });
+console.log("bytes", sizes);

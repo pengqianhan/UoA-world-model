@@ -1,0 +1,113 @@
+{
+  "timezone": "Pacific/Auckland",
+  "source": {
+    "name": "University of Auckland 2026 Calendar, Key University Dates: 2026 Semester and Quarter Dates",
+    "url": "https://www.auckland.ac.nz/assets/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar/2026-calendar-parts/2026-calendar-key-dates.pdf",
+    "checked": "2026-10-13"
+  },
+  "notes": [
+    "Transcribed by hand from the PDF above; the PDF is authoritative.",
+    "The PDF prints 'Late Year Term begins Monday 1 December' although 1 December 2026 is a Tuesday; the date is kept as printed.",
+    "Holiday names and dates are as printed in the PDF (Easter break: Friday 3 to Tuesday 7 April).",
+    "Only the start dates of 2027 terms were published at the time of the snapshot, so 2027 terms are not listed."
+  ],
+  "holidays": [
+    { "date": "2026-01-26", "name": { "en": "Auckland Anniversary Day" } },
+    { "date": "2026-02-06", "name": { "en": "Waitangi Day" } },
+    { "date": "2026-04-03", "name": { "en": "Easter break" } },
+    { "date": "2026-04-06", "name": { "en": "Easter break" } },
+    { "date": "2026-04-07", "name": { "en": "Easter break" } },
+    { "date": "2026-04-27", "name": { "en": "ANZAC Day" } },
+    { "date": "2026-06-01", "name": { "en": "King's Birthday" } },
+    { "date": "2026-07-10", "name": { "en": "Matariki" } },
+    { "date": "2026-10-26", "name": { "en": "Labour Day" } }
+  ],
+  "terms": [
+    {
+      "code": "1260",
+      "kind": "summer",
+      "name": { "en": "Summer School 2026", "mi": "Kura Raumati 2026" },
+      "start": "2026-01-05",
+      "lecturesEnd": "2026-02-13",
+      "end": "2026-02-18",
+      "breaks": [],
+      "studyBreak": { "start": "2026-02-14", "end": "2026-02-14" },
+      "exams": { "start": "2026-02-16", "end": "2026-02-18" }
+    },
+    {
+      "code": "1263",
+      "kind": "semester",
+      "name": { "en": "Semester One 2026", "mi": "Wehenga Tahi 2026" },
+      "start": "2026-03-02",
+      "lecturesEnd": "2026-06-05",
+      "end": "2026-06-29",
+      "breaks": [{ "name": { "en": "Mid-semester break / Easter" }, "start": "2026-04-03", "end": "2026-04-17" }],
+      "studyBreak": { "start": "2026-06-08", "end": "2026-06-10" },
+      "exams": { "start": "2026-06-11", "end": "2026-06-29" }
+    },
+    {
+      "code": "1265",
+      "kind": "semester",
+      "name": { "en": "Semester Two 2026", "mi": "Wehenga Rua 2026" },
+      "start": "2026-07-20",
+      "lecturesEnd": "2026-10-23",
+      "end": "2026-11-16",
+      "breaks": [{ "name": { "en": "Mid-semester break" }, "start": "2026-08-31", "end": "2026-09-11" }],
+      "studyBreak": { "start": "2026-10-27", "end": "2026-10-28" },
+      "exams": { "start": "2026-10-29", "end": "2026-11-16" }
+    },
+    {
+      "code": "1262",
+      "kind": "quarter",
+      "name": { "en": "Quarter One 2026" },
+      "start": "2026-01-12",
+      "lecturesEnd": "2026-03-20",
+      "end": "2026-03-28",
+      "breaks": [],
+      "studyBreak": { "start": "2026-03-23", "end": "2026-03-27" },
+      "exams": { "start": "2026-03-28", "end": "2026-03-28" }
+    },
+    {
+      "code": "1264",
+      "kind": "quarter",
+      "name": { "en": "Quarter Two 2026" },
+      "start": "2026-04-13",
+      "lecturesEnd": "2026-06-19",
+      "end": "2026-06-27",
+      "breaks": [],
+      "studyBreak": { "start": "2026-06-22", "end": "2026-06-26" },
+      "exams": { "start": "2026-06-27", "end": "2026-06-27" }
+    },
+    {
+      "code": "1266",
+      "kind": "quarter",
+      "name": { "en": "Quarter Three 2026" },
+      "start": "2026-07-06",
+      "lecturesEnd": "2026-09-11",
+      "end": "2026-09-19",
+      "breaks": [],
+      "studyBreak": { "start": "2026-09-14", "end": "2026-09-18" },
+      "exams": { "start": "2026-09-19", "end": "2026-09-19" }
+    },
+    {
+      "code": "1268",
+      "kind": "quarter",
+      "name": { "en": "Quarter Four 2026" },
+      "start": "2026-09-28",
+      "lecturesEnd": "2026-12-04",
+      "end": "2026-12-12",
+      "breaks": [],
+      "studyBreak": { "start": "2026-12-07", "end": "2026-12-11" },
+      "exams": { "start": "2026-12-12", "end": "2026-12-12" }
+    },
+    {
+      "code": "1267",
+      "kind": "lateYear",
+      "name": { "en": "Late Year Term 2026" },
+      "start": "2026-12-01",
+      "lecturesEnd": "2027-02-27",
+      "end": "2027-02-27",
+      "breaks": []
+    }
+  ]
+}
