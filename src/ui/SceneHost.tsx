@@ -1,0 +1,118 @@
+// Mounts the three.js scene and keeps it in step with the application state.
+import { effect } from "@preact/signals";
+import { useEffect, useRef } from "preact/hooks";
+import { loadContext } from "../app/data.ts";
+import { lang, pick, t } from "../app/i18n.ts";
+import {
+  busyBuildings,
+  busyRooms,
+  data,
+  frameRequest,
+  marker,
+  night,
+  openBuilding,
+  openRoom,
+  selBuilding,
+  selCampus,
+  selFloor,
+  selRoom,
+  webglFailed,
+} from "../app/state.ts";
+import { CampusScene } from "../scene/CampusScene.ts";
+import { buildingTitle } from "./common.tsx";
+
+/** Approximate width in metres to show for each campus that is on the map. */
+const CAMPUS_SPAN: Record<string, number> = { city: 1250, grafton: 520, newmarket: 620 };
+
+export const isLite = () => window.matchMedia("(max-width: 720px), (pointer: coarse)").matches;
+
+export function SceneHost() {
+  const stage = useRef<HTMLDivElement>(null);
+  const labels = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const lite = isLite();
+    let scene: CampusScene;
+    try {
+      scene = new CampusScene(stage.current!, labels.current!, {
+        lite,
+        buildingLabel: (b) => ({
+          text: b.id,
+          sub: lite && b.roomCount < 12 ? undefined : buildingTitle(b) || undefined,
+          title: `${t("building.number", { id: b.id })}${buildingTitle(b) ? ` · ${buildingTitle(b)}` : ""}`,
+        }),
+        roomLabel: (r) => ({
+          text: r.code.slice(r.b.length + 1),
+          title: `${r.code} · ${pick(r.name)}`,
+        }),
+      });
+      if (!scene.ok) throw new Error("no WebGL context");
+    } catch (e) {
+      console.error(e);
+      webglFailed.value = true;
+      return;
+    }
+    (window as unknown as { __scene?: CampusScene }).__scene = scene;
+
+    scene.onPick = (p) => {
+      if (p?.type === "building") openBuilding(p.id);
+      else if (p?.type === "room") openRoom(p.code);
+    };
+
+    const showCampus = (animate: boolean) => {
+      const c = data.value?.campusById.get(selCampus.peek());
+      if (c?.onMap) scene.showCampus(c.center, CAMPUS_SPAN[c.id] ?? 900, animate);
+    };
+
+    let first = true;
+    const stops = [
+      effect(() => {
+        const d = data.value;
+        if (!d) return;
+        scene.setCampus(d.campus);
+        if (!selBuilding.peek()) showCampus(false);
+        void loadContext()
+          .then((ctx) => scene.setContext(ctx))
+          .catch((e) => console.error("context", e));
+      }),
+      effect(() => {
+        if (!data.value) return;
+        const sel = { building: selBuilding.value, floor: selFloor.value, room: selRoom.value };
+        scene.setSelection(sel, !first);
+      }),
+      effect(() => {
+        const m = marker.value;
+        scene.setPin(m?.at ? { at: m.at, text: m.code.slice(m.building.length + 1), title: m.code } : undefined, !first);
+      }),
+      effect(() => {
+        // Re-frame on request, and whenever the selection is cleared.
+        frameRequest.value;
+        if (data.value && !selBuilding.value) showCampus(!first);
+      }),
+      effect(() => scene.setBusyRooms(busyRooms.value)),
+      effect(() => scene.setBuildingBadges(busyBuildings.value)),
+      effect(() => scene.setNight(night.value)),
+      effect(() => {
+        lang.value;
+        scene.refreshLabels();
+        stage.current?.querySelector("canvas")?.setAttribute("aria-label", t("app.sceneLabel"));
+      }),
+    ];
+    first = false;
+
+    const ro = new ResizeObserver(() => scene.resize());
+    ro.observe(stage.current!);
+    return () => {
+      ro.disconnect();
+      stops.forEach((stop) => stop());
+      scene.dispose();
+    };
+  }, []);
+
+  return (
+    <div class="scene">
+      <div class="stage" ref={stage} />
+      <div class="labels" ref={labels} />
+    </div>
+  );
+}

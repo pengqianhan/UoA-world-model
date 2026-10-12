@@ -11,7 +11,7 @@ This README is a stub while the first version is being built; see `PROGRESS.md` 
 
 ```bash
 npm ci
-npm run dev      # http://localhost:5173/UoA-world-model/
+npm run dev      # http://localhost:5273/UoA-world-model/
 npm test         # unit tests
 npm run build    # production build into dist/
 ```

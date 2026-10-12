@@ -9,6 +9,10 @@ const base = process.env.BASE_PATH ?? "/UoA-world-model/";
 export default defineConfig({
   base,
   plugins: [preact()],
+  // Fixed, uncommon ports so the dev server, the preview server and the e2e tests agree,
+  // and so they do not collide with other projects using Vite's default 5173.
+  server: { port: 5273, strictPort: true },
+  preview: { port: 4273, strictPort: true },
   build: {
     target: "es2022",
     sourcemap: false,
