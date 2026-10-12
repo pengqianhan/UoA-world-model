@@ -5,8 +5,12 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Claude Code session state
-.claude/
+# Claude Code session state stays local. The one thing shared from here is the skill
+# that ports this project to another university.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/campus-world-model/
 
 # Raw scraped snapshots of non-open-licensed sources stay local (see data/sources.json
 # for URL, fetch date and hash of every snapshot). OSM extracts are ODbL and are committed.

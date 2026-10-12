@@ -142,6 +142,14 @@ writes only `en` today because that is all the sources provide.
 `npm test` checks that every key used in the code exists in `en.json` and that components contain no
 hard-coded interface text.
 
+## Porting to another university
+
+Most of the code carries over to another campus; the data pipeline and a handful of Auckland-specific
+places do not. `.claude/skills/campus-world-model/` is a [Claude Code](https://claude.com/claude-code)
+skill that takes an agent through a port: recon of the new school's public data, rebuilding the
+pipeline, shipping the site and verifying it live. Fork or clone this repository, open it in Claude
+Code and run `/campus-world-model <university, campus>`.
+
 ## How it is put together
 
 ```
