@@ -1,0 +1,25 @@
+node_modules/
+dist/
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+
+# Claude Code session state
+.claude/
+
+# Raw scraped snapshots of non-open-licensed sources stay local (see data/sources.json
+# for URL, fetch date and hash of every snapshot). OSM extracts are ODbL and are committed.
+data/raw/*
+!data/raw/osm/
+!data/raw/README.md
+
+# Playwright
+test-results/
+playwright-report/
+e2e/screenshots/
+.env
+.env.*
+
+# Task brief for the build agent; contains a local filesystem path, so it stays local.
+GOAL.md
