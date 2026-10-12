@@ -3,27 +3,48 @@
 Handover notes for whoever (probably a future session of the same agent) picks this up next.
 Read `GOAL.md` (local only, not committed) first, then this file, then `git status` / `git log`.
 
-Last updated: 2026-10-13, about 01:30 NZDT (session 1)
+Last updated: 2026-10-13, about 01:40 NZDT (session 1)
 
 ## Now working on
 
-Everything in GOAL §2 that can be done without a timetable source is done and verified on the live
-site (see "Acceptance criteria" below). What remains is optional polish.
+Nothing is in progress. Everything in GOAL §2 that can be done without a timetable source is done and
+verified on the live site (see "Final report" and "Acceptance criteria"). The session-1 cron job was
+deleted after the final report because the only remaining work needs the user (see "Needs the user").
 
 **If you are a new session:** check `gh run list --limit 3` is green, run
 `E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e`, then either pick a bonus
 item below or, if the user has added a timetable snapshot, follow README "Adding the class timetable".
 
-Bonus ideas, in rough order of value (none started unless noted under "Done"):
+Bonus ideas not done, in rough order of value:
 
-1. Illustrative room interior for the selected room (walls + seat rows), clearly labelled illustrative.
-2. Terrain from open elevation tiles (large change: everything has to be draped).
-3. Course-level catalogue (titles for course codes) from the University Calendar.
-4. Remote campuses in 3D (building data exists; no OSM context fetched for them).
+1. Terrain from open elevation tiles (large change: everything has to be draped over it).
+2. Course-level catalogue (titles for course codes) from the University Calendar.
+3. Remote campuses in 3D (building data exists; no OSM context fetched for them).
+4. Seasons and weather effects in the scene.
+
+## Final report (2026-10-13)
+
+- Live site: https://pengqianhan.github.io/UoA-world-model/
+- Repository: https://github.com/pengqianhan/UoA-world-model (public, MIT for code)
+- Verified at commit `435a4e0`: CI run green (build, e2e on software WebGL, deploy); the same 11
+  Playwright tests pass against the live URL; screenshots read by eye (`docs/*.jpg` are taken from
+  the live site).
+- Data snapshots: campus map, OpenStreetMap and University Calendar all taken 2026-10-13
+  (Pacific/Auckland); recorded with hashes in `data/sources.json` and shown in About.
+- **Not achieved: class times.** No public, no-login source exists (table under "Data sources").
+  Courses 0, scheduled classes 0, so the building/floor/room location percentages do not apply.
+  Criteria 2 and 3 are therefore only partly met: rooms, floors and buildings work with real data,
+  but a room cannot show real classes and a course code resolves only to its subject. The site says
+  this plainly in the room card, the status strip, Search and About, and shows nothing invented.
+- Done beyond the minimum: Grafton and Newmarket in the same scene, day/night lighting with lit
+  windows, Open-Meteo temperature, illustrative room interiors (labelled as such), pins for rooms
+  without an outline, e2e in CI.
+- Not done: terrain (ground is flat), course-level catalogue, 3D for remote campuses, seasons,
+  Chinese or other translations (structure only, as specified).
 
 ## Acceptance criteria (GOAL §2): status and evidence
 
-Verified 2026-10-13 against https://pengqianhan.github.io/UoA-world-model/ at commit `484e2bc` with
+Verified 2026-10-13 against https://pengqianhan.github.io/UoA-world-model/ at commit `435a4e0` with
 `E2E_BASE_URL=... npm run e2e` (11/11 passed) plus screenshots read by eye.
 
 | # | Criterion | Status | Evidence |
@@ -36,7 +57,7 @@ Verified 2026-10-13 against https://pengqianhan.github.io/UoA-world-model/ at co
 | 6 | 390 px phone: search, building and class info | Met (class info = the "not shown" note) | e2e "6." (mobile project) |
 | 7 | About: unofficial notice, sources with links and snapshot dates, OSM attribution, limitations | Met | e2e "7." |
 | 8 | All text from locale files; `?lang=`; a new language is one new file | Met | e2e "8."; `tests/i18n.test.ts` |
-| 9 | Repo pushed, CI green on `main`, README covers running, refreshing data, adding a language | Met | run 38248478054: build, e2e, deploy all success |
+| 9 | Repo pushed, CI green on `main`, README covers running, refreshing data, adding a language | Met | latest runs on `main`: build, e2e, deploy all success |
 | 10 | Coverage numbers in the final report | See "Coverage" | `public/data/meta.json` |
 
 ## Coverage (snapshot 2026-10-13)
@@ -52,16 +73,17 @@ Verified 2026-10-13 against https://pengqianhan.github.io/UoA-world-model/ at co
 - Local toolchain: Vite 8 + TypeScript 7 + Preact 11 + three 0.186 + Vitest 5 + Playwright 1.64.
 - GitHub repo `pengqianhan/UoA-world-model` (public), Pages enabled with `build_type=workflow`,
   workflow `.github/workflows/deploy.yml` (typecheck, unit tests, build, deploy; separate e2e job).
-- Cron job `17 */5 * * *` created in session 1 (id 233af833). Session-only; re-check with CronList on
-  every wake-up and recreate if missing or older than 6 days.
+- Cron job `17 */5 * * *` was created at the start of session 1 (id 233af833) and deleted at the end
+  of it, after the final report. It was session-only. A new session that has real work to continue
+  (for example after the user supplies API credentials) should create a fresh one as GOAL §10 says.
 - Data feasibility research finished (see "Data sources").
 - Data pipeline (`npm run data:fetch`, `npm run data:build`) writes `public/data/*.json`:
   194 buildings (139 on the 3D map), 786 learning spaces with outlines, 4,668 further rooms in a lazy
   index, 251 subject codes, the 2026 academic calendar, OSM context (2,525 buildings, 4,380 road
   segments, 563 green/water areas, 1,819 trees). Schedule is empty (`available: false`).
-- App: three.js orthographic campus, building cut-away with floors and rooms, search, Now/Preview time
-  panel, About, status strip, URL state, English locale file, phone layout, day/night lighting,
-  Open-Meteo temperature in the time chip.
+- App: three.js orthographic campus, building cut-away with floors and rooms, illustrative interior
+  for the selected room, search, Now/Preview time panel, About, status strip with campus buttons,
+  URL state, English locale file, phone layout, day/night lighting, Open-Meteo temperature.
 - Tests: 66 unit tests (`npm test`), 11 Playwright tests (`npm run e2e`, 10 desktop + 1 phone) green
   locally on the real GPU, on SwiftShader (`E2E_GL=swiftshader`), in CI, and against the live site.
   Screenshots were inspected by eye: the canvas shows the campus, the floor view, the pin for
