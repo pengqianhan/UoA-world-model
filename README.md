@@ -4,7 +4,7 @@ An **unofficial**, student-made 3D map of University of Auckland buildings, floo
 It is not affiliated with, endorsed by or maintained by the University of Auckland, and uses no
 University logos or branding.
 
-**Live site: https://campus-world-model.pages.dev/uoa/**
+**Live site: https://campusworldmodel.com/uoa/**
 (also at https://pengqianhan.github.io/UoA-world-model/)
 
 ![The City Campus by day](docs/campus-day.jpg)
