@@ -152,6 +152,8 @@ const INDEX_EXCLUDED_TYPES = new Set([
 
 /** A floor holding any of these gets no floor plan: where people live is not drawn, even unnamed. */
 const PLAN_RESIDENTIAL_TYPES = new Set(["Stud Residential Accom"]);
+/** Buildings that get no floor plan, by their name in the source: childcare centres. */
+const PLAN_CHILDCARE_BUILDINGS = /Early Childhood|K[oō]hanga Reo/i;
 /** Shapes that are not rooms: single parking bays and the source's own test records. */
 const PLAN_SKIPPED_TYPES = new Set(["Parking For Vehicles", "Void 2.0 test"]);
 
@@ -339,6 +341,9 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
 
   // Floor plans: whatever else the map draws on a floor, as bare shapes. Unlike the rooms above,
   // these need no code and may be hidden from the source's search, because nothing names them.
+  for (const b of buildings) {
+    if (PLAN_CHILDCARE_BUILDINGS.test(b.sourceText)) for (const f of b.floors) f.noPlan = "childcare";
+  }
   const placed: { building: Building; floor: Floor; loc: MiLocation }[] = [];
   for (const loc of locations) {
     if (loc.geometry.type !== "Polygon") continue;
@@ -347,7 +352,7 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
     const building = (m && byId.get(m[1]!)) ?? byId.get(p.building);
     const floor = building?.floors.find((f) => f.i === Number(p.floor));
     if (!building || !floor) continue;
-    if (PLAN_RESIDENTIAL_TYPES.has(p.type)) floor.residential = true;
+    if (PLAN_RESIDENTIAL_TYPES.has(p.type)) floor.noPlan = "residential";
     else if (m && rooms.has(`${building.id}-${m[2]}`)) continue;
     else if (!building.offMap) placed.push({ building, floor, loc });
   }
@@ -355,8 +360,8 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
   for (const r of roomList) namedOn.set(`${r.b}|${r.f}`, [...(namedOn.get(`${r.b}|${r.f}`) ?? []), r.c]);
   const shapes = new Map<string, Map<number, { rings: Ring[]; area: number }[]>>();
   for (const { building, floor, loc } of placed) {
-    if (floor.residential) {
-      bump("plans.skipped.residentialFloor");
+    if (floor.noPlan) {
+      bump(`plans.skipped.${floor.noPlan}Floor`);
       continue;
     }
     if (PLAN_SKIPPED_TYPES.has(loc.properties.type)) {

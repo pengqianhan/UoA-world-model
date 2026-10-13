@@ -41,8 +41,8 @@ export interface Floor {
   outline?: FlatRing[][];
   /** Set when the source's outline for this floor was unusable and the building's footprint stands in. */
   outlineFrom?: "footprint";
-  /** True when people live on this floor. No floor plan is published for it. */
-  residential?: true;
+  /** Set when no floor plan is published for this floor: people live on it, or it is a childcare centre. */
+  noPlan?: "residential" | "childcare";
 }
 
 export interface Building {

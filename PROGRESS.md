@@ -149,11 +149,12 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
 - Floor plans, since 2026-10-13 (the user chose this after comparing with the Tsinghua map, whose
   floors look complete): every other polygon on a floor of an on-map building is published as a bare
   shape in `public/data/plans/<building>.json`, with no code, name or type, and cannot be selected.
-  That includes 2,089 rooms the source hides from its search (`status != 3`, mostly offices):
-  drawn, never named. Left out: every floor holding student accommodation (139 floors, marked
-  `residential`, with a note on screen), single parking bays, the source's "Void 2.0 test" records,
-  shapes under 2 m², and three shapes that lie over a named room. 14,563 shapes on 494 floors of
-  111 buildings, 954 KB in all, loaded one building at a time.
+  That includes 2,086 rooms the source hides from its search (`status != 3`, mostly offices):
+  drawn, never named. Left out, with `noPlan` on the floor and a note on screen: every floor holding
+  student accommodation (139 floors) and the three childcare centres (255, 410, 511; matched by
+  name, the source has no room type for them). Also left out: single parking bays, the source's
+  "Void 2.0 test" records, shapes under 2 m², and three shapes that lie over a named room. 14,508
+  shapes on 490 floors of 108 buildings, 950 KB in all, loaded one building at a time.
 - Room codes are `<building>-<room>`; the true floor comes from the map. Inference from the room
   number (agrees with the map for >85% of rooms, see `tests/roomcode.test.ts`) is only the fallback
   for unknown codes and is labelled "inferred" in the UI.

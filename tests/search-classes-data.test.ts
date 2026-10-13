@@ -174,11 +174,15 @@ describe("published floor plans", () => {
       }
     }
   });
-  it("leave every floor where people live blank", () => {
-    const residential = campus.buildings.flatMap((b) => b.floors.filter((f) => f.residential).map((f) => [b.id, f.i] as const));
-    expect(residential.length).toBeGreaterThan(100);
+  it("leave every floor where people live, and every childcare centre, blank", () => {
+    const blank = campus.buildings.flatMap((b) => b.floors.filter((f) => f.noPlan).map((f) => [b.id, f.i, f.noPlan] as const));
+    expect(blank.filter(([, , why]) => why === "residential").length).toBeGreaterThan(100);
+    expect(blank.filter(([, , why]) => why === "childcare").length).toBeGreaterThan(0);
     const byBuilding = new Map(plans.map((p) => [p.building, p]));
-    for (const [id, i] of residential) expect(byBuilding.get(id)?.floors[i], `${id} floor ${i}`).toBeUndefined();
+    for (const [id, i] of blank) expect(byBuilding.get(id)?.floors[i], `${id} floor ${i}`).toBeUndefined();
+    for (const b of campus.buildings) {
+      if (/Early Childhood|Kohanga Reo/i.test(b.sourceText)) expect(b.planShapes, b.id).toBeUndefined();
+    }
   });
   it("never lay a shape over a named room", () => {
     const byBuilding = new Map(plans.map((p) => [p.building, p]));

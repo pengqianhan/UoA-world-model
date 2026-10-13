@@ -373,7 +373,7 @@ test("a floor whose outline the campus map puts under another building is drawn 
   await shot(page, "11-floor-outline-footprint");
 });
 
-test("the rest of a floor is drawn as unnamed shapes that cannot be selected, and floors where people live stay blank", async ({ page }) => {
+test("the rest of a floor is drawn as unnamed shapes that cannot be selected, and floors where people live or children are cared for stay blank", async ({ page }) => {
   await open(page, "?building=405&floor=4&light=day");
   expect(await page.evaluate(() => window.__scene!.planShapes)).toBeGreaterThan(30);
   await expect(page.locator("#legend-plan")).toContainText("not named here");
@@ -391,6 +391,11 @@ test("the rest of a floor is drawn as unnamed shapes that cannot be selected, an
   // A hall of residence: the floor is there, its rooms are not, and the page says why.
   await open(page, "?building=440&floor=3&light=day");
   expect(await page.evaluate(() => window.__scene!.planShapes)).toBe(0);
-  await expect(page.locator("#floor-residential-note")).toContainText("People live on this floor");
+  await expect(page.locator("#floor-no-plan-note")).toContainText("People live on this floor");
   await shot(page, "12-floor-residential");
+
+  // A childcare centre likewise.
+  await open(page, "?building=410&light=day");
+  expect(await page.evaluate(() => window.__scene!.planShapes)).toBe(0);
+  await expect(page.locator("#floor-no-plan-note")).toContainText("childcare centre");
 });

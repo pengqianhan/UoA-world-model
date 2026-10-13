@@ -224,9 +224,9 @@ export function BuildingView() {
             </ul>
           )}
           {rooms.length > 0 && onFloor.length === 0 && !marker.value && <p class="bar-note">{t("building.noRoomsOnFloor")}</p>}
-          {floor?.residential && !b.offMap && (
-            <p class="bar-note" id="floor-residential-note">
-              {t("building.floorResidential")}
+          {floor?.noPlan && !b.offMap && (
+            <p class="bar-note" id="floor-no-plan-note">
+              {t(`building.noPlan.${floor.noPlan}`)}
             </p>
           )}
           {floor?.outlineFrom === "footprint" && !b.offMap && (
