@@ -5,6 +5,62 @@ import type { FlatRing } from "../shared/types.ts";
 
 type RGB = readonly [number, number, number];
 
+/** How the walls of an extrusion are textured and closed. */
+export interface WallOptions {
+  /** Metres. The wall texture repeats once per storey. */
+  storey?: number;
+  /** Metres. The wall texture repeats about once per bay along each face. */
+  bay?: number;
+  /** Close the underside, which a block that overhangs the one below needs to cast a whole shadow. */
+  bottom?: boolean;
+}
+
+/** A turn sharper than this, in radians, ends one face of a building and starts the next. */
+const CORNER = 0.5;
+
+/**
+ * Texture u at the start and end of each edge of a ring, so that every face carries a whole number
+ * of window bays. A face is a run of edges between two corners, so a curve drawn as many short
+ * edges is one face. A face too short for a bay keeps u = 0, the plain pier of the texture.
+ */
+function bayCoords(ring: readonly Vector2[], bay: number): number[] {
+  const n = ring.length;
+  const len: number[] = [];
+  const corner: boolean[] = [];
+  for (let i = 0; i < n; i++) {
+    const p = ring[(i + n - 1) % n]!;
+    const a = ring[i]!;
+    const b = ring[(i + 1) % n]!;
+    len.push(Math.hypot(b.x - a.x, b.y - a.y));
+    const turn = Math.atan2((a.x - p.x) * (b.y - a.y) - (a.y - p.y) * (b.x - a.x), (a.x - p.x) * (b.x - a.x) + (a.y - p.y) * (b.y - a.y));
+    corner.push(Math.abs(turn) > CORNER);
+  }
+  const out = new Array<number>(n * 2).fill(0);
+  // A ring without corners, such as a round tower, is one face.
+  let first = Math.max(0, corner.indexOf(true));
+  for (let done = 0; done < n; ) {
+    let run = 0;
+    let count = 0;
+    do {
+      run += len[(first + count) % n]!;
+      count++;
+    } while (done + count < n && !corner[(first + count) % n]);
+    const bays = Math.round(run / bay);
+    let along = 0;
+    for (let k = 0; k < count; k++) {
+      const e = (first + k) % n;
+      if (bays > 0) {
+        out[e * 2] = (along / run) * bays;
+        out[e * 2 + 1] = ((along + len[e]!) / run) * bays;
+      }
+      along += len[e]!;
+    }
+    first = (first + count) % n;
+    done += count;
+  }
+  return out;
+}
+
 /** Growable arrays for one merged mesh with per-face normals. */
 export class MeshBuilder {
   readonly positions: number[] = [];
@@ -24,12 +80,12 @@ export class MeshBuilder {
     return this.positions.length / 3;
   }
 
-  private vertex(x: number, y: number, z: number, nx: number, ny: number, nz: number, c?: RGB, v = 0.05): number {
+  private vertex(x: number, y: number, z: number, nx: number, ny: number, nz: number, c?: RGB, v = 0.05, u = 0.5): number {
     const i = this.vertexCount;
     this.positions.push(x, y, z);
     this.normals.push(nx, ny, nz);
     if (this.withColor) this.colors.push(c?.[0] ?? 1, c?.[1] ?? 1, c?.[2] ?? 1);
-    if (this.withUV) this.uvs.push(0.5, v);
+    if (this.withUV) this.uvs.push(u, v);
     return i;
   }
 
@@ -46,10 +102,10 @@ export class MeshBuilder {
   /**
    * Extrudes a polygon (outer ring + holes, flat decimetre rings) from y0 to y1.
    * `topColor` tints the roof and `sideColor` the walls when the builder has vertex colours.
-   * With UVs enabled, `storey` (metres) makes the wall texture repeat once per storey while the
-   * roof samples the plain part of the texture.
+   * With UVs enabled, `wall` says how the wall texture repeats; the roof samples its plain part.
    */
-  extrude(rings: readonly FlatRing[], y0: number, y1: number, topColor?: RGB, sideColor?: RGB, cap = true, storey = 0): void {
+  extrude(rings: readonly FlatRing[], y0: number, y1: number, topColor?: RGB, sideColor?: RGB, cap = true, wall: WallOptions = {}): void {
+    const { storey = 0, bay = 0, bottom = false } = wall;
     const outer = rings[0];
     if (!outer || outer.length < 6) return;
     const toVec = (flat: FlatRing) => {
@@ -69,10 +125,24 @@ export class MeshBuilder {
       for (const p of all) this.vertex(p.x, y1, -p.y, 0, 1, 0, topColor);
       for (const tri of ShapeUtils.triangulateShape(contour, holes)) this.upFacing(base, all, tri);
     }
+    if (bottom) {
+      const base = this.vertexCount;
+      const all = holes.length ? contour.concat(...holes) : contour;
+      for (const p of all) this.vertex(p.x, y0, -p.y, 0, -1, 0, sideColor);
+      const from = this.indices.length;
+      for (const tri of ShapeUtils.triangulateShape(contour, holes)) this.upFacing(base, all, tri);
+      // Same triangles as a roof, turned over to face down.
+      for (let i = from; i < this.indices.length; i += 3) {
+        const swap = this.indices[i + 1]!;
+        this.indices[i + 1] = this.indices[i + 2]!;
+        this.indices[i + 2] = swap;
+      }
+    }
 
     const v0 = storey > 0 ? y0 / storey : 0.05;
     const v1 = storey > 0 ? y1 / storey : 0.05;
-    const wall = (ring: Vector2[]) => {
+    const walls = (ring: Vector2[]) => {
+      const us = bay > 0 ? bayCoords(ring, bay) : undefined;
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i]!;
         const b = ring[(i + 1) % ring.length]!;
@@ -83,15 +153,17 @@ export class MeshBuilder {
         // Outward normal of a counter-clockwise ring in (east, north), mapped to (x, z = -north).
         const nx = dy / len;
         const nz = dx / len;
-        const i0 = this.vertex(a.x, y0, -a.y, nx, 0, nz, sideColor, v0);
-        const i1 = this.vertex(b.x, y0, -b.y, nx, 0, nz, sideColor, v0);
-        const i2 = this.vertex(b.x, y1, -b.y, nx, 0, nz, sideColor, v1);
-        const i3 = this.vertex(a.x, y1, -a.y, nx, 0, nz, sideColor, v1);
+        const ua = us?.[i * 2];
+        const ub = us?.[i * 2 + 1];
+        const i0 = this.vertex(a.x, y0, -a.y, nx, 0, nz, sideColor, v0, ua);
+        const i1 = this.vertex(b.x, y0, -b.y, nx, 0, nz, sideColor, v0, ub);
+        const i2 = this.vertex(b.x, y1, -b.y, nx, 0, nz, sideColor, v1, ub);
+        const i3 = this.vertex(a.x, y1, -a.y, nx, 0, nz, sideColor, v1, ua);
         this.indices.push(i0, i1, i2, i0, i2, i3);
       }
     };
-    wall(contour);
-    for (const h of holes) wall(h);
+    walls(contour);
+    for (const h of holes) walls(h);
   }
 
   /** A flat polygon at height y (no walls). */

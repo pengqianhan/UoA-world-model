@@ -25,7 +25,8 @@ It is built to answer two questions a student actually has:
 ## What you get
 
 - A rotatable miniature of the City, Grafton and Newmarket campuses: 139 University buildings on a base
-  of OpenStreetMap streets, parks, trees and surrounding buildings.
+  of OpenStreetMap streets, parks, trees and surrounding buildings. Each University building is
+  stacked floor by floor from the campus map, so its podium, tower, setbacks and courtyards show.
 - A cut-away view of every building: pick a floor, see its learning spaces (lecture theatres, teaching
   rooms, labs, studios, study spaces) drawn from the outlines on the official campus map, set in the
   rest of the floor plan: 14,508 other spaces as plain shapes without names.
@@ -189,8 +190,9 @@ e2e/                browser tests (Playwright), numbered after the acceptance cr
 Accuracy is labelled wherever it matters. A room drawn with an outline comes from the campus map. A
 room shown as a pin is known to the campus map by its code; the pin stands on the plain shape that
 the floor plan draws for it. Plain shapes carry no code, name or type. A room that the
-map does not know is placed on a floor inferred from its number and marked as inferred. Building
-heights are estimates from the number of floors.
+map does not know is placed on a floor inferred from its number and marked as inferred. A building's
+shape comes from the campus map's outline of each floor; its height is an estimate of 3.6 m a floor,
+and its windows are drawn by rule.
 
 ## Data sources and licences
 
@@ -211,7 +213,8 @@ If you represent the University and would like something changed or removed, ple
 
 - No class times until a timetable snapshot is added (see above).
 - A timetabled class is not the same as an occupied room.
-- Heights are estimated and the ground is flat, although the City Campus sits on a ridge.
+- Heights are estimated, windows are drawn by rule, and the ground is flat, although the City Campus
+  sits on a ridge.
 - Only learning spaces are named and can be selected. The rest of a floor is plain shapes, floors
   where people live and childcare centres are blank, and the furniture in a selected room is
   illustrative.
