@@ -176,6 +176,12 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   key-dates PDF (snapshot `data/raw/uoa-calendar/2026-key-dates.pdf`). 2027 only had start dates.
 - Subject list: parsed from the Calendar's "course codes by faculty" page (251 subjects).
 - Context: OpenStreetMap via one Overpass query (`data/raw/osm/context.json`, committed, ODbL).
+  Since 2026-10-13 the pipeline also uses what that snapshot already held and had ignored: the
+  `building:part` ways (341 drawn; they replace 20 outlines and stand on 74 others) with their
+  `height` and `min_height`, and `roof:shape` on 212 buildings and parts, drawn as six simplified
+  shapes (`MeshBuilder.roof`). A tower mapped in parts is drawn at its full height (the Sky Tower,
+  328 m); a tower that is one outline is still cut to a 24 m podium. The 45 parts inside University
+  footprints are dropped: University buildings take their shape from the campus map.
 - Weather: Open-Meteo, fetched by the visitor's browser in Now mode; optional.
 - Not done: course-level catalogue (the Curriculum Catalogue's lists are lazy-loaded APEX regions;
   many requests for little value while there is no timetable). Terrain (AWS open "terrarium" tiles

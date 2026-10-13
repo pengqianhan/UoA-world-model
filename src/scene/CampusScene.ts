@@ -331,7 +331,10 @@ export class CampusScene {
       const rand = mulberry32(7);
       for (const b of ctx.buildings) {
         const shade = 0.93 + rand() * 0.1;
-        mb.extrude([b.p], 0, b.h, [shade, shade, shade], [shade * 0.97, shade * 0.97, shade * 0.97]);
+        const base = b.b ?? 0;
+        mb.extrude([b.p], base, b.h, [shade, shade, shade], [shade * 0.97, shade * 0.97, shade * 0.97], !b.roof, { bottom: base > 0 });
+        // A shaped roof is a tone darker than the walls it sits on.
+        if (b.roof) mb.roof(b.p, b.h, b.roof, [shade * 0.88, shade * 0.88, shade * 0.9]);
       }
       this.contextBuildings = add(mb.build(), (p) => p.context, { shadow: true, vertexColors: true });
     }

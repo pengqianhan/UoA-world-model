@@ -1,7 +1,8 @@
 // Geometry builders. Data coordinates are [east, north] in decimetres; the scene uses metres with
 // x = east, y = up, z = -north (so north is "into" the screen at the default camera angle).
 import { BufferAttribute, BufferGeometry, ShapeUtils, Vector2 } from "three";
-import type { FlatRing } from "../shared/types.ts";
+import { boundingRectangle, type Pt } from "../shared/geo.ts";
+import type { ContextRoof, FlatRing } from "../shared/types.ts";
 
 type RGB = readonly [number, number, number];
 
@@ -164,6 +165,93 @@ export class MeshBuilder {
     };
     walls(contour);
     for (const h of holes) walls(h);
+  }
+
+  /** One flat-shaded triangle from points given as [east, height, north], wound to face out and up. */
+  private face(a: readonly number[], b: readonly number[], c: readonly number[], color?: RGB): void {
+    // Scene axes: x is east, y is up, z is south.
+    const ux = b[0]! - a[0]!;
+    const uy = b[1]! - a[1]!;
+    const uz = a[2]! - b[2]!;
+    const vx = c[0]! - a[0]!;
+    const vy = c[1]! - a[1]!;
+    const vz = a[2]! - c[2]!;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz);
+    if (len < 1e-6) return;
+    const i = this.vertexCount;
+    for (const p of [a, b, c]) this.vertex(p[0]!, p[1]!, -p[2]!, nx / len, ny / len, nz / len, color);
+    this.indices.push(i, i + 1, i + 2);
+  }
+
+  /**
+   * A roof over a ring whose walls end at height y. Every shape but the skillion is a skirt from
+   * the eaves up to a ridge: a full-length ridge makes a gable, a shortened one a hip, a single
+   * point a pyramid; a round profile turns those into a barrel and a dome. Exact on a rectangle,
+   * an approximation on anything else.
+   */
+  roof(ring: FlatRing, y: number, roof: ContextRoof, color?: RGB): void {
+    const pts: Pt[] = [];
+    for (let i = 0; i + 1 < ring.length; i += 2) pts.push([ring[i]! / 10, ring[i + 1]! / 10]);
+    if (pts.length < 3) return;
+    // Counter-clockwise in (east, north), so that faces come out wound upwards.
+    let twice = 0;
+    pts.forEach((p, i) => {
+      const q = pts[(i + 1) % pts.length]!;
+      twice += p[0] * q[1] - q[0] * p[1];
+    });
+    if (twice < 0) pts.reverse();
+    const box = boundingRectangle(pts);
+
+    if (roof.k === "skillion") {
+      // One plane, falling towards the bearing, or across the short side when none is given.
+      const rad = roof.bearing !== undefined ? (roof.bearing * Math.PI) / 180 : undefined;
+      const fall: Pt = rad !== undefined ? [Math.sin(rad), Math.cos(rad)] : [-Math.sin(box.angle), Math.cos(box.angle)];
+      const along = pts.map((p) => p[0] * fall[0] + p[1] * fall[1]);
+      const lo = Math.min(...along);
+      const span = Math.max(...along) - lo || 1;
+      const top = pts.map((p, i): number[] => [p[0], y + roof.h * (1 - (along[i]! - lo) / span), p[1]]);
+      const flat = pts.map((p) => new Vector2(p[0], p[1]));
+      for (const [i, j, k] of ShapeUtils.triangulateShape(flat, []) as [number, number, number][]) {
+        const ccw = (flat[j]!.x - flat[i]!.x) * (flat[k]!.y - flat[i]!.y) - (flat[k]!.x - flat[i]!.x) * (flat[j]!.y - flat[i]!.y) > 0;
+        this.face(top[i]!, top[ccw ? j : k]!, top[ccw ? k : j]!, color);
+      }
+      pts.forEach((p, i) => {
+        const j = (i + 1) % pts.length;
+        const q = pts[j]!;
+        this.face([p[0], y, p[1]], [q[0], y, q[1]], top[j]!, color);
+        this.face([p[0], y, p[1]], top[j]!, top[i]!, color);
+      });
+      return;
+    }
+
+    const angle = box.angle + (roof.across ? Math.PI / 2 : 0);
+    const dir: Pt = [Math.cos(angle), Math.sin(angle)];
+    const run = roof.across ? box.width : box.length;
+    const span = roof.across ? box.length : box.width;
+    const half = roof.k === "gabled" || roof.k === "round" ? run / 2 : roof.k === "hipped" ? Math.max(0, (run - span) / 2) : 0;
+    const steps = roof.k === "dome" || roof.k === "round" ? 5 : 1;
+    // The point of the ridge that a point of the eaves rises to.
+    const ridge = (p: Pt): Pt => {
+      const t = Math.max(-half, Math.min(half, (p[0] - box.centre[0]) * dir[0] + (p[1] - box.centre[1]) * dir[1]));
+      return [box.centre[0] + dir[0] * t, box.centre[1] + dir[1] * t];
+    };
+    const at = (p: Pt, k: number): number[] => {
+      const turn = ((k / steps) * Math.PI) / 2;
+      const inward = steps === 1 ? k : 1 - Math.cos(turn);
+      const up = steps === 1 ? k : Math.sin(turn);
+      const r = ridge(p);
+      return [p[0] + (r[0] - p[0]) * inward, y + roof.h * up, p[1] + (r[1] - p[1]) * inward];
+    };
+    pts.forEach((p, i) => {
+      const q = pts[(i + 1) % pts.length]!;
+      for (let k = 0; k < steps; k++) {
+        this.face(at(p, k), at(q, k), at(q, k + 1), color);
+        this.face(at(p, k), at(q, k + 1), at(p, k + 1), color);
+      }
+    });
   }
 
   /** A flat polygon at height y (no walls). */
