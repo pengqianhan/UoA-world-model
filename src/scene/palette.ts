@@ -19,6 +19,9 @@ export interface Palette {
   hover: number;
   slab: number;
   slabBelow: number;
+  /** Unnamed floor-plan shapes: a step darker than the slab they stand on. */
+  plan: number;
+  planEdge: number;
   roomEdge: number;
   ambient: number;
   ambientGround: number;
@@ -46,6 +49,8 @@ export const DAY: Palette = {
   hover: 0xf2a65a,
   slab: 0xf5f1e6,
   slabBelow: 0xd9d2c2,
+  plan: 0xe2dccd,
+  planEdge: 0x8b7b62,
   roomEdge: 0x4a4334,
   ambient: 0xffffff,
   ambientGround: 0xb9b3a4,
@@ -72,6 +77,8 @@ export const NIGHT: Palette = {
   hover: 0xffd08a,
   slab: 0x3b5270,
   slabBelow: 0x2a3d55,
+  plan: 0x4a6384,
+  planEdge: 0x9fb4cf,
   roomEdge: 0xdbe6f2,
   ambient: 0xa9c4e6,
   ambientGround: 0x121d29,
@@ -134,6 +141,8 @@ export function mixPalette(a: Palette, b: Palette, t: number): Palette {
     hover: c(a.hover, b.hover),
     slab: c(a.slab, b.slab),
     slabBelow: c(a.slabBelow, b.slabBelow),
+    plan: c(a.plan, b.plan),
+    planEdge: c(a.planEdge, b.planEdge),
     roomEdge: c(a.roomEdge, b.roomEdge),
     ambient: c(a.ambient, b.ambient),
     ambientGround: c(a.ambientGround, b.ambientGround),

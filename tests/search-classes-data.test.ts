@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildSchedule, parseDate, parseDays, parseTime, type RawClass } from "../scripts/lib/classes.ts";
 import { decodeRing, pointInRing, shareInside } from "../src/shared/geo.ts";
 import { buildIndex, compact, fold, search } from "../src/shared/search.ts";
-import type { CampusData, ContextData, Meta, RoomIndex, Schedule, Subject } from "../src/shared/types.ts";
+import type { CampusData, ContextData, FloorPlans, Meta, RoomIndex, Schedule, Subject } from "../src/shared/types.ts";
 
 const read = <T>(name: string) => JSON.parse(fs.readFileSync(`public/data/${name}`, "utf8")) as T;
 const campus = read<CampusData>("campus.json");
@@ -140,6 +140,53 @@ describe("published campus data is self-consistent", () => {
     } else {
       expect(schedule.snapshotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       for (const s of schedule.sessions) expect(s.sourceText.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("published floor plans", () => {
+  const files = fs.readdirSync("public/data/plans");
+  const plans = files.map((f) => JSON.parse(fs.readFileSync(`public/data/plans/${f}`, "utf8")) as FloorPlans);
+  const buildings = new Map(campus.buildings.map((b) => [b.id, b]));
+
+  it("have one file for each building that counts plan shapes, and the counts agree", () => {
+    expect(files.sort()).toEqual(campus.buildings.filter((b) => b.planShapes).map((b) => `${b.id}.json`).sort());
+    let total = 0;
+    for (const plan of plans) {
+      const b = buildings.get(plan.building)!;
+      expect(b.offMap, b.id).toBeUndefined();
+      const count = Object.values(plan.floors).reduce((n, shapes) => n + shapes.length, 0);
+      expect(count, b.id).toBe(b.planShapes);
+      for (const i of Object.keys(plan.floors)) expect(b.floors.some((f) => f.i === Number(i)), `${b.id} floor ${i}`).toBe(true);
+      total += count;
+    }
+    expect(total).toBe(read<Meta>("meta.json").coverage.planShapes);
+    expect(total).toBeGreaterThan(10_000);
+  });
+  it("carry shapes and nothing that names them: no code, no name, no type", () => {
+    for (const plan of plans) {
+      expect(Object.keys(plan).sort(), plan.building).toEqual(["building", "floors", "version"]);
+      for (const shapes of Object.values(plan.floors)) {
+        for (const rings of shapes) {
+          expect(rings[0]!.length, plan.building).toBeGreaterThanOrEqual(6);
+          for (const ring of rings) expect(ring.every(Number.isInteger), plan.building).toBe(true);
+        }
+      }
+    }
+  });
+  it("leave every floor where people live blank", () => {
+    const residential = campus.buildings.flatMap((b) => b.floors.filter((f) => f.residential).map((f) => [b.id, f.i] as const));
+    expect(residential.length).toBeGreaterThan(100);
+    const byBuilding = new Map(plans.map((p) => [p.building, p]));
+    for (const [id, i] of residential) expect(byBuilding.get(id)?.floors[i], `${id} floor ${i}`).toBeUndefined();
+  });
+  it("never lay a shape over a named room", () => {
+    const byBuilding = new Map(plans.map((p) => [p.building, p]));
+    for (const r of campus.rooms) {
+      for (const rings of byBuilding.get(r.b)?.floors[r.f] ?? []) {
+        const covered = pointInRing(r.c, decodeRing(rings[0]!)) && !rings.slice(1).some((hole) => pointInRing(r.c, decodeRing(hole)));
+        expect(covered, r.code).toBe(false);
+      }
     }
   });
 });

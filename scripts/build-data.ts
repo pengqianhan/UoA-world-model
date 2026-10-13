@@ -30,6 +30,7 @@ import type {
   Coverage,
   FlatRing,
   Floor,
+  FloorPlans,
   Meta,
   RoadClass,
   Room,
@@ -149,6 +150,11 @@ const INDEX_EXCLUDED_TYPES = new Set([
   "Building",
 ]);
 
+/** A floor holding any of these gets no floor plan: where people live is not drawn, even unnamed. */
+const PLAN_RESIDENTIAL_TYPES = new Set(["Stud Residential Accom"]);
+/** Shapes that are not rooms: single parking bays and the source's own test records. */
+const PLAN_SKIPPED_TYPES = new Set(["Parking For Vehicles", "Void 2.0 test"]);
+
 const CODE_RE = /^(\d{3}[A-Z]?)-([A-Z0-9]+)$/;
 
 function toRing(coords: number[][], tolerance: number): Ring {
@@ -194,7 +200,7 @@ function roomKind(sourceType: string, name: string): RoomKind {
   return kind;
 }
 
-function buildCampus(): { data: CampusData; index: RoomIndex; stats: Record<string, number> } {
+function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[]; stats: Record<string, number> } {
   const venues = readJson<MiVenue[]>("mapsindoors/venues.json");
   const miBuildings = readJson<MiBuilding[]>("mapsindoors/buildings.json");
   const locations = readJson<MiLocation[]>("mapsindoors/locations.json");
@@ -331,6 +337,66 @@ function buildCampus(): { data: CampusData; index: RoomIndex; stats: Record<stri
   const roomList = [...rooms.values()].sort((a, z) => a.code.localeCompare(z.code, "en", { numeric: true }));
   for (const r of roomList) byId.get(r.b)!.roomCount++;
 
+  // Floor plans: whatever else the map draws on a floor, as bare shapes. Unlike the rooms above,
+  // these need no code and may be hidden from the source's search, because nothing names them.
+  const placed: { building: Building; floor: Floor; loc: MiLocation }[] = [];
+  for (const loc of locations) {
+    if (loc.geometry.type !== "Polygon") continue;
+    const p = loc.properties;
+    const m = CODE_RE.exec(p.externalId?.trim().toUpperCase() ?? "");
+    const building = (m && byId.get(m[1]!)) ?? byId.get(p.building);
+    const floor = building?.floors.find((f) => f.i === Number(p.floor));
+    if (!building || !floor) continue;
+    if (PLAN_RESIDENTIAL_TYPES.has(p.type)) floor.residential = true;
+    else if (m && rooms.has(`${building.id}-${m[2]}`)) continue;
+    else if (!building.offMap) placed.push({ building, floor, loc });
+  }
+  const namedOn = new Map<string, Pt[]>();
+  for (const r of roomList) namedOn.set(`${r.b}|${r.f}`, [...(namedOn.get(`${r.b}|${r.f}`) ?? []), r.c]);
+  const shapes = new Map<string, Map<number, { rings: Ring[]; area: number }[]>>();
+  for (const { building, floor, loc } of placed) {
+    if (floor.residential) {
+      bump("plans.skipped.residentialFloor");
+      continue;
+    }
+    if (PLAN_SKIPPED_TYPES.has(loc.properties.type)) {
+      bump("plans.skipped.notARoom");
+      continue;
+    }
+    // polygons() drops outlines under 2 square metres, which here are ducts and risers.
+    const poly = polygons(loc.geometry, 0.2)[0];
+    if (!poly) {
+      bump("plans.skipped.tiny");
+      continue;
+    }
+    // A shape lying over a named room is the open area around it; the room is what is drawn there.
+    const named = namedOn.get(`${building.id}|${floor.i}`) ?? [];
+    if (named.some((c) => pointInRing(c, poly[0]!) && !poly.slice(1).some((hole) => pointInRing(c, hole)))) {
+      bump("plans.skipped.coversNamedRoom");
+      continue;
+    }
+    let floors = shapes.get(building.id);
+    if (!floors) shapes.set(building.id, (floors = new Map()));
+    let list = floors.get(floor.i);
+    if (!list) floors.set(floor.i, (list = []));
+    list.push({ rings: poly, area: ringArea(poly[0]!) });
+    if (loc.properties.status !== 3) bump("plans.shapes.hiddenFromSourceSearch");
+  }
+  const plans: FloorPlans[] = [];
+  for (const b of buildings) {
+    const floors = shapes.get(b.id);
+    if (!floors) continue;
+    const plan: FloorPlans = { version: 1, building: b.id, floors: {} };
+    b.planShapes = 0;
+    for (const [i, list] of [...floors].sort((a, z) => a[0] - z[0])) {
+      // Largest first, so a room inside an open area is drawn after the area around it.
+      plan.floors[i] = list.sort((a, z) => z.area - a.area).map((s) => s.rings.map(encodeRing));
+      b.planShapes += list.length;
+      bump("plans.floors");
+    }
+    plans.push(plan);
+  }
+
   const campuses: Campus[] = venues
     .map((v) => {
       const id = venueCampus(v.name);
@@ -360,6 +426,7 @@ function buildCampus(): { data: CampusData; index: RoomIndex; stats: Record<stri
       rooms: roomList,
     },
     index,
+    plans,
     stats,
   };
 }
@@ -650,13 +717,14 @@ function snapshotDate(source: string): string {
 }
 
 function write(name: string, value: unknown): number {
-  fs.mkdirSync(OUT, { recursive: true });
+  const file = path.join(OUT, name);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   const text = JSON.stringify(value);
-  fs.writeFileSync(path.join(OUT, name), text + "\n");
+  fs.writeFileSync(file, text + "\n");
   return text.length;
 }
 
-const { data: campus, index, stats: campusStats } = buildCampus();
+const { data: campus, index, plans, stats: campusStats } = buildCampus();
 const { data: context, stats: contextStats } = buildContext(campus);
 const subjects = buildSubjects();
 const calendar = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "academic-calendar.json"), "utf8")) as AcademicCalendar;
@@ -670,6 +738,7 @@ const coverage: Coverage = {
   buildingsOnMap: campus.buildings.filter((b) => !b.offMap).length,
   rooms: campus.rooms.length,
   indexedRooms: Object.values(index).reduce((n, l) => n + l.length, 0),
+  planShapes: campus.buildings.reduce((n, b) => n + (b.planShapes ?? 0), 0),
   subjects: subjects.length,
   courses: schedule.courses.length,
   sessions: schedule.sessions.length,
@@ -718,7 +787,13 @@ if (schedule.available) {
 
 const meta: Meta = { version: 1, generatedAt: campus.generatedAt, sources, coverage };
 
+// One file per building, so opening a building loads only its own floors. The folder is rebuilt
+// whole: a building that lost its plan must not keep an old file.
+fs.rmSync(path.join(OUT, "plans"), { recursive: true, force: true });
+const planBytes = plans.reduce((n, plan) => n + write(`plans/${plan.building}.json`, plan), 0);
+
 const sizes = {
+  [`plans/ (${plans.length} files)`]: planBytes,
   "campus.json": write("campus.json", campus),
   "context.json": write("context.json", context),
   "rooms-index.json": write("rooms-index.json", index),

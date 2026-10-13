@@ -33,7 +33,8 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { Building, CampusData, ContextData, FlatRing, Floor, Room } from "../shared/types.ts";
+import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room } from "../shared/types.ts";
+import { decodeRing, interiorPoint } from "../shared/geo.ts";
 import { MeshBuilder, ringsBounds } from "./geometry.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
@@ -78,6 +79,8 @@ const ROAD_Y = { path: 0.12, steps: 0.12, service: 0.14, street: 0.16, major: 0.
 const AREA_Y = { park: 0.02, grass: 0.04, wood: 0.06, pitch: 0.08, water: 0.1 } as const;
 const SLAB = 0.35;
 const ROOM_HEIGHT = 1.5;
+/** The unnamed shapes of a floor plan stand lower than the rooms that can be selected. */
+const PLAN_HEIGHT = 0.45;
 const ROOM_HEIGHT_SELECTED = 3.0;
 
 const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
@@ -126,6 +129,8 @@ export class CampusScene {
   private buildingMeshes = new Map<string, Mesh>();
   private buildingEdges = new Map<string, LineSegments>();
   private roomMeshes = new Map<string, Mesh>();
+  private plans = new Map<string, FloorPlans>();
+  private planObjects: (Mesh | LineSegments)[] = [];
   private selectedOutline?: LineLoop;
   private interior?: Group;
   private pin?: PinSpec;
@@ -262,6 +267,15 @@ export class CampusScene {
     this.restyle();
     this.applyFocus();
     this.rebuildLabels();
+    this.needsShadow = true;
+    this.needsRender = true;
+  }
+
+  /** The floor plans of one building: the other spaces on its floors, drawn as bare shapes. */
+  setPlans(plans: FloorPlans): void {
+    this.plans.set(plans.building, plans);
+    if (this.selection.building !== plans.building) return;
+    this.rebuildPlan();
     this.needsShadow = true;
     this.needsRender = true;
   }
@@ -625,6 +639,7 @@ export class CampusScene {
     this.interior = undefined;
     this.detailGroup.clear();
     this.roomMeshes.clear();
+    this.planObjects = [];
     this.selectedOutline = undefined;
 
     const cur = this.currentFloor();
@@ -665,6 +680,7 @@ export class CampusScene {
     slabEdges.userData.role = "slabEdges";
     slabEdges.userData.noPick = true;
     this.detailGroup.add(slabEdges);
+    this.rebuildPlan();
 
     // Rooms on the selected floor, as low blocks on the slab.
     for (const r of this.roomsByBuilding.get(b.id) ?? []) {
@@ -682,6 +698,46 @@ export class CampusScene {
     this.styleRooms();
   }
 
+  /** One merged mesh and one set of lines for every unnamed shape on the open floor. */
+  private rebuildPlan(): void {
+    for (const o of this.planObjects) {
+      this.detailGroup.remove(o);
+      o.geometry.dispose();
+      (o.material as MeshLambertMaterial | LineBasicMaterial).dispose();
+    }
+    this.planObjects = [];
+    const cur = this.currentFloor();
+    const shapes = cur && this.plans.get(cur.b.id)?.floors[cur.floor.i];
+    if (!cur || !shapes?.length) return;
+    const p = this.palette;
+    const y = this.floorY(cur.b, cur.floor.i);
+    const top = y + SLAB + PLAN_HEIGHT;
+    const mb = new MeshBuilder();
+    const lines: number[] = [];
+    for (const rings of shapes) {
+      // From the underside of the slab, so a shape that overhangs the floor outline has a base.
+      mb.extrude(rings, y, top);
+      for (const ring of rings) {
+        for (let i = 0; i + 1 < ring.length; i += 2) {
+          const j = (i + 2) % ring.length;
+          lines.push(ring[i]! / 10, top + 0.02, -ring[i + 1]! / 10, ring[j]! / 10, top + 0.02, -ring[j + 1]! / 10);
+        }
+      }
+    }
+    const mesh = new Mesh(mb.build(), new MeshLambertMaterial({ color: p.plan }));
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.role = "plan";
+    mesh.userData.noPick = true;
+    const g = new BufferGeometry();
+    g.setAttribute("position", new Float32BufferAttribute(lines, 3));
+    const edges = new LineSegments(g, new LineBasicMaterial({ color: p.planEdge, transparent: true, opacity: 0.6 }));
+    edges.userData.role = "planEdges";
+    edges.userData.noPick = true;
+    this.planObjects = [mesh, edges];
+    this.detailGroup.add(mesh, edges);
+  }
+
   private rebuildDetailColours(): void {
     const p = this.palette;
     for (const child of this.detailGroup.children) {
@@ -689,6 +745,8 @@ export class CampusScene {
       if (role === "below") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.slabBelow);
       if (role === "slab") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.slab);
       if (role === "slabEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.uniEdge);
+      if (role === "plan") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.plan);
+      if (role === "planEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.planEdge);
     }
   }
 
@@ -1051,6 +1109,34 @@ export class CampusScene {
 
   /** Number of frames drawn so far; lets tests wait for a real render. */
   frames = 0;
+
+  /** Data requests the host is still waiting for; lets tests wait for the whole picture. */
+  loading = 0;
+
+  /** Number of unnamed floor-plan shapes drawn on the open floor. For tests. */
+  get planShapes(): number {
+    const cur = this.currentFloor();
+    return (this.planObjects.length && cur && this.plans.get(cur.b.id)?.floors[cur.floor.i]?.length) || 0;
+  }
+
+  /**
+   * A point on the page where an unnamed floor-plan shape is drawn with no room, label or other
+   * building in front of it. For tests.
+   */
+  planPoint(): { x: number; y: number } | undefined {
+    const cur = this.currentFloor();
+    const shapes = (this.planObjects.length && cur && this.plans.get(cur.b.id)?.floors[cur.floor.i]) || [];
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const v = new Vector3();
+    for (const rings of shapes) {
+      const c = interiorPoint(decodeRing(rings[0]!));
+      v.set(c[0], this.floorY(cur!.b, cur!.floor.i) + SLAB + PLAN_HEIGHT, -c[1]).project(this.camera);
+      const p = { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
+      if (document.elementFromPoint(p.x, p.y) !== this.renderer.domElement) continue;
+      if (!this.pickAt(p.x, p.y) && !this.labelAt(p.x, p.y)) return p;
+    }
+    return undefined;
+  }
 
   /** True while a camera or focus animation is running. */
   get animating(): boolean {

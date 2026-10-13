@@ -1,7 +1,7 @@
 // Mounts the three.js scene and keeps it in step with the application state.
 import { effect } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { loadContext } from "../app/data.ts";
+import { loadContext, loadPlans } from "../app/data.ts";
 import { lang, pick, t } from "../app/i18n.ts";
 import {
   busyBuildings,
@@ -79,6 +79,16 @@ export function SceneHost() {
         if (!data.value) return;
         const sel = { building: selBuilding.value, floor: selFloor.value, room: selRoom.value };
         scene.setSelection(sel, !first);
+      }),
+      effect(() => {
+        // The rest of the open building's floors arrives after the building itself.
+        const b = selBuilding.value ? data.value?.buildingById.get(selBuilding.value) : undefined;
+        if (!b?.planShapes || b.offMap) return;
+        scene.loading++;
+        void loadPlans(b.id)
+          .then((plans) => scene.setPlans(plans))
+          .catch((e) => console.error("plans", e))
+          .finally(() => scene.loading--);
       }),
       effect(() => {
         const m = marker.value;

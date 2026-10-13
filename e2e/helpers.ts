@@ -7,6 +7,9 @@ export const SHOTS = path.join("e2e", "screenshots");
 interface SceneHandle {
   frames: number;
   animating: boolean;
+  loading: number;
+  planShapes: number;
+  planPoint(): { x: number; y: number } | undefined;
   probe(): { width: number; height: number; distinctColours: number; samples: number };
   cameraState(): { azimuth: number; polar: number; zoom: number; target: [number, number, number] };
   screenPoint(kind: "building" | "room", id: string): { x: number; y: number } | undefined;
@@ -28,7 +31,7 @@ export async function open(page: Page, query = ""): Promise<void> {
 export async function settle(page: Page): Promise<void> {
   await page.waitForFunction(() => !!window.__scene && window.__scene.frames > 2, undefined, { timeout: 30_000 });
   await expect(page.locator(".splash")).toHaveCount(0);
-  await page.waitForFunction(() => !window.__scene!.animating);
+  await page.waitForFunction(() => !window.__scene!.animating && !window.__scene!.loading);
   // Let label layout and the last frame land.
   await page.waitForTimeout(250);
 }

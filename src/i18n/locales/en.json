@@ -48,7 +48,7 @@
     "buildingMeta_other": "{campus} · {count} learning spaces",
     "buildingMetaNone": "{campus}",
     "roomMeta": "{building} · Floor {floor}",
-    "roomIndexed": "Position from the campus map; outline not shown",
+    "roomIndexed": "Position from the campus map; shown as a pin",
     "roomInferredFloor": "Not on the campus map. Floor {floor} is inferred from the room number.",
     "roomBuildingOnly": "Not on the campus map. Only the building is known.",
     "subjectMeta": "{faculty}",
@@ -78,15 +78,17 @@
     "roomSelect": "Room",
     "heightNote": "Building heights are estimated from the number of floors.",
     "floorOutlineFootprint": "The campus map has no usable outline for this floor, so the building's footprint is drawn.",
+    "floorResidential": "People live on this floor, so its rooms are not drawn.",
     "offMap": "This building is outside the 3D map.",
-    "legend": "Room types in this building"
+    "legend": "What the colours on the floor mean",
+    "legendPlan": "Other spaces on the campus map, not named here"
   },
   "room": {
     "area": "about {area} m²",
     "floor": "Floor {name}",
     "precision": {
       "room": "Position and outline from the official campus map · outline simplified",
-      "indexed": "Position from the official campus map · outline not shown",
+      "indexed": "Position from the official campus map · shown as a pin",
       "floor": "Floor inferred from the room number · position within the floor unknown",
       "building": "Only the building is known"
     },
@@ -207,6 +209,7 @@
       "buildingsOnMap": "of which on the 3D map",
       "rooms": "Learning spaces with an outline",
       "indexedRooms": "Other rooms that can be located",
+      "planShapes": "Other spaces drawn as unnamed shapes",
       "subjects": "Subject codes",
       "courses": "Courses with scheduled classes",
       "sessions": "Scheduled classes",
@@ -221,7 +224,7 @@
       "timetableLoaded": "Class times come from a snapshot of the timetable taken on {date}. Rooms and times change during the semester; your own timetable is the authority.",
       "scheduled": "A timetabled class is not the same as an occupied room. Classes are cancelled, moved and recorded online, and rooms are used for things that are not on the timetable.",
       "heights": "Building heights are not surveyed. Each building is drawn as its footprint raised by its number of floors at {height} m per floor, and the ground is drawn flat although the campus sits on a ridge.",
-      "rooms": "Room outlines are simplified from the official campus map and only learning spaces (lecture theatres, teaching rooms, labs, studios, study spaces) are drawn. Other rooms can be found by code and are shown as a point. The furniture drawn in a selected room is decoration laid out by rule; it is not a seating plan and says nothing about capacity.",
+      "rooms": "Outlines are simplified from the official campus map. Learning spaces (lecture theatres, teaching rooms, labs, studios, study spaces) are named and can be selected. Every other space on the campus map is drawn as a plain shape with no name, so that a floor reads as a floor plan; a room among them is found by its code and marked with a pin. Floors where people live are left blank, and single parking bays are not drawn. The furniture drawn in a selected room is decoration laid out by rule; it is not a seating plan and says nothing about capacity.",
       "campuses": "Only the City, Grafton and Newmarket campuses are modelled in 3D. Buildings on other campuses appear in search and are marked as not on the map.",
       "context": "Surrounding buildings, streets and trees come from OpenStreetMap. Where a height is not mapped, a default is used. Trees inside woodland areas are scattered for decoration.",
       "calendar": "Semester dates are transcribed by hand from the 2026 University Calendar. Dates for 2027 were not fully published when this was built.",

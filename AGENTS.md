@@ -20,8 +20,9 @@ These bind every change, whoever or whatever wrote it.
 - **Closed is a verdict.** A 401, a 403, a login redirect or a dropped connection is recorded once
   and left alone.
 - **Places, not people.** Publish codes, titles, times and rooms. Drop staff names and enrolment
-  numbers at parse time. Outlines are for teaching and study spaces; residential rooms, plant,
-  toilets and anything the source hides from its own search stay out.
+  numbers at parse time. Teaching and study spaces are named and can be selected. Every other
+  space is at most a bare shape on its floor: no code, no name, no type, nothing to select. Floors
+  where people live stay blank, and a room the source hides from its own search is never named.
 - **Label the precision.** Keep each record's original text. Mark whether it is located to a room, a
   floor or a building. Inferred floors and estimated heights are labelled as such on screen. A
   record that cannot be used goes to `exclusions` with its reason.
