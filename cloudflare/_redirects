@@ -1,0 +1,4 @@
+# Copied to the root of the Cloudflare Pages site by the deploy-cloudflare job.
+# Each school lives under its own path. Until there is a page for choosing a school,
+# the root sends visitors to the only one; temporary (302) so browsers do not remember it.
+/ /uoa/ 302

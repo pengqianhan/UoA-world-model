@@ -70,3 +70,34 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Second copy of the site on Cloudflare Pages, where each school lives under its own path
+  # (/uoa/). Skipped until the repository variable CLOUDFLARE_PROJECT names the Pages project;
+  # the two secrets hold an API token with the "Cloudflare Pages: Edit" permission and the
+  # account id.
+  deploy-cloudflare:
+    if: github.ref == 'refs/heads/main' && vars.CLOUDFLARE_PROJECT != ''
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: ${{ vars.CLOUDFLARE_PROJECT }}
+      SCHOOL: uoa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build for the school's path and lay out the site root
+        run: |
+          BASE_PATH="/$SCHOOL/" npm run build
+          mkdir site
+          mv dist "site/$SCHOOL"
+          cp cloudflare/_headers cloudflare/_redirects site/
+      - name: Create the Pages project on the first run
+        run: npx --yes wrangler@4 pages project create "$PROJECT" --production-branch main || true
+      - name: Publish to Cloudflare Pages
+        run: npx --yes wrangler@4 pages deploy site --project-name "$PROJECT" --branch main

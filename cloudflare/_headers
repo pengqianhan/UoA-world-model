@@ -1,0 +1,4 @@
+# Copied to the root of the Cloudflare Pages site by the deploy-cloudflare job.
+# Files under a school's assets/ carry a content hash in their name, so they can be cached for good.
+/:school/assets/*
+  Cache-Control: public, max-age=31536000, immutable
