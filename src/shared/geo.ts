@@ -78,6 +78,25 @@ export function bbox(ring: Ring): [number, number, number, number] {
   return [x0, y0, x1, y1];
 }
 
+/**
+ * The share of a shape's area that lies inside `ring`, estimated on an n-by-n grid of sample
+ * points. `polys` is a list of polygons, each a list of rings with the outer ring first.
+ */
+export function shareInside(polys: readonly Ring[][], ring: Ring, n = 24): number {
+  const [x0, y0, x1, y1] = bbox(polys.flatMap((poly) => poly[0] ?? []));
+  let inside = 0;
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const p: Pt = [x0 + ((i + 0.5) * (x1 - x0)) / n, y0 + ((j + 0.5) * (y1 - y0)) / n];
+      if (!polys.some((poly) => poly[0] && pointInRing(p, poly[0]) && !poly.slice(1).some((h) => pointInRing(p, h)))) continue;
+      total++;
+      if (pointInRing(p, ring)) inside++;
+    }
+  }
+  return total ? inside / total : 0;
+}
+
 /** Drops a duplicated closing vertex and consecutive duplicates. */
 export function cleanRing(ring: Ring, eps = 1e-3): Ring {
   const out: Ring = [];

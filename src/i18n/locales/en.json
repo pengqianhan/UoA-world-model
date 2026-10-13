@@ -77,6 +77,7 @@
     "floorHasRooms_other": "{count} learning spaces on this floor",
     "roomSelect": "Room",
     "heightNote": "Building heights are estimated from the number of floors.",
+    "floorOutlineFootprint": "The campus map has no usable outline for this floor, so the building's footprint is drawn.",
     "offMap": "This building is outside the 3D map.",
     "legend": "Room types in this building"
   },

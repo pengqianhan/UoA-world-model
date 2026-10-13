@@ -13,6 +13,7 @@ import {
   pointInRing,
   ringArea,
   ringCentroid,
+  shareInside,
   simplifyLine,
   simplifyRing,
   type Pt,
@@ -48,6 +49,8 @@ const OUT = path.join(ROOT, "public", "data");
 const ORIGIN = { lat: -36.8523, lon: 174.7691 };
 /** Display convention for stacking floors; the source has no heights. */
 const FLOOR_HEIGHT = 3.6;
+/** A floor outline with less of its area than this over its own building belongs to another one. */
+const MIN_FOOTPRINT_SHARE = 0.2;
 /** south, west, north, east of the 3D scene; must match scripts/fetch-osm.ts. */
 const SCENE_BBOX = [-36.8689, 174.7608, -36.8441, 174.7797] as const;
 
@@ -224,9 +227,17 @@ function buildCampus(): { data: CampusData; index: RoomIndex; stats: Record<stri
       .map(([k, f]) => ({ i: Number(k), f }))
       .sort((a, z) => a.i - z.i);
     for (const { i, f } of sorted) {
-      const polys = polygons(f.geometry, 0.25).map((poly) => poly.map(encodeRing));
-      const key = JSON.stringify(polys);
       const floor: Floor = { i, name: f.name };
+      let rings = polygons(f.geometry, 0.25);
+      // A few floors in the source carry the outline of a different building. The footprint
+      // stands in for an outline that misses its own building, and the floor is marked.
+      if (rings.length && shareInside(rings, outline[0]!) < MIN_FOOTPRINT_SHARE) {
+        rings = [outline];
+        floor.outlineFrom = "footprint";
+        bump("floors.outlineFromFootprint");
+      }
+      const polys = rings.map((poly) => poly.map(encodeRing));
+      const key = JSON.stringify(polys);
       if (polys.length && key !== prevKey) floor.outline = polys;
       if (polys.length) prevKey = key;
       floors.push(floor);
