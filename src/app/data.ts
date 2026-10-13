@@ -6,6 +6,7 @@ import type {
   Campus,
   CampusData,
   ContextData,
+  FloorPlans,
   Meta,
   Room,
   RoomIndex,
@@ -91,6 +92,21 @@ export function loadRoomIndex(): Promise<RoomIndex> {
     throw e;
   });
   return roomIndexPromise;
+}
+
+const plansPromises = new Map<string, Promise<FloorPlans>>();
+
+/** The floor plans of one building: its other spaces as bare shapes. Loaded when the building is opened. */
+export function loadPlans(building: string): Promise<FloorPlans> {
+  let promise = plansPromises.get(building);
+  if (!promise) {
+    promise = getJson<FloorPlans>(`plans/${building}.json`).catch((e) => {
+      plansPromises.delete(building);
+      throw e;
+    });
+    plansPromises.set(building, promise);
+  }
+  return promise;
 }
 
 export interface IndexedRoom {

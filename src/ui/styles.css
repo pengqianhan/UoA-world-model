@@ -228,6 +228,10 @@ a {
 .kind-dot.kind-studentHub {
   background: #e58aae;
 }
+.kind-dot.kind-plan {
+  border-radius: 2px;
+  background: #e2dccd;
+}
 
 .lbl-room.sel {
   border-color: var(--accent);

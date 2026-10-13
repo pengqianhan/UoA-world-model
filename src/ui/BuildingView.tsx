@@ -163,6 +163,7 @@ export function BuildingView() {
   const title = buildingTitle(b);
   const floorsWithRooms = b.floors.filter((f) => rooms.some((r) => r.f === f.i));
   const floor = b.floors.find((f) => f.i === selFloor.value);
+  const hasPlan = !!b.planShapes && !b.offMap;
   const kinds = [...new Set(rooms.map((r) => r.kind))];
 
   return (
@@ -206,7 +207,7 @@ export function BuildingView() {
           ) : (
             <p class="bar-note">{t("building.noRooms")}</p>
           )}
-          {kinds.length > 0 && (
+          {(kinds.length > 0 || hasPlan) && (
             <ul class="legend" aria-label={t("building.legend")}>
               {kinds.map((k) => (
                 <li>
@@ -214,9 +215,20 @@ export function BuildingView() {
                   {t(`room.kind.${k}`)}
                 </li>
               ))}
+              {hasPlan && (
+                <li id="legend-plan">
+                  <span class="kind-dot kind-plan" aria-hidden="true" />
+                  {t("building.legendPlan")}
+                </li>
+              )}
             </ul>
           )}
           {rooms.length > 0 && onFloor.length === 0 && !marker.value && <p class="bar-note">{t("building.noRoomsOnFloor")}</p>}
+          {floor?.noPlan && !b.offMap && (
+            <p class="bar-note" id="floor-no-plan-note">
+              {t(`building.noPlan.${floor.noPlan}`)}
+            </p>
+          )}
           {floor?.outlineFrom === "footprint" && !b.offMap && (
             <p class="bar-note" id="floor-outline-note">
               {t("building.floorOutlineFootprint")}

@@ -88,6 +88,10 @@ export function AboutPanel() {
                   <td>{n(c.indexedRooms)}</td>
                 </tr>
                 <tr>
+                  <th>{t("about.coverage.planShapes")}</th>
+                  <td>{n(c.planShapes)}</td>
+                </tr>
+                <tr>
                   <th>{t("about.coverage.subjects")}</th>
                   <td>{n(c.subjects)}</td>
                 </tr>

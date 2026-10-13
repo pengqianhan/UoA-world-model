@@ -41,6 +41,8 @@ export interface Floor {
   outline?: FlatRing[][];
   /** Set when the source's outline for this floor was unusable and the building's footprint stands in. */
   outlineFrom?: "footprint";
+  /** Set when no floor plan is published for this floor: people live on it, or it is a childcare centre. */
+  noPlan?: "residential" | "childcare";
 }
 
 export interface Building {
@@ -60,6 +62,8 @@ export interface Building {
   heightSource: "floor-count";
   /** Number of published learning spaces in this building. */
   roomCount: number;
+  /** Number of shapes in this building's floor-plan file. Absent when there is no file. */
+  planShapes?: number;
   /** True when the building lies outside the 3D scene (remote campuses and outliers). */
   offMap?: boolean;
 }
@@ -92,6 +96,17 @@ export interface CampusData {
   campuses: Campus[];
   buildings: Building[];
   rooms: Room[];
+}
+
+/**
+ * The rest of a building's floors: every other space the campus map draws, as a bare shape with
+ * no code, name or type. One file per building, public/data/plans/<building id>.json.
+ */
+export interface FloorPlans {
+  version: 1;
+  building: string;
+  /** Floor index (Floor.i) -> shapes, largest first. Each shape is [ring] -> FlatRing, outer ring first. */
+  floors: Record<string, FlatRing[][]>;
 }
 
 export type RoadClass = "motorway" | "major" | "street" | "service" | "path" | "steps";
@@ -131,6 +146,8 @@ export interface Coverage {
   buildingsOnMap: number;
   rooms: number;
   indexedRooms: number;
+  /** Other spaces drawn as bare shapes in the floor plans. */
+  planShapes: number;
   subjects: number;
   courses: number;
   sessions: number;

@@ -17,7 +17,8 @@ published with `onMap: false`, searchable and marked as not on the map.
 `scripts/lib/classes.ts`; in `build-data.ts` the `Mi*` types, `buildCampus`, `buildSubjects` and the
 `sources` list. Write one fetch script per usable source in their place and chain them in the
 `data:fetch` script of `package.json`. `LEARNING_TYPES` maps the source's room types onto `RoomKind`
-and decides which rooms get outlines; `INDEX_EXCLUDED_TYPES` decides which never appear. The
+and decides which rooms are named and selectable; `INDEX_EXCLUDED_TYPES` decides which stay out of
+search; `PLAN_RESIDENTIAL_TYPES` and `PLAN_SKIPPED_TYPES` decide what the floor plans leave blank. The
 `sources` list is what About shows: name, link, licence line, snapshot date.
 
 **Room codes.** `src/shared/roomcode.ts`, `CODE_RE` in `build-data.ts`, `tests/roomcode.test.ts`.

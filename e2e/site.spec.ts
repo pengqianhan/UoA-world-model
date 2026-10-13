@@ -136,17 +136,17 @@ test("3. search finds real room codes, buildings and course codes, and moves the
   await expect(subject).toContainText("Computer Science");
   await expect(subject).toContainText("timetable is not public");
 
-  // A room the campus map knows but whose outline is not published: found and pinned.
+  // A room the campus map knows but that is not named on the floor: found and pinned.
   await input.fill("104-G53");
   const marker = page.locator(".result.type-marker");
   await expect(marker).toContainText("104-G53");
-  await expect(marker).toContainText("outline not shown");
+  await expect(marker).toContainText("shown as a pin");
   await marker.locator(".result-main").click();
   await settle(page);
   expect(params(page).get("building")).toBe("104");
   expect(params(page).get("room")).toBe("104-G53");
   await expect(page.locator('[data-label="pin"]')).toBeVisible();
-  await expect(page.locator("#precision-note")).toContainText("outline not shown");
+  await expect(page.locator("#precision-note")).toContainText("shown as a pin");
   await shot(page, "03-search-pin");
 
   // An unknown room in a known building falls back to an inferred floor, and says so.
@@ -371,4 +371,31 @@ test("a floor whose outline the campus map puts under another building is drawn 
   await expect(page.locator("#floor-outline-note")).toContainText("building's footprint");
   await expectRealRender(page);
   await shot(page, "11-floor-outline-footprint");
+});
+
+test("the rest of a floor is drawn as unnamed shapes that cannot be selected, and floors where people live or children are cared for stay blank", async ({ page }) => {
+  await open(page, "?building=405&floor=4&light=day");
+  expect(await page.evaluate(() => window.__scene!.planShapes)).toBeGreaterThan(30);
+  await expect(page.locator("#legend-plan")).toContainText("not named here");
+  await expectRealRender(page);
+  await shot(page, "12-floor-plan");
+
+  // A click on one of the plain shapes selects nothing and leaves the building open.
+  const pt = (await page.evaluate(() => window.__scene!.planPoint()))!;
+  await page.mouse.click(pt.x, pt.y);
+  await settle(page);
+  expect(params(page).get("room")).toBeNull();
+  expect(params(page).get("building")).toBe("405");
+  await expect(page.locator("#room-card")).toHaveCount(0);
+
+  // A hall of residence: the floor is there, its rooms are not, and the page says why.
+  await open(page, "?building=440&floor=3&light=day");
+  expect(await page.evaluate(() => window.__scene!.planShapes)).toBe(0);
+  await expect(page.locator("#floor-no-plan-note")).toContainText("People live on this floor");
+  await shot(page, "12-floor-residential");
+
+  // A childcare centre likewise.
+  await open(page, "?building=410&light=day");
+  expect(await page.evaluate(() => window.__scene!.planShapes)).toBe(0);
+  await expect(page.locator("#floor-no-plan-note")).toContainText("childcare centre");
 });

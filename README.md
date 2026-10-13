@@ -27,7 +27,8 @@ It is built to answer two questions a student actually has:
 - A rotatable miniature of the City, Grafton and Newmarket campuses: 139 University buildings on a base
   of OpenStreetMap streets, parks, trees and surrounding buildings.
 - A cut-away view of every building: pick a floor, see its learning spaces (lecture theatres, teaching
-  rooms, labs, studios, study spaces) drawn from the outlines on the official campus map.
+  rooms, labs, studios, study spaces) drawn from the outlines on the official campus map, set in the
+  rest of the floor plan: 14,508 other spaces as plain shapes without names.
 - Search over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings and 251
   subject codes. Māori names match with or without macrons (`Maori` finds `Māori`).
 - "Now" (Auckland time, daylight saving included) and "Preview" (any day and time), with the academic
@@ -173,7 +174,8 @@ data/
   sources.json        provenance of every snapshot
   academic-calendar.json   hand-transcribed key dates
   raw/                snapshots (gitignored except OpenStreetMap)
-public/data/        published data: campus, context, rooms-index, subjects, calendar, schedule, meta
+public/data/        published data: campus, context, rooms-index, subjects, calendar, schedule, meta,
+                    and plans/ with one floor-plan file per building
 src/shared/         pure logic shared by pipeline and app: geometry, room codes, Auckland time,
                     calendar, schedule, search
 src/scene/          three.js scene
@@ -185,7 +187,8 @@ e2e/                browser tests (Playwright), numbered after the acceptance cr
 ```
 
 Accuracy is labelled wherever it matters. A room drawn with an outline comes from the campus map. A
-room shown as a pin is known to the campus map but its outline is not published here. A room that the
+room shown as a pin is known to the campus map by its code; the pin stands on the plain shape that
+the floor plan draws for it. Plain shapes carry no code, name or type. A room that the
 map does not know is placed on a floor inferred from its number and marked as inferred. Building
 heights are estimates from the number of floors.
 
@@ -193,7 +196,7 @@ heights are estimates from the number of floors.
 
 | Source | Used for | Terms |
 | --- | --- | --- |
-| [University of Auckland campus maps](https://maps.auckland.ac.nz/) (the public map, served by MapsIndoors) | Buildings, floors, room codes, room types and positions | © University of Auckland. Only derived facts are published here: learning spaces with simplified outlines, other searchable rooms as a code, floor and point. Residential rooms, parking, plant and anything the map marks as not searchable are left out. |
+| [University of Auckland campus maps](https://maps.auckland.ac.nz/) (the public map, served by MapsIndoors) | Buildings, floors, room codes, room types and positions | © University of Auckland. Only derived facts are published here: learning spaces with their names and simplified outlines; other searchable rooms as a code, floor and point; every other space as a simplified outline with no code, name or type. Floors with student accommodation, childcare centres and single parking bays are left out, and a room the map marks as not searchable is never named. |
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) via the Overpass API | Surrounding buildings, streets, paths, parks, trees | © OpenStreetMap contributors, [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The snapshot in `data/raw/osm/` and the derived `public/data/context.json` are under the same licence. |
 | [University of Auckland Calendar 2026](https://www.auckland.ac.nz/en/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar.html) | Semester dates, breaks, holidays; list of subject codes | © University of Auckland. Dates and codes are quoted as facts with a link to the source. |
 | [Open-Meteo](https://open-meteo.com/) | Current temperature in Auckland, fetched by the visitor's browser | [CC BY 4.0](https://open-meteo.com/en/licence) |
@@ -209,7 +212,9 @@ If you represent the University and would like something changed or removed, ple
 - No class times until a timetable snapshot is added (see above).
 - A timetabled class is not the same as an occupied room.
 - Heights are estimated and the ground is flat, although the City Campus sits on a ridge.
-- Only learning spaces have outlines; furniture is not shown.
+- Only learning spaces are named and can be selected. The rest of a floor is plain shapes, floors
+  where people live and childcare centres are blank, and the furniture in a selected room is
+  illustrative.
 - Only the City, Grafton and Newmarket campuses are in 3D; other campuses' buildings appear in search,
   marked as not on the map.
 - The academic calendar covers 2026 only.
