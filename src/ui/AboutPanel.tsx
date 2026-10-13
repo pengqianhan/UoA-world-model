@@ -1,10 +1,11 @@
 // About: the unofficial notice, data sources with snapshot dates, coverage, and known limitations.
 import { useEffect, useRef } from "preact/hooks";
 import { formatDate, intlLocale, lang, languages, setLang, t } from "../app/i18n.ts";
-import { REPO } from "../app/links.ts";
+import { INSPIRED_BY, REPO } from "../app/links.ts";
 import { data, panel } from "../app/state.ts";
 import { aucklandWallTime } from "../shared/time.ts";
 import { IconButton, Section } from "./common.tsx";
+import { WorldLink } from "./Travel.tsx";
 
 const longDate: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
 
@@ -155,6 +156,13 @@ export function AboutPanel() {
 
           <Section title={t("about.privacyTitle")}>
             <p>{t("about.privacy")}</p>
+          </Section>
+
+          <Section title={t("about.inspirationTitle")}>
+            <p id="inspiration">{t("about.inspiration")}</p>
+            <p>
+              <WorldLink world={INSPIRED_BY} />
+            </p>
           </Section>
 
           <Section title={t("about.codeTitle")}>

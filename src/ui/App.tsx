@@ -8,6 +8,7 @@ import { SceneHost } from "./SceneHost.tsx";
 import { SearchPanel } from "./SearchPanel.tsx";
 import { TimePanel, notTeachingReason, previewTeachingDay } from "./TimePanel.tsx";
 import { TopBar, statusLine } from "./TopBar.tsx";
+import { TravelOverlay, Worlds, cancelTravel, travel } from "./Travel.tsx";
 
 /** Campus-level summary: where we are in the academic year and what is timetabled right now. */
 function StatusStrip() {
@@ -49,6 +50,7 @@ function StatusStrip() {
             </button>
           ))}
       </div>
+      <Worlds />
     </section>
   );
 }
@@ -67,7 +69,8 @@ export function App() {
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA");
       if (e.key === "Escape") {
-        if (panel.value !== "none") panel.value = "none";
+        if (travel.value) cancelTravel();
+        else if (panel.value !== "none") panel.value = "none";
         else if (selRoom.value) {
           selRoom.value = undefined;
           marker.value = undefined;
@@ -77,13 +80,21 @@ export function App() {
         panel.value = "search";
       }
     };
+    // Coming back with the browser's Back button can restore the page as it was left: mid-flight.
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) travel.value = undefined;
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("pageshow", onShow);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pageshow", onShow);
+    };
   }, []);
 
   const loaded = !!data.value;
   return (
-    <div class={`app ${selBuilding.value ? "in-building" : "in-campus"} ${night.value > 0.5 ? "is-night" : "is-day"} panel-${panel.value}`}>
+    <div class={`app ${selBuilding.value ? "in-building" : "in-campus"} ${night.value > 0.5 ? "is-night" : "is-day"} panel-${panel.value} ${travel.value ? "travelling" : ""}`}>
       <SceneHost />
       <TopBar />
       {!loaded && (
@@ -102,6 +113,7 @@ export function App() {
       {panel.value === "time" && <TimePanel />}
       {panel.value === "about" && <AboutPanel />}
       <Attribution />
+      <TravelOverlay />
     </div>
   );
 }

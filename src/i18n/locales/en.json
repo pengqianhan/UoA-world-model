@@ -237,6 +237,8 @@
     "privacy": "The site has no accounts, sets no cookies and has no analytics. Staff names are deliberately left out. If the weather line is shown, your browser asks Open-Meteo for the current weather in Auckland; nothing about you is sent beyond that request.",
     "osm": "Map context © OpenStreetMap contributors, available under the Open Database License.",
     "osmLink": "OpenStreetMap copyright and licence",
+    "inspirationTitle": "Inspiration",
+    "inspiration": "This site was inspired by the Tsinghua World Model, an independent student project that lets you walk through Tsinghua University's campus and find courses and classrooms in it. The idea of a campus you can step into comes from there. The code, models and data here were made separately.",
     "codeTitle": "Code and corrections",
     "code": "The code is open source under the MIT licence. If a room is in the wrong place, please open an issue.",
     "repo": "Source code on GitHub",
@@ -268,5 +270,19 @@
     "noTimetable": "Class times are not shown: the timetable is not public.",
     "why": "Why?",
     "hintCampus": "Click a building to see its floors and rooms."
+  },
+  "travel": {
+    "heading": "Other worlds",
+    "go": "Travel to {name}. This leaves UoA World Model.",
+    "label": "Travelling to {name}",
+    "leaving": "Leaving Auckland",
+    "distance": "{km} km",
+    "stay": "Stay in Auckland",
+    "worlds": {
+      "tsinghua": {
+        "name": "Tsinghua World Model",
+        "place": "Tsinghua University, Beijing"
+      }
+    }
   }
 }

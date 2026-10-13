@@ -83,3 +83,31 @@ test("phone: the top bar holds the site name, the source link, About, Search and
     }
   }
 });
+
+test("phone: the way to other worlds sits in the status strip, inside the screen, and starts a flight that can be called off", async ({ page }) => {
+  // The other site is never called. Should the flight run its course, the page stays where it is.
+  await page.route("https://tsinghua-world-model.pages.dev/**", (route) => route.abort());
+  for (const width of [390, 360]) {
+    await page.setViewportSize({ width, height: 780 });
+    await open(page, "?light=day");
+    const link = page.locator('#status-strip a[data-world="tsinghua"]');
+    await expect(link).toBeVisible();
+    const box = (await link.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, `${width} px`).toBeLessThanOrEqual(width);
+    // The strip leaves the top bar and most of the map alone.
+    const strip = (await page.locator("#status-strip").boundingBox())!;
+    expect(strip.y, `${width} px`).toBeGreaterThan(780 * 0.6);
+    expect(strip.x + strip.width).toBeLessThanOrEqual(width);
+  }
+  await shot(page, "13-mobile-worlds");
+
+  await page.locator('#status-strip a[data-world="tsinghua"]').tap();
+  const flight = page.getByRole("dialog", { name: "Travelling to Tsinghua World Model" });
+  await expect(flight).toBeVisible();
+  await expect(flight.locator(".travel-distance")).toHaveText(/^[\d,]+ km$/);
+  await shot(page, "13-mobile-travel");
+  await flight.getByRole("button", { name: "Stay in Auckland" }).tap();
+  await expect(flight).toHaveCount(0);
+  await expect(page.locator("#status-strip")).toBeVisible();
+});

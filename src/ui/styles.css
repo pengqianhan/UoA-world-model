@@ -917,6 +917,145 @@ select optgroup {
   color: var(--accent);
 }
 
+/* The way to other universities' maps. Teal, where the campus tabs are amber: these leave the site. */
+
+.worlds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.worlds-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.world {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  border: 1px solid rgba(110, 211, 200, 0.45);
+  border-radius: 999px;
+  background: rgba(110, 211, 200, 0.1);
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.world:hover {
+  border-color: var(--teal);
+  background: rgba(110, 211, 200, 0.2);
+}
+
+.prose .world {
+  margin-top: 2px;
+}
+
+/* ---- Travel to another world -------------------------------------------------------------- */
+
+/* The map rushes up and out of focus underneath while the stars come in on top. */
+.stage {
+  transition: transform 0.5s ease, filter 0.5s ease;
+}
+
+.labels {
+  transition: opacity 0.3s ease;
+}
+
+.travelling .stage {
+  filter: blur(5px);
+  transform: scale(1.7);
+  transition: transform 2s cubic-bezier(0.55, 0, 0.9, 0.5), filter 1.2s ease-in;
+}
+
+.travelling .labels {
+  opacity: 0;
+}
+
+.travel {
+  position: absolute;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #0b141b;
+  animation: travel-dark 0.9s ease-in both;
+}
+
+@keyframes travel-dark {
+  from {
+    background: rgba(11, 20, 27, 0);
+  }
+}
+
+.travel canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.travel-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 0 var(--gap);
+  text-align: center;
+  text-shadow: 0 1px 14px #0b141b, 0 0 3px #0b141b;
+  animation: travel-card 0.5s 0.15s ease-out both;
+}
+
+/* Opacity alone: the button under it has to hold still to be pressed. */
+@keyframes travel-card {
+  from {
+    opacity: 0;
+  }
+}
+
+.travel-from {
+  color: var(--teal);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.travel-to {
+  font: 600 clamp(28px, 6vw, 46px) / 1.15 var(--font-display);
+  text-wrap: balance;
+}
+
+.travel-place {
+  color: var(--muted);
+}
+
+.travel-distance {
+  min-height: 1.3em;
+  margin-top: 10px;
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.travel-card .btn {
+  margin-top: 18px;
+  text-shadow: none;
+}
+
 /* ---- Building view ------------------------------------------------------------------------ */
 
 .floors {
