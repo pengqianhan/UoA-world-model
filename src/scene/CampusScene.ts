@@ -35,6 +35,7 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room } from "../shared/types.ts";
 import { decodeRing, interiorPoint } from "../shared/geo.ts";
+import { massing } from "../shared/massing.ts";
 import { MeshBuilder, ringsBounds } from "./geometry.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
@@ -79,6 +80,11 @@ const ROAD_Y = { path: 0.12, steps: 0.12, service: 0.14, street: 0.16, major: 0.
 const AREA_Y = { park: 0.02, grass: 0.04, wood: 0.06, pitch: 0.08, water: 0.1 } as const;
 const SLAB = 0.35;
 const ROOM_HEIGHT = 1.5;
+/** Metres between window centres on University buildings. A drawing convention, like the storey height. */
+const WINDOW_BAY = 3.2;
+/** Roofs keep the building colour; walls are a step darker so that terraces and setbacks read. */
+const ROOF_TINT = [1, 1, 1] as const;
+const WALL_TINT = [0.96, 0.95, 0.93] as const;
 /** The unnamed shapes of a floor plan stand lower than the rooms that can be selected. */
 const PLAN_HEIGHT = 0.45;
 const ROOM_HEIGHT_SELECTED = 3.0;
@@ -211,8 +217,8 @@ export class CampusScene {
     this.ground.receiveShadow = true;
     this.scene.add(this.ground, this.contextGroup, this.uniGroup, this.detailGroup, this.pinGroup);
 
-    this.wallTexture = this.makeBandTexture("#ffffff", "#c9c2b2");
-    this.glowTexture = this.makeBandTexture("#000000", "#ffffff");
+    this.wallTexture = this.makeWindowTexture("#ffffff", "#c2bbab");
+    this.glowTexture = this.makeWindowTexture("#000000", "#ffffff");
     this.applyPalette();
 
     const el = this.renderer.domElement;
@@ -248,10 +254,20 @@ export class CampusScene {
     this.buildingEdges.clear();
     for (const b of campus.buildings) {
       if (b.offMap) continue;
-      const mb = new MeshBuilder(false, true);
-      mb.extrude(b.outline, 0, b.height, undefined, undefined, true, campus.floorHeight);
+      const mb = new MeshBuilder(true, true);
+      for (const block of massing(b, campus.floorHeight)) {
+        const wall = { storey: campus.floorHeight, bay: WINDOW_BAY, bottom: block.y0 > 0 };
+        for (const poly of block.outline) mb.extrude(poly, block.y0, block.y1, ROOF_TINT, WALL_TINT, true, wall);
+      }
       const geometry = mb.build();
-      const mat = new MeshLambertMaterial({ color: 0xffffff, map: this.wallTexture, emissive: 0xffc56e, emissiveMap: this.glowTexture, emissiveIntensity: 0 });
+      const mat = new MeshLambertMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        map: this.wallTexture,
+        emissive: 0xffc56e,
+        emissiveMap: this.glowTexture,
+        emissiveIntensity: 0,
+      });
       const mesh = new Mesh(geometry, mat);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -381,18 +397,19 @@ export class CampusScene {
   }
 
   /**
-   * A 1-D texture repeated once per storey on University building walls: `base` with a `band`
-   * where the windows are. Used once for the daytime wall colour and once as the night glow.
+   * One window bay of one storey, repeated over University building walls: `base` with a `pane`
+   * where the window is. Used once for the daytime wall colour and once as the night glow. The
+   * windows are drawn by rule; nothing about a real facade is known.
    */
-  private makeBandTexture(base: string, band: string): CanvasTexture {
+  private makeWindowTexture(base: string, pane: string): CanvasTexture {
     const c = document.createElement("canvas");
-    c.width = 4;
+    c.width = 32;
     c.height = 32;
     const g = c.getContext("2d")!;
     g.fillStyle = base;
-    g.fillRect(0, 0, 4, 32);
-    g.fillStyle = band;
-    g.fillRect(0, 9, 4, 13);
+    g.fillRect(0, 0, 32, 32);
+    g.fillStyle = pane;
+    g.fillRect(7, 9, 18, 13);
     const tex = new CanvasTexture(c);
     tex.wrapS = RepeatWrapping;
     tex.wrapT = RepeatWrapping;

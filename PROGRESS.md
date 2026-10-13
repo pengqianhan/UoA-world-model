@@ -159,6 +159,11 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   number (agrees with the map for >85% of rooms, see `tests/roomcode.test.ts`) is only the fallback
   for unknown codes and is labelled "inferred" in the UI.
 - Building height = (levels at or above index 0) × 3.6 m. Not surveyed; said so in About.
+- Building shape in the campus view, since 2026-10-13: the floors at or above entry level are
+  stacked, each with the campus map's outline for that floor (`src/shared/massing.ts`), where it
+  used to be the footprint raised to the full height. 91 of the 139 buildings on the map get more
+  than one block. A mezzanine does not cut the storey it sits in. Windows are one pane per 3.2 m
+  bay and storey, drawn by rule (`WINDOW_BAY` in `CampusScene.ts`); About says so.
 - Nine floors in the 2026-10-13 snapshot carry the outline of a different building (floor 1 of 114
   has a basement 300 m away; the others are 301 B, 310 B1, 502 1, 507 -1, 901 4, 902 3 and two
   off the map). A floor outline with under 20% of its area over its own building's footprint is
