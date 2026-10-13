@@ -97,6 +97,50 @@ export function shareInside(polys: readonly Ring[][], ring: Ring, n = 24): numbe
   return total ? inside / total : 0;
 }
 
+/**
+ * The smallest rectangle around a ring that lies along one of the ring's edges. `angle` is the
+ * direction of its long side, in radians anticlockwise from east.
+ */
+export function boundingRectangle(ring: Ring): { centre: Pt; angle: number; length: number; width: number } {
+  let best = { centre: [0, 0] as Pt, angle: 0, length: 0, width: 0 };
+  let bestArea = Infinity;
+  const fit = (angle: number) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    let u0 = Infinity;
+    let u1 = -Infinity;
+    let v0 = Infinity;
+    let v1 = -Infinity;
+    for (const [x, y] of ring) {
+      const u = x * cos + y * sin;
+      const v = y * cos - x * sin;
+      if (u < u0) u0 = u;
+      if (u > u1) u1 = u;
+      if (v < v0) v0 = v;
+      if (v > v1) v1 = v;
+    }
+    const area = (u1 - u0) * (v1 - v0);
+    if (area >= bestArea) return;
+    bestArea = area;
+    const cu = (u0 + u1) / 2;
+    const cv = (v0 + v1) / 2;
+    const long = u1 - u0 >= v1 - v0;
+    best = {
+      centre: [cu * cos - cv * sin, cu * sin + cv * cos],
+      angle: long ? angle : angle + Math.PI / 2,
+      length: long ? u1 - u0 : v1 - v0,
+      width: long ? v1 - v0 : u1 - u0,
+    };
+  };
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 0.3) fit(Math.atan2(b[1] - a[1], b[0] - a[0]));
+  }
+  if (bestArea === Infinity) fit(0);
+  return best;
+}
+
 /** Drops a duplicated closing vertex and consecutive duplicates. */
 export function cleanRing(ring: Ring, eps = 1e-3): Ring {
   const out: Ring = [];

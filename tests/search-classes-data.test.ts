@@ -122,7 +122,7 @@ describe("published campus data is self-consistent", () => {
     const ctx = read<ContextData>("context.json");
     expect(ctx.attribution).toMatch(/OpenStreetMap contributors/);
     expect(ctx.buildings.length).toBeGreaterThan(1000);
-    expect(Math.max(...ctx.buildings.map((b) => b.h))).toBeLessThanOrEqual(200);
+    expect(Math.max(...ctx.buildings.map((b) => b.h))).toBeLessThanOrEqual(330);
   });
   it("meta lists every source with a link and a snapshot date", () => {
     const meta = read<Meta>("meta.json");

@@ -112,12 +112,36 @@ export interface FloorPlans {
 export type RoadClass = "motorway" | "major" | "street" | "service" | "path" | "steps";
 export type AreaClass = "park" | "grass" | "wood" | "pitch" | "water";
 
+export type RoofShape = "gabled" | "hipped" | "pyramidal" | "dome" | "round" | "skillion";
+
+/** A roof as OpenStreetMap tags it. The shape is drawn in a simplified form. */
+export interface ContextRoof {
+  k: RoofShape;
+  /** Height of the roof above the top of the walls, metres. */
+  h: number;
+  /** Gabled, hipped and round roofs: true when the ridge runs across the long side instead of along it. */
+  across?: true;
+  /** Skillion roofs: compass bearing, in degrees, that the roof falls towards. */
+  bearing?: number;
+}
+
+/** A building of the surrounding city, or one part of a building that OpenStreetMap maps in parts. */
+export interface ContextBuilding {
+  /** Outer ring. */
+  p: FlatRing;
+  /** Height of the top of the walls, metres above the ground. */
+  h: number;
+  /** Height the walls start at, for a part that sits on top of another. Absent when it is the ground. */
+  b?: number;
+  roof?: ContextRoof;
+}
+
 export interface ContextData {
   version: 1;
   origin: Origin;
   attribution: string;
-  /** Non-University buildings: outer ring + height in metres. */
-  buildings: { p: FlatRing; h: number }[];
+  /** Non-University buildings and building parts. */
+  buildings: ContextBuilding[];
   roads: { k: RoadClass; p: FlatRing }[];
   areas: { k: AreaClass; p: FlatRing }[];
   rails: FlatRing[];

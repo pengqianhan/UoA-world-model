@@ -27,6 +27,8 @@ It is built to answer two questions a student actually has:
 - A rotatable miniature of the City, Grafton and Newmarket campuses: 139 University buildings on a base
   of OpenStreetMap streets, parks, trees and surrounding buildings. Each University building is
   stacked floor by floor from the campus map, so its podium, tower, setbacks and courtyards show.
+  The city around it is drawn with the parts, heights and roof shapes OpenStreetMap holds, from
+  house gables to the Sky Tower.
 - A cut-away view of every building: pick a floor, see its learning spaces (lecture theatres, teaching
   rooms, labs, studios, study spaces) drawn from the outlines on the official campus map, set in the
   rest of the floor plan: 14,508 other spaces as plain shapes without names.

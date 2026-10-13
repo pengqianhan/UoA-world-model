@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   bbox,
+  boundingRectangle,
   cleanRing,
   encodeRing,
   interiorPoint,
@@ -26,13 +27,16 @@ import type {
   Building,
   Campus,
   CampusData,
+  ContextBuilding,
   ContextData,
+  ContextRoof,
   Coverage,
   FlatRing,
   Floor,
   FloorPlans,
   Meta,
   RoadClass,
+  RoofShape,
   Room,
   RoomIndex,
   RoomKind,
@@ -479,6 +483,82 @@ const ROAD_CLASS: Record<string, RoadClass> = {
   steps: "steps",
 };
 
+/** Metres per level where OpenStreetMap gives levels and no height. */
+const OSM_LEVEL = 3.3;
+/** Parts covering at least this share of their building's outline stand in for it. */
+const PARTS_REPLACE_OUTLINE = 0.9;
+/** A ridge is drawn only on an outline that fills this share of its bounding rectangle. */
+const RIDGE_MIN_FILL = 0.6;
+
+/** OpenStreetMap roof shapes and the simplified shape each is drawn as. Others are drawn flat. */
+const ROOF_SHAPES: Record<string, RoofShape> = {
+  gabled: "gabled",
+  "half-hipped": "gabled",
+  gambrel: "gabled",
+  hipped: "hipped",
+  mansard: "hipped",
+  crosspitched: "hipped",
+  pyramidal: "pyramidal",
+  dome: "dome",
+  onion: "dome",
+  round: "round",
+  skillion: "skillion",
+};
+
+const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+
+function num(s: string | undefined): number | undefined {
+  const n = parseFloat(s ?? "");
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** A tagged height in metres; a height of zero or less is a mapping slip and counts as missing. */
+function height(s: string | undefined): number | undefined {
+  const n = num(s);
+  return n !== undefined && n > 0 ? n : undefined;
+}
+
+/** A bearing in degrees from a number or a compass point. */
+function bearing(s: string | undefined): number | undefined {
+  const i = COMPASS.indexOf((s ?? "").toUpperCase());
+  return i >= 0 ? i * 22.5 : num(s);
+}
+
+/** The roof an element's tags describe, sized to the outline it sits on. */
+function roofOf(t: Record<string, string>, ring: Ring, bump: (k: string) => void): ContextRoof | undefined {
+  const k = ROOF_SHAPES[t["roof:shape"] ?? ""];
+  if (!k) return undefined;
+  const box = boundingRectangle(ring);
+  // A ridge over an L or a cross would send roof faces across the gap, so those stay flat.
+  if ((k === "gabled" || k === "hipped" || k === "round") && ringArea(ring) < RIDGE_MIN_FILL * box.length * box.width) {
+    bump("context.roofs.flatOnIrregularOutline");
+    return undefined;
+  }
+  const levels = num(t["roof:levels"]);
+  let h = num(t["roof:height"]) ?? (levels !== undefined ? levels * 3 : undefined);
+  if (h === undefined || h <= 0) {
+    h = k === "dome" || k === "pyramidal" ? box.width / 2 : k === "skillion" ? Math.min(2, box.width * 0.25) : Math.min(3.5, box.width * 0.3);
+    bump("context.roofs.defaultHeight");
+  }
+  if (h < 0.2) return undefined;
+  const roof: ContextRoof = { k, h: round1(h) };
+  // roof:direction is the way a slope faces; some mappers put "along" or "across" in it.
+  const word = t["roof:orientation"] ?? t["roof:direction"];
+  const slope = bearing(t["roof:direction"]);
+  if (k === "skillion") {
+    if (slope !== undefined) roof.bearing = Math.round(slope);
+  } else if (k !== "pyramidal" && k !== "dome") {
+    if (word === "across") roof.across = true;
+    else if (word !== "along" && slope !== undefined) {
+      const rad = (slope * Math.PI) / 180;
+      // The ridge runs across the long side when the slopes face along it.
+      if (Math.abs(Math.sin(rad) * Math.cos(box.angle) + Math.cos(rad) * Math.sin(box.angle)) > 0.7) roof.across = true;
+    }
+  }
+  bump(`context.roofs.${k}`);
+  return roof;
+}
+
 function areaClass(t: Record<string, string>): AreaClass | undefined {
   if (t.natural === "water") return "water";
   if (t.natural === "wood" || t.landuse === "forest") return "wood";
@@ -580,6 +660,23 @@ function buildContext(campus: CampusData): { data: ContextData; stats: Record<st
     trees: [],
   };
 
+  // Building outlines are held back until their parts are known.
+  interface Outline {
+    ring: Ring;
+    box: [number, number, number, number];
+    area: number;
+    tags: Record<string, string>;
+    /** Height from the tags, a default, or a tower's podium. */
+    h: number;
+    /** True when `h` is the building's tagged height, which includes its roof. */
+    tagged: boolean;
+    tower: boolean;
+    parts: ContextBuilding[];
+    partArea: number;
+  }
+  const outlines: Outline[] = [];
+  const partElements: OsmElement[] = [];
+
   for (const e of osm.elements) {
     const t = e.tags ?? {};
 
@@ -607,20 +704,25 @@ function buildContext(campus: CampusData): { data: ContextData; stats: Record<st
           bump("context.buildings.droppedAsUniversity");
           continue;
         }
-        let h = parseFloat(t.height ?? "");
-        if (!Number.isFinite(h)) {
-          const levels = parseFloat(t["building:levels"] ?? "");
-          if (Number.isFinite(levels)) h = levels * 3.3 + 1;
-        }
-        if (!Number.isFinite(h)) {
+        const tagged = height(t.height);
+        const levels = num(t["building:levels"]);
+        let h = tagged ?? (levels !== undefined ? levels * OSM_LEVEL + 1 : undefined);
+        if (h === undefined) {
           h = t.building === "roof" || t.building === "carport" || t.building === "shed" ? 3 : area > 900 ? 10 : 6.5;
           bump("context.buildings.defaultHeight");
         }
         // Masts and observation towers are tagged with their full height on a podium-sized
-        // footprint; extruding that would draw a 300 m slab, so only the podium is kept.
-        if (h > 200 || t.man_made === "tower" || t.building === "tower") h = Math.min(h, 24);
-        out.buildings.push({ p: encodeRing(ring), h: round1(h) });
+        // footprint; extruding that would draw a 300 m slab, so only the podium is kept. A tower
+        // that is mapped in parts is drawn from its parts instead, further down.
+        const tower = h > 200 || t.man_made === "tower" || t.building === "tower";
+        if (tower) h = Math.min(h, 24);
+        outlines.push({ ring, box: bbox(ring), area, tags: t, h, tagged: tagged !== undefined && !tower, tower, parts: [], partArea: 0 });
       }
+      continue;
+    }
+
+    if (t["building:part"] && t["building:part"] !== "no") {
+      partElements.push(e);
       continue;
     }
 
@@ -655,6 +757,70 @@ function buildContext(campus: CampusData): { data: ContextData; stats: Record<st
         out.areas.push({ k, p: encodeRing(ring) });
       }
     }
+  }
+
+  // Parts: where OpenStreetMap maps a building as several volumes, each with its own height.
+  for (const e of partElements) {
+    const t = e.tags ?? {};
+    for (const ring0 of outerRings(e)) {
+      const ring = simplifyRing(ring0, 0.3);
+      const area = ringArea(ring);
+      if (area < 0.5) continue;
+      const c = ringCentroid(ring);
+      if (!inScene(c, 30)) continue;
+      if (insideUni(c)) {
+        bump("context.parts.droppedAsUniversity");
+        continue;
+      }
+      // The smallest outline around the part is its building.
+      let holder: Outline | undefined;
+      for (const o of outlines) {
+        if (c[0] < o.box[0] || c[0] > o.box[2] || c[1] < o.box[1] || c[1] > o.box[3] || !pointInRing(c, o.ring)) continue;
+        if (!holder || o.area < holder.area) holder = o;
+      }
+      const roof = roofOf(t, ring, bump);
+      const tagged = height(t.height);
+      const levels = num(t["building:levels"]);
+      // A tagged height includes the roof; levels do not.
+      let top = tagged !== undefined ? tagged - (roof?.h ?? 0) : levels !== undefined ? levels * OSM_LEVEL : undefined;
+      if (top === undefined) {
+        top = holder && !holder.tower ? holder.h : 6.5;
+        bump("context.parts.heightFromBuilding");
+      }
+      const minLevel = num(t["building:min_level"]);
+      let base = num(t.min_height) ?? (minLevel !== undefined ? minLevel * OSM_LEVEL : 0);
+      // A part tagged as a roof is a canopy: a thin slab at its height.
+      if (t["building:part"] === "roof") base = Math.max(base, top - 0.4);
+      if (top < base + 0.3) top = base + 0.3;
+      const part: ContextBuilding = { p: encodeRing(ring), h: round1(top), ...(base > 0 ? { b: round1(base) } : {}), ...(roof ? { roof } : {}) };
+      if (holder) {
+        holder.parts.push(part);
+        // Only parts that stand on the ground cover the outline; stacked ones would count twice.
+        if (base === 0) holder.partArea += area;
+      } else {
+        out.buildings.push(part);
+        bump("context.parts.withoutOutline");
+      }
+    }
+  }
+  for (const o of outlines) {
+    if (o.parts.length) {
+      out.buildings.push(...o.parts);
+      bump("context.parts", o.parts.length);
+      if (o.partArea >= PARTS_REPLACE_OUTLINE * o.area) {
+        bump("context.buildings.replacedByParts");
+        continue;
+      }
+      // Parts cover only some of the outline: it stays as the base they stand on, no higher
+      // than the lowest part that starts at the ground.
+      const lowest = Math.min(...o.parts.filter((p) => !p.b).map((p) => p.h));
+      out.buildings.push({ p: encodeRing(o.ring), h: round1(Math.min(o.h, lowest)) });
+      bump("context.buildings.underParts");
+      continue;
+    }
+    const roof = o.tower ? undefined : roofOf(o.tags, o.ring, bump);
+    const top = roof && o.tagged ? Math.max(o.h - roof.h, 2) : o.h;
+    out.buildings.push({ p: encodeRing(o.ring), h: round1(top), ...(roof ? { roof } : {}) });
   }
 
   // Largest areas first so small pitches and gardens draw on top of the parks that contain them.
