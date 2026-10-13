@@ -63,9 +63,9 @@ To test a deployed copy instead of a local build:
 E2E_BASE_URL=https://pengqianhan.github.io/campus-world-model/ npm run e2e
 ```
 
-The site is static. Pushing to `main` runs `.github/workflows/deploy.yml`, which type-checks, tests,
-builds and publishes to GitHub Pages. The Vite `base` is `/campus-world-model/`; set `BASE_PATH=/` to
-host at a domain root.
+The site is static. A merge into `main` runs `.github/workflows/deploy.yml`, which type-checks, runs
+the unit and end-to-end tests, builds, and publishes to GitHub Pages only if all of that passed. The
+Vite `base` is `/campus-world-model/`; set `BASE_PATH=/` to host at a domain root.
 
 The same workflow publishes a second copy to Cloudflare Pages under `/uoa/`, with the files in
 `cloudflare/` at the site root. That job runs only when the repository variable `CLOUDFLARE_PROJECT`
@@ -155,6 +155,12 @@ places do not. `.claude/skills/campus-world-model/` is a [Claude Code](https://c
 skill that takes an agent through a port: recon of the new school's public data, rebuilding the
 pipeline, shipping the site and verifying it live. Fork or clone this repository, open it in Claude
 Code and run `/campus-world-model <university, campus>`.
+
+## Contributing
+
+Reports and fixes are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). The rules every change keeps
+and the checks it passes are written for people and for coding agents alike, in
+[AGENTS.md](AGENTS.md) and [docs/standards.md](docs/standards.md).
 
 ## How it is put together
 

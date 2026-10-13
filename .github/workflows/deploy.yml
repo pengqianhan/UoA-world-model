@@ -9,9 +9,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request replaces the run in progress. On main a run is never cut short,
+# because it ends in a deploy: the next push waits its turn.
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
@@ -59,7 +61,7 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/main'
-    needs: build
+    needs: [build, e2e]
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -77,7 +79,7 @@ jobs:
   # account id.
   deploy-cloudflare:
     if: github.ref == 'refs/heads/main' && vars.CLOUDFLARE_PROJECT != ''
-    needs: build
+    needs: [build, e2e]
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

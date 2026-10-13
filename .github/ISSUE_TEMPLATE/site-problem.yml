@@ -1,0 +1,42 @@
+name: The site does not work properly
+description: Something fails to load, looks broken or behaves in a way you did not expect
+labels: ["bug"]
+body:
+  - type: input
+    id: link
+    attributes:
+      label: Link to the view
+      description: >-
+        Copy the address from your browser's address bar. It records the building, floor, room
+        and time, so it shows us exactly what you see.
+      placeholder: "https://…/?building=…&floor=…&room=…"
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: dropdown
+    id: screen
+    attributes:
+      label: Where you saw it
+      options:
+        - Computer
+        - Phone
+        - Tablet
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      placeholder: "Chrome, Safari, Firefox, Edge…"
