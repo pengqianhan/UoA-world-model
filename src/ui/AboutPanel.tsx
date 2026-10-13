@@ -1,11 +1,11 @@
 // About: the unofficial notice, data sources with snapshot dates, coverage, and known limitations.
 import { useEffect, useRef } from "preact/hooks";
 import { formatDate, intlLocale, lang, languages, setLang, t } from "../app/i18n.ts";
+import { REPO } from "../app/links.ts";
 import { data, panel } from "../app/state.ts";
 import { aucklandWallTime } from "../shared/time.ts";
 import { IconButton, Section } from "./common.tsx";
 
-const REPO = "https://github.com/pengqianhan/campus-world-model";
 const longDate: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
 
 export function AboutPanel() {

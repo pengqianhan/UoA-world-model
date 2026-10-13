@@ -281,6 +281,27 @@ test("8. ?lang= is honoured and unknown languages fall back to English", async (
   await expect(page.locator(".brand-name")).toHaveText("UoA World Model");
 });
 
+test("the top bar links straight to the source code on GitHub, beside About", async ({ page }) => {
+  await open(page, "?light=day");
+  const link = page.locator(".topbar").getByRole("link", { name: "Source code on GitHub" });
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", "https://github.com/pengqianhan/campus-world-model");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", /noopener/);
+  // The mark is drawn, not an empty box.
+  const markWidth = await link.locator("svg path").evaluate((el) => (el as SVGPathElement).getBBox().width);
+  expect(markWidth).toBeGreaterThan(20);
+  const here = (await link.boundingBox())!;
+  const about = (await page.getByRole("button", { name: "About", exact: true }).boundingBox())!;
+  expect(Math.abs(here.y - about.y)).toBeLessThan(2);
+  expect(about.x - (here.x + here.width)).toBeGreaterThanOrEqual(0);
+  expect(about.x - (here.x + here.width)).toBeLessThan(16);
+
+  // It is still there inside a building.
+  await open(page, "?light=day&building=260");
+  await expect(link).toBeVisible();
+});
+
 test("timetable features work end to end when a schedule is present (fixture schedule, never published)", async ({ page }) => {
   // Tuesday 13 Oct 2026, 10:15 in Auckland: the fixture has a class in 303-G23 from 10:00 to 11:00.
   await page.clock.setFixedTime(new Date("2026-10-12T21:15:00Z"));

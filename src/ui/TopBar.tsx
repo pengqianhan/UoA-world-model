@@ -1,5 +1,6 @@
-// The bar across the top: site name (click to return to the campus), About, Search, and the time chip.
+// The bar across the top: site name (click to return to the campus), the source code, About, Search, and the time chip.
 import { formatDate, pick, t } from "../app/i18n.ts";
+import { REPO } from "../app/links.ts";
 import { data, goHome, panel, selBuilding, shown, status, timeMode, type PanelId } from "../app/state.ts";
 import { formatMinutes } from "../shared/time.ts";
 import { Icon, IconButton } from "./common.tsx";
@@ -47,6 +48,9 @@ export function TopBar() {
         </button>
       )}
       <div class="topbar-spacer" />
+      <a class="btn square" id="repo-link" href={REPO} target="_blank" rel="noopener noreferrer" aria-label={t("about.repo")} title={t("about.repo")}>
+        <Icon name="github" />
+      </a>
       <IconButton icon="info" label={t("nav.about")} text={t("nav.about")} class="hide-text-sm" pressed={panel.value === "about"} onClick={() => toggle("about")} />
       <IconButton
         id="search-button"

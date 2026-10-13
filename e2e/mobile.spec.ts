@@ -61,3 +61,25 @@ test("6. phone: search for a room and see the building and class information", a
   await expect(page.locator("#unofficial-notice")).toBeVisible();
   await shot(page, "06-mobile-about");
 });
+
+test("phone: the top bar holds the site name, the source link, About, Search and the time side by side, down to a 360 px screen", async ({ page }) => {
+  for (const width of [390, 360]) {
+    await page.setViewportSize({ width, height: 780 });
+    for (const query of ["?light=day", "?light=day&building=260"]) {
+      await open(page, query);
+      await expect(page.locator("#repo-link")).toBeVisible();
+      const boxes = await page.locator(".topbar > *:not(.topbar-spacer)").evaluateAll((els) =>
+        els
+          .map((el) => el.getBoundingClientRect())
+          .filter((r) => r.width > 0)
+          .map((r) => ({ left: r.left, right: r.right, width: r.width })),
+      );
+      expect(boxes.length).toBe(5);
+      expect(boxes[0]!.left).toBeGreaterThanOrEqual(0);
+      expect(boxes.at(-1)!.right, `${width} px, ${query}`).toBeLessThanOrEqual(width);
+      for (let i = 1; i < boxes.length; i++) expect(boxes[i]!.left, `${width} px, ${query}, item ${i}`).toBeGreaterThanOrEqual(boxes[i - 1]!.right);
+      // Nothing is squeezed below a size a finger can hit.
+      for (const b of boxes) expect(b.width).toBeGreaterThanOrEqual(36);
+    }
+  }
+});
