@@ -4,7 +4,7 @@ Handover notes for whoever (probably a future session of the same agent) picks t
 Read `AGENTS.md` first, then this file, then `git status` / `git log`. `GOAL.md`, the original brief,
 is local only; its rules now live in `AGENTS.md`.
 
-Last updated: 2026-10-13, afternoon NZDT
+Last updated: 2026-10-13, evening NZDT
 
 ## Now working on
 
@@ -189,6 +189,11 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
 
 ## Decisions (and why) — do not re-litigate without new information
 
+- **One source for a University building (the user, 2026-10-13).** Its shape comes from the campus
+  map alone. OpenStreetMap's copy stays dropped, although it tags a height on 9 of these buildings
+  and maps the Clock Tower in 13 parts with a dome and pinnacles: the two sources disagree on
+  height (building 405 is tagged 50 m and stands 32 m here from its floors), and mixing them would
+  leave some buildings surveyed and their neighbours estimated. Reopen only if the user asks.
 - **GOAL.md is gitignored.** It contains the local working-directory path (with a username).
 - **Stack:** Vite + TypeScript + three.js + Preact (+ signals). Shared pure-TS modules in
   `src/shared` are used by both the pipeline and the app.

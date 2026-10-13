@@ -23,9 +23,10 @@ take.
 ### 1. Footprints and surroundings
 
 OpenStreetMap through Overpass: `scripts/fetch-osm.ts` with the new bounding box. Usable everywhere
-under ODbL, with attribution in About. Note what the campus buildings carry (`name`, `ref`,
-`building:levels`, `height`): they are the fallback for building names and heights when the indoor
-layer is thin.
+under ODbL, with attribution in About. The one query also brings building parts and roof shapes,
+which the pipeline draws for the city around the campus. Note what the campus buildings carry
+(`name`, `ref`, `building:levels`, `height`): they are the fallback for building names and heights
+when the indoor layer is thin.
 
 ### 2. Indoor: buildings, floors, rooms
 
@@ -40,7 +41,9 @@ layer is thin.
 4. **Floor-plan PDFs**: record that they exist. They hold no machine-readable outlines.
 
 Capture the building identifier used in room codes, each floor's outline and name, and for each room
-its code, type, polygon or point, and the source's own "public" or "searchable" flag.
+its code, type, polygon or point, and the source's own "public" or "searchable" flag. Capture the
+spaces that are not rooms too (corridors, stairs, offices), with their types: they become the
+unnamed shapes of each floor plan, and the types tell which floors to leave blank.
 
 With this layer absent, rooms come only from the timetable's location text: the building view shows
 floors without room outlines, and every floor is inferred and labelled so.
