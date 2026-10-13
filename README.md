@@ -223,3 +223,11 @@ If you represent the University and would like something changed or removed, ple
 - Only the City, Grafton and Newmarket campuses are in 3D; other campuses' buildings appear in search,
   marked as not on the map.
 - The academic calendar covers 2026 only.
+
+## Inspiration
+
+This project was inspired by the
+[Tsinghua World Model](https://tsinghua-world-model.pages.dev/?campus=1&classMode=live), an
+independent student project that lets you walk through Tsinghua University's campus and find
+courses and classrooms in it. The idea of a campus you can step into comes from there. The code,
+models and data here were made separately; nothing is copied from that site.
