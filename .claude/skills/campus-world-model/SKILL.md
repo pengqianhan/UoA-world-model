@@ -10,10 +10,10 @@ This repo is a working world model of one university: a static site that draws t
 answers two questions a student has, "which building and floor is my room in" and "what is timetabled
 in this room now". A **port** makes it another school's.
 
-The **contract** is `src/shared/types.ts`, the shape of `public/data/*.json`. Everything downstream of
-it carries over: scene, interface, URL state, tests. Everything upstream is rebuilt for the new school:
-sources, `scripts/fetch-*.ts`, `scripts/build-data.ts`. What the school publishes without a login
-decides how much of the contract can be filled, so recon comes before code.
+The **contract** is `src/shared/types.ts`, the shape of every file under `public/data/`. Everything
+downstream of it carries over: scene, interface, URL state, tests. Everything upstream is rebuilt for
+the new school: sources, `scripts/fetch-*.ts`, `scripts/build-data.ts`. What the school publishes
+without a login decides how much of the contract can be filled, so recon comes before code.
 
 ## Rules of a port
 
@@ -58,11 +58,12 @@ resume from `PROGRESS.md`, and delete it after the final report.
 
 3. **Pipeline.** Rebuild everything upstream of the contract along the data seams in
    [SEAMS.md](SEAMS.md): one fetch script per usable source, then `scripts/build-data.ts`.
-   Done when `npm run data:fetch && npm run data:build` writes all seven contract files from the new
-   school's snapshots; with a usable timetable, every class meeting in the snapshot is a session with
-   a precision or an exclusion with a reason, and the two counts add up to the meetings in the
-   snapshot; `npm run typecheck && npm test` pass with the room-code and time-zone cases rewritten
-   from real values; and the coverage block of `public/data/meta.json` is copied into `PROGRESS.md`.
+   Done when `npm run data:fetch && npm run data:build` writes every file of the contract from the
+   new school's snapshots; with a usable timetable, every class meeting in the snapshot is a session
+   with a precision or an exclusion with a reason, and the two counts add up to the meetings in the
+   snapshot; `npm run typecheck && npm test` pass with every assertion that names an Auckland place
+   or count rewritten from the new data (SEAMS.md, "Tests"); and the coverage block of
+   `public/data/meta.json` is copied into `PROGRESS.md`.
 
 4. **Identity.** Make the repo the new school's along the identity seams in [SEAMS.md](SEAMS.md).
    Done when `git grep -il -e auckland -e uoa -- . ':!.claude'` lists only `README.md`, for its
@@ -79,8 +80,9 @@ resume from `PROGRESS.md`, and delete it after the final report.
 6. **Acceptance.** The numbered tests in `e2e/` are the acceptance criteria; each title says what it
    proves. Re-point them at real places of this school (SEAMS.md, "Tests"), keeping the numbers and
    what each proves. With the timetable absent, tests 2 and 3 prove rooms and buildings and the
-   fixture test proves the class display.
-   Done when every numbered test passes three ways: on the local build, in CI, and with
+   fixture test proves the class display. A test without a number proves one behaviour on one real
+   place; re-point those the same way.
+   Done when every test passes three ways: on the local build, in CI, and with
    `E2E_BASE_URL=<public URL> npm run e2e`; and you have opened the desktop and phone screenshots
    taken from the public URL. A green run over a black canvas is a failure.
 
