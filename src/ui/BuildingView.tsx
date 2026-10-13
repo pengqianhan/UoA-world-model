@@ -162,6 +162,7 @@ export function BuildingView() {
   const onFloor = rooms.filter((r) => r.f === selFloor.value);
   const title = buildingTitle(b);
   const floorsWithRooms = b.floors.filter((f) => rooms.some((r) => r.f === f.i));
+  const floor = b.floors.find((f) => f.i === selFloor.value);
   const kinds = [...new Set(rooms.map((r) => r.kind))];
 
   return (
@@ -216,6 +217,11 @@ export function BuildingView() {
             </ul>
           )}
           {rooms.length > 0 && onFloor.length === 0 && !marker.value && <p class="bar-note">{t("building.noRoomsOnFloor")}</p>}
+          {floor?.outlineFrom === "footprint" && !b.offMap && (
+            <p class="bar-note" id="floor-outline-note">
+              {t("building.floorOutlineFootprint")}
+            </p>
+          )}
           {b.offMap && <p class="bar-note">{t("building.offMap")}</p>}
         </div>
       </div>

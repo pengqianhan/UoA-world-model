@@ -149,6 +149,11 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   number (agrees with the map for >85% of rooms, see `tests/roomcode.test.ts`) is only the fallback
   for unknown codes and is labelled "inferred" in the UI.
 - Building height = (levels at or above index 0) × 3.6 m. Not surveyed; said so in About.
+- Nine floors in the 2026-10-13 snapshot carry the outline of a different building (floor 1 of 114
+  has a basement 300 m away; the others are 301 B, 310 B1, 502 1, 507 -1, 901 4, 902 3 and two
+  off the map). A floor outline with under 20% of its area over its own building's footprint is
+  replaced by the footprint and marked `outlineFrom: "footprint"`; the building bar says so. Real
+  outlines never score under 45%.
 
 ### Other sources
 

@@ -39,6 +39,8 @@ export interface Floor {
   name: string;
   /** Polygons with holes: [polygon][ring] -> FlatRing. Omitted when identical to the floor below. */
   outline?: FlatRing[][];
+  /** Set when the source's outline for this floor was unusable and the building's footprint stands in. */
+  outlineFrom?: "footprint";
 }
 
 export interface Building {

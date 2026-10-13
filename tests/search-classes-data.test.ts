@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildSchedule, parseDate, parseDays, parseTime, type RawClass } from "../scripts/lib/classes.ts";
-import { decodeRing, pointInRing } from "../src/shared/geo.ts";
+import { decodeRing, pointInRing, shareInside } from "../src/shared/geo.ts";
 import { buildIndex, compact, fold, search } from "../src/shared/search.ts";
 import type { CampusData, ContextData, Meta, RoomIndex, Schedule, Subject } from "../src/shared/types.ts";
 
@@ -77,6 +77,16 @@ describe("published campus data is self-consistent", () => {
       expect(b!.floors.some((f) => f.i === r.f), r.code).toBe(true);
       expect(r.code.startsWith(`${r.b}-`), r.code).toBe(true);
       expect(pointInRing(r.c, decodeRing(r.poly)), r.code).toBe(true);
+    }
+  });
+  it("every floor outline lies over its own building's footprint", () => {
+    for (const b of campus.buildings) {
+      const footprint = decodeRing(b.outline[0]!);
+      for (const f of b.floors) {
+        if (!f.outline) continue;
+        const polys = f.outline.map((poly) => poly.map((r) => decodeRing(r)));
+        expect(shareInside(polys, footprint), `${b.id} floor ${f.name}`).toBeGreaterThan(0.2);
+      }
     }
   });
   it("room codes are unique across the published rooms and the index", () => {

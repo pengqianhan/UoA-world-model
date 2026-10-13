@@ -357,3 +357,18 @@ test("other campuses: Grafton and Newmarket are on the map; remote campuses are 
   await expect(page.locator("#building-bar")).toContainText("outside the 3D map");
   await expect(page.locator("#building-bar")).toContainText("Tai Tonga Campus");
 });
+
+test("a floor whose outline the campus map puts under another building is drawn over its own, and says so", async ({ page }) => {
+  // In the source, floor 1 of building 114 carries the outline of a basement 300 m away.
+  await open(page, "?building=114&floor=1&light=day");
+  const centre = await page.evaluate(async () => {
+    const campus = (await (await fetch("data/campus.json")).json()) as { buildings: { id: string; center: [number, number] }[] };
+    return campus.buildings.find((b) => b.id === "114")!.center;
+  });
+  const cam = await page.evaluate(() => window.__scene!.cameraState());
+  // Scene axes: x is east and z is south.
+  expect(Math.hypot(cam.target[0] - centre[0], cam.target[2] + centre[1])).toBeLessThan(40);
+  await expect(page.locator("#floor-outline-note")).toContainText("building's footprint");
+  await expectRealRender(page);
+  await shot(page, "11-floor-outline-footprint");
+});
