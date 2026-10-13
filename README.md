@@ -4,7 +4,8 @@ An **unofficial**, student-made 3D map of University of Auckland buildings, floo
 It is not affiliated with, endorsed by or maintained by the University of Auckland, and uses no
 University logos or branding.
 
-**Live site: https://pengqianhan.github.io/UoA-world-model/**
+**Live site: https://campus-world-model.pages.dev/uoa/**
+(also at https://pengqianhan.github.io/UoA-world-model/)
 
 ![The City Campus by day](docs/campus-day.jpg)
 
@@ -65,6 +66,11 @@ E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e
 The site is static. Pushing to `main` runs `.github/workflows/deploy.yml`, which type-checks, tests,
 builds and publishes to GitHub Pages. The Vite `base` is `/UoA-world-model/`; set `BASE_PATH=/` to
 host at a domain root.
+
+The same workflow publishes a second copy to Cloudflare Pages under `/uoa/`, with the files in
+`cloudflare/` at the site root. That job runs only when the repository variable `CLOUDFLARE_PROJECT`
+names a Pages project and the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set, so
+a fork deploys to GitHub Pages alone until it has them.
 
 ## Updating the data snapshot
 

@@ -153,6 +153,16 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
 - **Ports:** dev server 5273, preview 4273 (`vite.config.ts`). Port 5173 on this machine belongs to
   another project of the user's; never touch that process.
 - **Vite `base` is `/UoA-world-model/`** (override with `BASE_PATH`).
+- **Two hosts since 2026-10-13.** GitHub Pages as before, and Cloudflare Pages project
+  `campus-world-model` at <https://campus-world-model.pages.dev/uoa/>, published by the
+  `deploy-cloudflare` CI job (repository variable `CLOUDFLARE_PROJECT`, secrets
+  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`). Cloudflare because the user plans advertising,
+  which GitHub Pages' terms do not suit.
+- **One neutral address, one path per school.** The user plans to add other New Zealand universities
+  and chose the name `campusworldmodel.com` (not yet registered) with each school under its own path:
+  `/uoa/` now, a school picker at the root later (today the root redirects to `/uoa/`,
+  `cloudflare/_redirects`). Path names are each school's own short name, not its city: AUT is in
+  Auckland too. Holding several schools in this one repository is a refactor that has not started.
 - **All network fetching goes through `scripts/lib/snapshot.ts`** (cache-first, ≥1.1 s between
   requests, honest User-Agent). Never fetch a URL that already has a snapshot unless `--refresh`.
 - **Labels are HTML, hit-tested by the scene** (`pointer-events: none`) so that a drag starting on a
