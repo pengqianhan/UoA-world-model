@@ -1,18 +1,34 @@
 # PROGRESS
 
 Handover notes for whoever (probably a future session of the same agent) picks this up next.
-Read `GOAL.md` (local only, not committed) first, then this file, then `git status` / `git log`.
+Read `AGENTS.md` first, then this file, then `git status` / `git log`. `GOAL.md`, the original brief,
+is local only; its rules now live in `AGENTS.md`.
 
-Last updated: 2026-10-13, about 01:40 NZDT (session 1)
+Last updated: 2026-10-13, afternoon NZDT
 
 ## Now working on
 
-Nothing is in progress. Everything in GOAL §2 that can be done without a timetable source is done and
-verified on the live site (see "Final report" and "Acceptance criteria"). The session-1 cron job was
-deleted after the final report because the only remaining work needs the user (see "Needs the user").
+The build is finished: everything in GOAL §2 that can be done without a timetable source is done and
+verified on the live site (see "Final report" and "Acceptance criteria").
+
+The project is moving to being maintained by coding agents, in three stages agreed with the user on
+2026-10-13:
+
+1. **Rules without automation (this stage).** `AGENTS.md`, `docs/standards.md`, `CONTRIBUTING.md`,
+   issue and pull-request forms; end-to-end tests gate the deploy; `main` is protected and takes
+   changes only through pull requests that the user merges.
+2. **Agents write and review, the user merges.** From here a `LESSONS.md` records what had to be
+   fixed twice, what should not have merged and what was verified too thinly; a lesson seen on three
+   separate days moves into `docs/standards.md`. How the agents are triggered and paid for is not
+   decided.
+3. **Automatic merging for low-risk changes** (documents, tests, sourced data corrections). The gates
+   in `AGENTS.md` keep waiting for the user.
+
+Not built yet, and wanted by stage 2: a place for sourced corrections that the pipeline applies, so
+that a fault in a source can be fixed without a hand edit to `public/data/`.
 
 **If you are a new session:** check `gh run list --limit 3` is green, run
-`E2E_BASE_URL=https://pengqianhan.github.io/campus-world-model/ npm run e2e`, then either pick a bonus
+`E2E_BASE_URL=https://campusworldmodel.com/uoa/ npm run e2e`, then take up an open issue, pick a bonus
 item below or, if the user has added a timetable snapshot, follow README "Adding the class timetable".
 
 Bonus ideas not done, in rough order of value:

@@ -1,0 +1,27 @@
+name: Another university
+description: Ask for a campus to be added, or offer to add one
+labels: ["new-school"]
+body:
+  - type: input
+    id: school
+    attributes:
+      label: University and campus
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Where its public data lives, if you know
+      description: >-
+        Links to the campus map, a class search or timetable that opens without signing in, and
+        the page of key dates. The site only uses data anyone can open without an account.
+  - type: dropdown
+    id: who
+    attributes:
+      label: Would you like to do it yourself?
+      options:
+        - I am asking for it
+        - I would like to help
+        - I will port it in a repository of my own
+    validations:
+      required: true

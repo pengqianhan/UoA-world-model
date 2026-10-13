@@ -17,25 +17,14 @@ decides how much of the contract can be filled, so recon comes before code.
 
 ## Rules of a port
 
-- **Real or absent.** Every published record traces to a snapshot of a source anyone can open without
-  signing in. A layer with no such source ships absent and the site says so in plain words;
-  `schedule.available: false` already drives those notes. One invented class makes every real one
-  untrustworthy.
-- **Snapshot once.** Recon looks at a route once. After that every fetch goes through
-  `scripts/lib/snapshot.ts`, which caches, paces to one request a second, names the project in its
-  User-Agent, and logs URL, date and hash to `data/sources.json`. Raw snapshots stay in gitignored
-  `data/raw/`; openly licensed raw data (OpenStreetMap) is the exception and is committed.
-- **Closed is a verdict.** A 401, a 403, a login redirect or a dropped connection is recorded once
-  and left alone. Whatever needs a login, a credential, a payment, or a message to the school or to
-  anyone else goes under "Needs the user" in the handover, and the port continues with the rest.
-- **Places, not people.** Publish codes, titles, times and rooms. Drop staff names and enrolment
-  numbers at parse time. Outlines are for teaching and study spaces; residential rooms, plant, toilets
-  and anything the source hides from its own search stay out.
-- **Label the precision.** Keep each record's original text. Mark whether it is located to a room, a
-  floor or a building. Inferred floors and estimated heights are labelled as such on screen. A record
-  that cannot be used goes to `exclusions` with its reason.
-- **Unofficial, visibly.** Its own name, palette and favicon; the unofficial notice in the page title,
-  About and README.
+The "Rules" section of [AGENTS.md](../../../AGENTS.md) binds a port as it binds this site; read it
+before recon. Two of the rules carry more in a port:
+
+- **Real or absent.** A layer with no public source ships absent, and `schedule.available: false`
+  already drives the notes that say so.
+- **Closed is a verdict.** Recon looks at a route once. Whatever needs a login, a credential, a
+  payment, or a message to the school or to anyone else goes under "Needs the user" in the handover,
+  and the port continues with the rest.
 
 ## Handover
 
@@ -45,7 +34,8 @@ progress with its exact next step, what is done with its evidence, decisions wit
 routes that were tried and failed, and "Needs the user".
 
 Write the plan for a piece before starting it and the result after. Commit and push each verified
-piece: an interrupted session keeps only what was pushed.
+piece straight to `main`: an interrupted session keeps only what was pushed, and a port has no
+reviewer to wait for, so "How a change lands" in AGENTS.md starts to apply once the port is live.
 
 A choice that comes up mid-port is yours. Take the option that keeps the site real and live, record
 it under Decisions, continue.

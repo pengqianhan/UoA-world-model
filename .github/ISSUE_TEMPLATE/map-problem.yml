@@ -1,0 +1,29 @@
+name: Something on the map is wrong
+description: A room, floor, building or name that does not match the real campus
+labels: ["map-data"]
+body:
+  - type: input
+    id: link
+    attributes:
+      label: Link to the view
+      description: >-
+        Copy the address from your browser's address bar. It records the building, floor, room
+        and time, so it shows us exactly what you see.
+      placeholder: "https://…/?building=…&floor=…&room=…"
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What is wrong
+    validations:
+      required: true
+  - type: textarea
+    id: right
+    attributes:
+      label: What is right, and how you know
+      description: >-
+        For example: you were in the room, there is a sign on the door, or a page on the
+        university's website says so (paste its link).
+    validations:
+      required: true
