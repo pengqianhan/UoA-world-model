@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const USER_AGENT =
-  "UoA-world-model/0.1 (unofficial student project; https://github.com/pengqianhan/UoA-world-model)";
+  "campus-world-model/0.1 (unofficial student project; https://github.com/pengqianhan/campus-world-model)";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 export const RAW_DIR = path.join(ROOT, "data", "raw");

@@ -5,7 +5,7 @@ import { data, panel } from "../app/state.ts";
 import { aucklandWallTime } from "../shared/time.ts";
 import { IconButton, Section } from "./common.tsx";
 
-const REPO = "https://github.com/pengqianhan/UoA-world-model";
+const REPO = "https://github.com/pengqianhan/campus-world-model";
 const longDate: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
 
 export function AboutPanel() {

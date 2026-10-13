@@ -12,7 +12,7 @@ verified on the live site (see "Final report" and "Acceptance criteria"). The se
 deleted after the final report because the only remaining work needs the user (see "Needs the user").
 
 **If you are a new session:** check `gh run list --limit 3` is green, run
-`E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e`, then either pick a bonus
+`E2E_BASE_URL=https://pengqianhan.github.io/campus-world-model/ npm run e2e`, then either pick a bonus
 item below or, if the user has added a timetable snapshot, follow README "Adding the class timetable".
 
 Bonus ideas not done, in rough order of value:
@@ -28,8 +28,8 @@ Bonus ideas not done, in rough order of value:
 
 ## Final report (2026-10-13)
 
-- Live site: https://pengqianhan.github.io/UoA-world-model/
-- Repository: https://github.com/pengqianhan/UoA-world-model (public, MIT for code)
+- Live site: https://pengqianhan.github.io/campus-world-model/
+- Repository: https://github.com/pengqianhan/campus-world-model (public, MIT for code)
 - Verified at commit `435a4e0`: CI run green (build, e2e on software WebGL, deploy); the same 11
   Playwright tests pass against the live URL; screenshots read by eye (`docs/*.jpg` are taken from
   the live site).
@@ -48,7 +48,7 @@ Bonus ideas not done, in rough order of value:
 
 ## Acceptance criteria (GOAL §2): status and evidence
 
-Verified 2026-10-13 against https://pengqianhan.github.io/UoA-world-model/ at commit `435a4e0` with
+Verified 2026-10-13 against https://pengqianhan.github.io/campus-world-model/ at commit `435a4e0` with
 `E2E_BASE_URL=... npm run e2e` (11/11 passed) plus screenshots read by eye.
 
 | # | Criterion | Status | Evidence |
@@ -75,7 +75,7 @@ Verified 2026-10-13 against https://pengqianhan.github.io/UoA-world-model/ at co
 ## Done (with evidence)
 
 - Local toolchain: Vite 8 + TypeScript 7 + Preact 11 + three 0.186 + Vitest 5 + Playwright 1.64.
-- GitHub repo `pengqianhan/UoA-world-model` (public), Pages enabled with `build_type=workflow`,
+- GitHub repo `pengqianhan/campus-world-model` (public), Pages enabled with `build_type=workflow`,
   workflow `.github/workflows/deploy.yml` (typecheck, unit tests, build, deploy; separate e2e job).
 - Cron job `17 */5 * * *` was created at the start of session 1 (id 233af833) and deleted at the end
   of it, after the final report. It was session-only. A new session that has real work to continue
@@ -152,7 +152,12 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   `src/shared` are used by both the pipeline and the app.
 - **Ports:** dev server 5273, preview 4273 (`vite.config.ts`). Port 5173 on this machine belongs to
   another project of the user's; never touch that process.
-- **Vite `base` is `/UoA-world-model/`** (override with `BASE_PATH`).
+- **Vite `base` is `/campus-world-model/`** (override with `BASE_PATH`).
+- **The repository was renamed on 2026-10-13** from `UoA-world-model` to `campus-world-model`, to
+  match the domain and because it is meant to hold several schools. GitHub redirects the old
+  repository address. The old GitHub Pages address, `pengqianhan.github.io/UoA-world-model/`, does
+  not redirect and answers 404; the evidence in this file that names a GitHub Pages address was
+  gathered at that old address.
 - **Two hosts since 2026-10-13.** GitHub Pages as before, and Cloudflare Pages project
   `campus-world-model` at <https://campusworldmodel.com/uoa/> (also reachable as
   `campus-world-model.pages.dev`), published by the `deploy-cloudflare` CI job (repository variable

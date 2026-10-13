@@ -2,8 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 // By default the tests run against a local production build (`npm run build && npm run preview`).
 // Set E2E_BASE_URL to check a deployed copy instead, e.g. the GitHub Pages site:
-//   E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e
-const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:4273/UoA-world-model/";
+//   E2E_BASE_URL=https://pengqianhan.github.io/campus-world-model/ npm run e2e
+const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:4273/campus-world-model/";
 const local = baseURL.startsWith("http://localhost");
 
 // Headless Chromium needs to be told how to get a WebGL context. On Windows the real GPU is

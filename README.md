@@ -5,7 +5,7 @@ It is not affiliated with, endorsed by or maintained by the University of Auckla
 University logos or branding.
 
 **Live site: https://campusworldmodel.com/uoa/**
-(also at https://pengqianhan.github.io/UoA-world-model/)
+(also at https://pengqianhan.github.io/campus-world-model/)
 
 ![The City Campus by day](docs/campus-day.jpg)
 
@@ -42,7 +42,7 @@ Requires Node 22.12 or newer (developed and built in CI on Node 24).
 
 ```bash
 npm ci
-npm run dev        # http://localhost:5273/UoA-world-model/
+npm run dev        # http://localhost:5273/campus-world-model/
 ```
 
 Other commands:
@@ -52,7 +52,7 @@ Other commands:
 | `npm test` | Unit tests (room codes, floors, Auckland time and daylight saving, calendar, search, data checks) |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build into `dist/` |
-| `npm run preview` | Serve `dist/` at http://localhost:4273/UoA-world-model/ |
+| `npm run preview` | Serve `dist/` at http://localhost:4273/campus-world-model/ |
 | `npm run e2e` | Playwright tests against the preview build (run `npx playwright install chromium` once) |
 | `npm run data:fetch` | Download any data snapshot that is not cached yet |
 | `npm run data:build` | Rebuild `public/data/*.json` from the cached snapshots |
@@ -60,11 +60,11 @@ Other commands:
 To test a deployed copy instead of a local build:
 
 ```bash
-E2E_BASE_URL=https://pengqianhan.github.io/UoA-world-model/ npm run e2e
+E2E_BASE_URL=https://pengqianhan.github.io/campus-world-model/ npm run e2e
 ```
 
 The site is static. Pushing to `main` runs `.github/workflows/deploy.yml`, which type-checks, tests,
-builds and publishes to GitHub Pages. The Vite `base` is `/UoA-world-model/`; set `BASE_PATH=/` to
+builds and publishes to GitHub Pages. The Vite `base` is `/campus-world-model/`; set `BASE_PATH=/` to
 host at a domain root.
 
 The same workflow publishes a second copy to Cloudflare Pages under `/uoa/`, with the files in
