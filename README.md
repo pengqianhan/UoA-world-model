@@ -38,7 +38,7 @@ It is built to answer two questions a student actually has:
 
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
-  lifts and toilets.
+  lifts and toilets; About's note on the far campuses put right.
 - **2026-10-14:** every space on a floor shows its type, rooms stand as walls, and buildings gain
   roof colours, rims, storeys and windows; a flight to the Tsinghua World Model.
 - **2026-10-13:** first release.
@@ -72,7 +72,7 @@ Everything, with its pull request, is in the [changelog](CHANGELOG.md).
   heights and roof shapes OpenStreetMap holds, from house gables to the Sky Tower.
 - **A cut-away view of every building:** pick a floor, see its learning spaces (lecture theatres,
   teaching rooms, labs, studios, study spaces) drawn from the outlines on the official campus map, set
-  in the rest of the floor plan: 14,508 other spaces without names, each tinted by its type on the
+  in the rest of the floor plan: 14,862 other spaces without names, each tinted by its type on the
   campus map (office, other lab, toilet, stairs or lift, service) and showing that type when pointed
   at or tapped. Stairs, lifts and toilets carry a sign.
 - **Search** over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings and 251
@@ -272,13 +272,13 @@ If you represent the University and would like something changed or removed, ple
   campus map's type and nothing more; where the map's type says nothing ("Non Usable Area",
   "Nonasgn Rentable" and the like) the site says "Other area". Floors where people live and
   childcare centres are blank, and the furniture in a selected room is illustrative.
-- **The campus map itself draws nothing on 96 floors of the 3D map** (most of them in halls of
-  residence) and only a few spaces on 34 more. The floor list marks both and the building bar says
+- **The campus map itself draws nothing on 98 floors of the 3D map** (most of them in halls of
+  residence) and only a few spaces on 35 more. The floor list marks both and the building bar says
   so.
 - **The campuses away from the centre** (Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore) each stand
   in a patch of surroundings a few hundred metres across, and the map jumps between them. Everything
-  is drawn on one flat map centred on the City Campus, so shapes 125 km north are about 1% too wide.
-  The sea is not drawn (OpenStreetMap's coastline is a line, not an area).
+  is drawn on one flat map centred on the City Campus, so shapes 125 km north are about 1.4% too
+  narrow east to west. The sea is not drawn (OpenStreetMap's coastline is a line, not an area).
 - **The academic calendar covers 2026 only.**
 
 ## Inspiration

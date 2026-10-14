@@ -30,11 +30,19 @@ A change to what the site does or shows adds its line here, and the README's
 - **Signs on the floor plan** for stairs, lifts, toilets, accessible toilets and showers. A room
   found by its code outlines the shape it stands on, and its card shows that shape's type (#21).
 
+### Fixed
+
+- **About had the far campuses' error the wrong way round.** Shapes at Tai Tokerau are drawn about
+  1.4% narrower east to west than they are, not 1% wider (#30).
+
 ### Documents
 
 - The porting skill and `PROGRESS.md` caught up with the work of 14 and 15 October (#28).
 - This changelog, and a "What's new" section at the top of the README, which is also laid out
   afresh with its text unchanged (#29).
+- The README's pictures retaken from the live site, on the ground's heights and with every campus,
+  and its counts brought up to date: 14,862 other spaces, 98 bare floors and 35 partly drawn
+  (#30).
 
 ## 2026-10-14
 
