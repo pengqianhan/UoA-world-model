@@ -369,3 +369,55 @@ export function ringsBounds(rings: readonly FlatRing[]): [number, number, number
   }
   return [x0, z0, x1, z1];
 }
+
+/**
+ * A flat geometry laid over the ground: its triangles split until no edge is longer than
+ * `maxEdge` metres, then each vertex raised by the ground under it. Normals stay straight up,
+ * which suits paint on the ground. Only positions are kept.
+ */
+export function drape(g: BufferGeometry, ground: (east: number, north: number) => number, maxEdge = 10): BufferGeometry {
+  const pos = g.getAttribute("position");
+  const index = g.getIndex();
+  const out: number[] = [];
+  const limit = maxEdge * maxEdge;
+  type V = [number, number, number];
+  const d2 = (a: V, b: V) => (a[0] - b[0]) ** 2 + (a[2] - b[2]) ** 2;
+  const mid = (a: V, b: V): V => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+  // Split the longest edge at its middle; both halves keep the triangle's winding.
+  const tri = (a: V, b: V, c: V): void => {
+    const ab = d2(a, b);
+    const bc = d2(b, c);
+    const ca = d2(c, a);
+    const m = Math.max(ab, bc, ca);
+    if (m <= limit) {
+      out.push(...a, ...b, ...c);
+      return;
+    }
+    if (m === ab) {
+      const d = mid(a, b);
+      tri(a, d, c);
+      tri(d, b, c);
+    } else if (m === bc) {
+      const d = mid(b, c);
+      tri(a, b, d);
+      tri(a, d, c);
+    } else {
+      const d = mid(c, a);
+      tri(a, b, d);
+      tri(d, b, c);
+    }
+  };
+  const v = (i: number): V => [pos.getX(i), pos.getY(i), pos.getZ(i)];
+  const count = index ? index.count : pos.count;
+  for (let k = 0; k + 2 < count; k += 3) {
+    const [i, j, l] = index ? [index.getX(k), index.getX(k + 1), index.getX(k + 2)] : [k, k + 1, k + 2];
+    tri(v(i), v(j), v(l));
+  }
+  for (let k = 0; k < out.length; k += 3) out[k + 1] = out[k + 1]! + ground(out[k]!, -out[k + 2]!);
+  const normals = new Float32Array(out.length);
+  for (let k = 1; k < normals.length; k += 3) normals[k] = 1;
+  const draped = new BufferGeometry();
+  draped.setAttribute("position", new BufferAttribute(new Float32Array(out), 3));
+  draped.setAttribute("normal", new BufferAttribute(normals, 3));
+  return draped;
+}

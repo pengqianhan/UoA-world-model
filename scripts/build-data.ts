@@ -11,6 +11,7 @@ import {
   encodeRing,
   interiorPoint,
   makeProjector,
+  makeUnprojector,
   overlap,
   pointInRing,
   ringArea,
@@ -47,9 +48,12 @@ import type {
   SpaceKind,
   SpaceType,
   Subject,
+  TerrainData,
 } from "../src/shared/types.ts";
 import { AREAS, CENTRAL, type SceneArea } from "./lib/areas.ts";
 import { CATALOGUE_DIR, CATALOGUE_YEAR, facetFile } from "./lib/catalogue.ts";
+import { decodePng, type Image } from "./lib/png.ts";
+import { TERRAIN_ZOOM, globalPixel, terrainBox, terrainFile, terrarium, tilesFor } from "./lib/terrain.ts";
 import { buildSchedule, loadClassSnapshots } from "./lib/classes.ts";
 import { hasSnapshot, manifest, readSnapshot } from "./lib/snapshot.ts";
 
@@ -995,6 +999,83 @@ function decodeEntities(s: string): string {
     .replace(/&ndash;/g, "–");
 }
 
+// ---------------------------------------------------------------------------------------------
+// Terrain
+// ---------------------------------------------------------------------------------------------
+
+/** Grid spacing of the published ground, metres: a little coarser than the 8 m source. */
+const TERRAIN_STEP = 10;
+/**
+ * Lowest height kept, metres. The tiles hold single-pixel pits where land meets sea (-1,421 m in
+ * Hobson Bay, -451 m at the Viaduct); the sea itself is near 0.
+ */
+const TERRAIN_FLOOR = -2;
+
+/** The ground under one area of the map on a square grid, from the elevation tile snapshot. */
+function buildTerrain(area: SceneArea): { data?: TerrainData; stats: Record<string, number> } {
+  const stats: Record<string, number> = {};
+  const box = terrainBox(area);
+  const tiles = new Map<string, Image>();
+  for (const [x, y] of tilesFor(box, TERRAIN_ZOOM)) {
+    const file = terrainFile(TERRAIN_ZOOM, x, y);
+    if (!hasSnapshot(file)) return { stats };
+    tiles.set(`${x}/${y}`, decodePng(readSnapshot(file)));
+  }
+  const pixel = (px: number, py: number): number => {
+    const tx = Math.floor(px / 256);
+    const ty = Math.floor(py / 256);
+    const img = tiles.get(`${tx}/${ty}`);
+    if (!img) return 0;
+    const i = ((py - ty * 256) * img.width + (px - tx * 256)) * 3;
+    return terrarium(img.rgb[i]!, img.rgb[i + 1]!, img.rgb[i + 2]!);
+  };
+  // Pixel values stand for pixel centres; sample between the four nearest.
+  const sample = (lon: number, lat: number): number => {
+    const [gx, gy] = globalPixel(lon, lat, TERRAIN_ZOOM).map((v) => v - 0.5);
+    const x0 = Math.floor(gx!);
+    const y0 = Math.floor(gy!);
+    const fx = gx! - x0;
+    const fy = gy! - y0;
+    const v = (dx: number, dy: number) => Math.max(TERRAIN_FLOOR, pixel(x0 + dx, y0 + dy));
+    return (v(0, 0) * (1 - fx) + v(1, 0) * fx) * (1 - fy) + (v(0, 1) * (1 - fx) + v(1, 1) * fx) * fy;
+  };
+  const unproject = makeUnprojector(ORIGIN);
+  const [sx, sy] = project(box[1], box[0]);
+  const [ex, ey] = project(box[3], box[2]);
+  const x0 = Math.floor(sx / TERRAIN_STEP) * TERRAIN_STEP;
+  const y0 = Math.floor(sy / TERRAIN_STEP) * TERRAIN_STEP;
+  const cols = Math.ceil((ex - x0) / TERRAIN_STEP) + 1;
+  const rows = Math.ceil((ey - y0) / TERRAIN_STEP) + 1;
+  const heights = new Int16Array(cols * rows);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const h = sample(...unproject(x0 + c * TERRAIN_STEP, y0 + r * TERRAIN_STEP));
+      heights[r * cols + c] = Math.round(h * 10);
+      lo = Math.min(lo, h);
+      hi = Math.max(hi, h);
+    }
+  }
+  const prefix = area === CENTRAL ? "" : `${area.id}.`;
+  stats[`${prefix}terrain.lowest`] = Math.round(lo);
+  stats[`${prefix}terrain.highest`] = Math.round(hi);
+  stats[`${prefix}terrain.points`] = cols * rows;
+  return {
+    data: {
+      version: 1,
+      area: area.id,
+      x0,
+      y0,
+      step: TERRAIN_STEP,
+      cols,
+      rows,
+      h: Buffer.from(heights.buffer).toString("base64"),
+    },
+    stats,
+  };
+}
+
 /** Campuses in the Curriculum Catalogue's words that are campuses on the map. Others stay as text. */
 const CATALOGUE_CAMPUSES: Record<string, string> = {
   City: "city",
@@ -1128,6 +1209,9 @@ const { data: campus, index, plans, stats: campusStats } = buildCampus();
 // campus or building in them is shown.
 const contexts = areaBoxes.map((box) => ({ area: box.area, ...buildContext(campus, box) }));
 const contextStats = Object.assign({}, ...contexts.map((c) => c.stats)) as Record<string, number>;
+// The ground under each area, where its elevation tiles have been taken.
+const terrains = areaBoxes.map((box) => ({ area: box.area, ...buildTerrain(box.area) }));
+Object.assign(contextStats, ...terrains.map((t) => t.stats));
 const subjects = buildSubjects();
 const { data: catalogue, stats: catalogueStats } = buildCourses();
 const calendar = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "academic-calendar.json"), "utf8")) as AcademicCalendar;
@@ -1178,6 +1262,17 @@ const sources: SourceInfo[] = [
     provides: "Semester dates, breaks, holidays and the list of subject codes",
   },
 ];
+if (terrains.some((t) => t.data)) {
+  sources.push({
+    id: "terrain",
+    name: "Land Information New Zealand 8 m Digital Elevation Model (2012), via the AWS Terrain Tiles",
+    url: "https://registry.opendata.aws/terrain-tiles/",
+    licence:
+      "New Zealand terrain data © Land Information New Zealand and the New Zealand Government, CC BY 3.0 NZ; tiles by Mapzen/Tilezen, with SRTM, GMTED2010 (U.S. Geological Survey) and ETOPO1 (U.S. NOAA) data at the coast.",
+    snapshotDate: snapshotDate("terrain"),
+    provides: "The height of the ground under the map",
+  });
+}
 if (catalogue) {
   sources.push({
     id: "uoa-catalogue",
@@ -1206,6 +1301,8 @@ const meta: Meta = { version: 1, generatedAt: campus.generatedAt, sources, cover
 fs.rmSync(path.join(OUT, "plans"), { recursive: true, force: true });
 const planBytes = plans.reduce((n, plan) => n + write(`plans/${plan.building}.json`, plan), 0);
 fs.rmSync(path.join(OUT, "context"), { recursive: true, force: true });
+fs.rmSync(path.join(OUT, "terrain"), { recursive: true, force: true });
+const terrainBytes = Object.fromEntries(terrains.filter((t) => t.data).map((t) => [`terrain/${t.area.id}.json`, write(`terrain/${t.area.id}.json`, t.data)]));
 const contextBytes = Object.fromEntries(
   contexts.map((c) => {
     const file = c.area === CENTRAL ? "context.json" : `context/${c.area.id}.json`;
@@ -1217,6 +1314,7 @@ const sizes = {
   [`plans/ (${plans.length} files)`]: planBytes,
   "campus.json": write("campus.json", campus),
   ...contextBytes,
+  ...terrainBytes,
   "rooms-index.json": write("rooms-index.json", index),
   "subjects.json": write("subjects.json", subjects),
   ...(catalogue ? { "courses.json": write("courses.json", catalogue) } : {}),

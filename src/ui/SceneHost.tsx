@@ -1,7 +1,7 @@
 // Mounts the three.js scene and keeps it in step with the application state.
 import { effect } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { loadContext, loadPlans, mergeContexts } from "../app/data.ts";
+import { loadContext, loadPlans, loadTerrain, mergeContexts } from "../app/data.ts";
 import { lang, pick, t } from "../app/i18n.ts";
 import {
   busyBuildings,
@@ -24,7 +24,8 @@ import {
   webglFailed,
 } from "../app/state.ts";
 import { CampusScene } from "../scene/CampusScene.ts";
-import type { Building, ContextData } from "../shared/types.ts";
+import { Terrain } from "../scene/terrain.ts";
+import type { Building, ContextData, TerrainData } from "../shared/types.ts";
 import { buildingTitle } from "./common.tsx";
 import { weather } from "./weather.ts";
 
@@ -94,19 +95,29 @@ export function SceneHost() {
       if (c?.onMap) scene.showCampus(c.center, CAMPUS_SPAN[c.id] ?? campusSpan(d!.campus.buildings.filter((b) => b.campus === c.id && !b.offMap)), animate);
     };
 
-    // The surroundings of every area shown so far, the central one first.
+    // The ground and surroundings of every area shown so far, the central one first. The ground
+    // comes first, so that what stands on it is built once, in place.
     const areas: string[] = [];
     const areaContexts = new Map<string, ContextData>();
+    const areaTerrains = new Map<string, TerrainData>();
     const showArea = (area: string | undefined) => {
       const key = area ?? "";
       if (areas.includes(key)) return;
       areas.push(key);
       scene.loading++;
-      void loadContext(area)
-        .then((ctx) => {
+      const terrain = loadTerrain(area).catch((e) => {
+        // Without its ground an area is drawn flat, as before.
+        console.error("terrain", area ?? "central", e);
+        return undefined;
+      });
+      void Promise.all([loadContext(area), terrain])
+        .then(([ctx, ground]) => {
           areaContexts.set(key, ctx);
-          const loaded = areas.filter((a) => areaContexts.has(a)).map((a) => areaContexts.get(a)!);
-          scene.setContext(loaded.length === 1 ? loaded[0]! : mergeContexts(loaded));
+          if (ground) areaTerrains.set(key, ground);
+          const loaded = areas.filter((a) => areaContexts.has(a));
+          if (ground) scene.setTerrain(new Terrain(loaded.filter((a) => areaTerrains.has(a)).map((a) => areaTerrains.get(a)!)));
+          const contexts = loaded.map((a) => areaContexts.get(a)!);
+          scene.setContext(contexts.length === 1 ? contexts[0]! : mergeContexts(contexts));
         })
         .catch((e) => console.error("context", area ?? "central", e))
         .finally(() => scene.loading--);

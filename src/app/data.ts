@@ -14,6 +14,7 @@ import type {
   Schedule,
   Session,
   Subject,
+  TerrainData,
 } from "../shared/types.ts";
 
 export interface AppData {
@@ -95,6 +96,22 @@ export function loadContext(area?: string): Promise<ContextData> {
       throw e;
     });
     contextPromises.set(key, promise);
+  }
+  return promise;
+}
+
+const terrainPromises = new Map<string, Promise<TerrainData>>();
+
+/** The ground under one area of the map: the central one by default. Each is fetched once. */
+export function loadTerrain(area?: string): Promise<TerrainData> {
+  const key = area ?? "central";
+  let promise = terrainPromises.get(key);
+  if (!promise) {
+    promise = getJson<TerrainData>(`terrain/${key}.json`).catch((e) => {
+      terrainPromises.delete(key);
+      throw e;
+    });
+    terrainPromises.set(key, promise);
   }
   return promise;
 }

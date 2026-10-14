@@ -12,6 +12,7 @@ interface SceneHandle {
   planPoint(): { x: number; y: number } | undefined;
   spaceAt(x: number, y: number): { text: string; kind: string } | undefined;
   spaceFloors(): { kind: string; colour: number }[];
+  groundState(x: number, y: number, building?: string): { terrain: boolean; ground: number; base?: number; low?: number; meshY?: number };
   lightState(): {
     azimuth: number;
     elevation: number;
