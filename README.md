@@ -35,7 +35,7 @@ It is built to answer two questions a student actually has:
   rooms, labs, studios, study spaces) drawn from the outlines on the official campus map, set in the
   rest of the floor plan: 14,508 other spaces without names, each tinted by its type on the campus
   map (office, other lab, toilet, stairs or lift, service) and showing that type when pointed at or
-  tapped.
+  tapped. Stairs, lifts and toilets carry a sign.
 - Search over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings, 251
   subject codes and the 6,982 courses of the 2026 Curriculum Catalogue, by code or title, with the
   terms and campuses each is offered in. Māori names match with or without macrons (`Maori` finds
@@ -201,7 +201,7 @@ e2e/                browser tests (Playwright), numbered after the acceptance cr
 
 Accuracy is labelled wherever it matters. A room drawn with an outline comes from the campus map. A
 room shown as a pin is known to the campus map by its code; the pin stands on the shape that the
-floor plan draws for it. The shapes carry the campus map's type for each, in its own words, and no
+floor plan draws for it, which is outlined. The shapes carry the campus map's type for each, in its own words, and no
 code or name. A room that the map does not know is placed on a floor inferred from its number and
 marked as inferred. A building's
 shape comes from the campus map's outline of each floor, with floors that are alike within a
