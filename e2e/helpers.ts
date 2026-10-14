@@ -12,6 +12,7 @@ interface SceneHandle {
   planPoint(): { x: number; y: number } | undefined;
   spaceAt(x: number, y: number): { text: string; kind: string } | undefined;
   spaceFloors(): { kind: string; colour: number }[];
+  pinOutline(): { text: string; kind: string; icon?: string } | undefined;
   floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number; outerWalls: boolean; windowsBelow: boolean };
   openFloorBox(): { left: number; top: number; right: number; bottom: number } | undefined;
   probe(): { width: number; height: number; distinctColours: number; samples: number };

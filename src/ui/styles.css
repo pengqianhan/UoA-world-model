@@ -296,6 +296,47 @@ a {
   border-color: rgba(255, 180, 84, 0.7);
 }
 
+/* Signs on stairs, lifts and toilets: a glyph masked out of the label's own colour. */
+.lbl-sign {
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 6px;
+  background: rgba(51, 66, 79, 0.92);
+}
+.lbl-sign b {
+  display: none;
+}
+.lbl-sign::after {
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  content: "";
+  -webkit-mask: var(--glyph) center / contain no-repeat;
+  mask: var(--glyph) center / contain no-repeat;
+}
+.sign-toilet,
+.sign-accessible,
+.sign-shower {
+  background: rgba(36, 102, 168, 0.92);
+}
+.sign-stairs {
+  --glyph: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M2 21h6v-5h5v-5h5V6h4' fill='none' stroke='black' stroke-width='2.6' stroke-linejoin='round'/></svg>");
+}
+.sign-lift {
+  --glyph: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='3.5' y='2' width='17' height='20' rx='2.5' fill='none' stroke='black' stroke-width='2.2'/><path d='M12 5.5l4 4.5H8zM12 18.5l4-4.5H8z'/></svg>");
+}
+.sign-toilet {
+  --glyph: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='6.5' cy='3.5' r='2.3'/><path d='M3.5 7h6v7.5H8.2V22H4.8v-7.5H3.5z'/><path d='M12 1v22' stroke='black' stroke-width='1.2'/><circle cx='17.5' cy='3.5' r='2.3'/><path d='M15.5 7h4l2.5 8h-2.6v7h-3.8v-7H13z'/></svg>");
+}
+.sign-accessible {
+  --glyph: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='10' cy='3' r='2.3'/><path d='M8.6 6.5h2.8v4.5h5.4v2.6H8.6z'/><path d='M16.2 13.6l2.6 6 2.2-1' fill='none' stroke='black' stroke-width='2.2'/><path d='M6.8 10.2a6.4 6.4 0 1 0 8.6 8.4' fill='none' stroke='black' stroke-width='2.4'/></svg>");
+}
+.sign-shower {
+  --glyph: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 1v4' stroke='black' stroke-width='2.4'/><path d='M4.5 12a7.5 7.5 0 0 1 15 0z'/><path d='M7.5 15l-1.2 3M12 15v3M16.5 15l1.2 3M6 20.5l-.6 1.5M12 20.5V22M18 20.5l.6 1.5' stroke='black' stroke-width='2' stroke-linecap='round'/></svg>");
+}
+
 /* ---- Buttons ------------------------------------------------------------------------------ */
 
 .btn {
