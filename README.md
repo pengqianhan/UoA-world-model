@@ -221,6 +221,9 @@ If you represent the University and would like something changed or removed, ple
 - Only learning spaces are named and can be selected. The rest of a floor is plain shapes, floors
   where people live and childcare centres are blank, and the furniture in a selected room is
   illustrative.
+- The campus map itself draws nothing on 96 floors of the 3D map (most of them in halls of
+  residence) and only a few spaces on 34 more. The floor list marks both and the building bar says
+  so.
 - Only the City, Grafton and Newmarket campuses are in 3D; other campuses' buildings appear in search,
   marked as not on the map.
 - The academic calendar covers 2026 only.

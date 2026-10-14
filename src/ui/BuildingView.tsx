@@ -19,7 +19,7 @@ import {
 } from "../app/state.ts";
 import { sessionsOnDate } from "../shared/schedule.ts";
 import { formatMinutes } from "../shared/time.ts";
-import type { Building, Session } from "../shared/types.ts";
+import type { Building, Floor, Session } from "../shared/types.ts";
 import { buildingTitle, campusName, componentName, sessionTimes } from "./common.tsx";
 import { notTeachingReason } from "./TimePanel.tsx";
 
@@ -34,6 +34,7 @@ function FloorList({ d, b }: { d: AppData; b: Building }) {
   useEffect(() => {
     document.querySelector(".floor.on")?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [b.id, current]);
+  const marks = new Set(b.offMap ? [] : b.floors.map(floorMark).filter(Boolean));
   return (
     <nav class="floors" aria-label={t("building.floorList")}>
       <span class="floors-title">{t("building.floorList")}</span>
@@ -42,26 +43,55 @@ function FloorList({ d, b }: { d: AppData; b: Building }) {
         {b.floors.map((f) => {
           const count = counts.get(f.i) ?? 0;
           const on = f.i === selFloor.value;
+          const mark = b.offMap ? undefined : floorMark(f);
+          const title = [
+            t("building.floor", { name: f.name }),
+            count ? tn("building.floorHasRooms", count) : "",
+            mark ? t(`building.floorMark.${mark}`) : "",
+          ];
           return (
             <li>
               <button
                 type="button"
-                class={`floor ${on ? "on" : ""} ${count ? "has-rooms" : ""}`}
+                class={`floor ${on ? "on" : ""} ${count ? "has-rooms" : ""} ${mark ? `mark-${mark}` : ""}`}
                 aria-current={on ? "true" : undefined}
                 data-floor={f.name}
-                title={`${t("building.floor", { name: f.name })}${count ? ` · ${tn("building.floorHasRooms", count)}` : ""}`}
+                title={title.filter(Boolean).join(" · ")}
                 onClick={() => openFloor(f.i)}
               >
                 <span class="floor-name">{f.name}</span>
-                {count > 0 && <span class="floor-count">{count}</span>}
+                {count > 0 ? (
+                  <span class="floor-count">{count}</span>
+                ) : (
+                  mark && <span class={`floor-mark ${mark}`} aria-hidden="true" />
+                )}
                 {busyOn.has(f.i) && <span class="floor-busy" aria-hidden="true" />}
               </button>
             </li>
           );
         })}
       </ol>
+      {marks.size > 0 && (
+        <ul class="floors-legend" id="floors-legend">
+          {(["partial", "blank"] as const)
+            .filter((m) => marks.has(m))
+            .map((m) => (
+              <li>
+                <span class={`floor-mark ${m}`} aria-hidden="true" />
+                {t(`building.floorMark.${m}`)}
+              </li>
+            ))}
+        </ul>
+      )}
     </nav>
   );
+}
+
+/** How much of a floor the campus map lets this site draw, when it is not the whole floor. */
+function floorMark(f: Floor): "partial" | "blank" | undefined {
+  if (f.noPlan) return "blank";
+  if (f.partialPlan) return "partial";
+  return undefined;
 }
 
 function SessionRow({ d, s, live }: { d: AppData; s: Session; live: boolean }) {
@@ -227,6 +257,11 @@ export function BuildingView() {
           {floor?.noPlan && !b.offMap && (
             <p class="bar-note" id="floor-no-plan-note">
               {t(`building.noPlan.${floor.noPlan}`)}
+            </p>
+          )}
+          {floor?.partialPlan && !b.offMap && (
+            <p class="bar-note" id="floor-partial-note">
+              {t("building.partialPlan")}
             </p>
           )}
           {floor?.outlineFrom === "footprint" && !b.offMap && (
