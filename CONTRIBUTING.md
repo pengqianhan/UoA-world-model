@@ -15,6 +15,8 @@ were in the room, there is a sign on the door, or a page on the university's web
 
 Open a pull request against `main`. Its form asks how the change was checked; the checks are in
 [docs/standards.md](docs/standards.md). The maintainer merges, and a merge goes live within minutes.
+A change to what the site does or shows also adds a line to [CHANGELOG.md](CHANGELOG.md) and to
+"What's new" in the README.
 
 Every change keeps the rules in [AGENTS.md](AGENTS.md). The two that surprise people most: the site
 only publishes data that anyone can open without signing in, and it never publishes staff names.
