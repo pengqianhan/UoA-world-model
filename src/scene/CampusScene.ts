@@ -103,6 +103,8 @@ export interface SceneOptions {
   /** Text for building labels. */
   buildingLabel: (b: Building) => { text: string; sub?: string; title?: string };
   roomLabel: (r: Room) => { text: string; title?: string };
+  /** Accessible name of the sign on a stair, lift or toilet. */
+  signTitle?: (type: SpaceType) => string;
 }
 
 interface Tween {
@@ -182,6 +184,14 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** An unnamed shape on the open floor, as published and in metres, with its type and a point inside it. */
+interface PlanSpace {
+  flat: FlatRing[];
+  rings: [number, number][][];
+  type: SpaceType;
+  at: [number, number];
+}
+
 export class CampusScene {
   onPick?: (pick: Pick) => void;
   onHover?: (pick: Pick) => void;
@@ -221,8 +231,10 @@ export class CampusScene {
   private roomMeshes = new Map<string, Mesh>();
   private plans = new Map<string, FloorPlans>();
   private planObjects: (Mesh | LineSegments)[] = [];
-  /** The unnamed shapes on the open floor, in metres, with their types; largest first. */
-  private planSpaces: { rings: [number, number][][]; type: SpaceType }[] = [];
+  /** The unnamed shapes on the open floor; largest first. */
+  private planSpaces: PlanSpace[] = [];
+  /** The shape under the pin, outlined: the room the pin stands for, as the campus map draws it. */
+  private pinShape?: SpaceType;
   /** The space last reported to `onSpace`. */
   private spaceShown?: SpaceType;
   private selectedOutline?: LineLoop;
@@ -406,6 +418,9 @@ export class CampusScene {
     this.plans.set(plans.building, plans);
     if (this.selection.building !== plans.building) return;
     this.rebuildPlan();
+    // The pin's outline and the signs on the floor come from the shapes.
+    this.rebuildPin();
+    this.rebuildLabels();
     this.needsShadow = true;
     this.needsRender = true;
   }
@@ -640,9 +655,36 @@ export class CampusScene {
       ((child as Mesh).material as MeshLambertMaterial).dispose();
     }
     this.pinGroup.clear();
+    this.pinShape = undefined;
     const cur = this.currentFloor();
     if (!this.pin || !cur) return;
     const y = this.floorY(cur.b, cur.floor.i) + SLAB;
+    // The pin stands on the shape the campus map draws for its room: outline it and tint its floor.
+    const shape = this.planSpaceAt(this.pin.at);
+    if (shape) {
+      this.pinShape = shape.type;
+      const fill = new MeshBuilder();
+      fill.extrude(shape.flat, y + PLAN_FLOOR, y + PLAN_FLOOR + 0.02);
+      const fillMesh = new Mesh(
+        fill.build(),
+        new MeshLambertMaterial({ color: lerpColour(this.palette.accent, this.palette.slab, 0.45), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
+      );
+      fillMesh.receiveShadow = true;
+      const top = y + PLAN_WALL + 0.06;
+      const lines: number[] = [];
+      for (const ring of shape.rings) {
+        ring.forEach(([ax, ay], i) => {
+          const [bx, by] = ring[(i + 1) % ring.length]!;
+          lines.push(ax, top, -ay, bx, top, -by);
+        });
+      }
+      const g = new BufferGeometry();
+      g.setAttribute("position", new Float32BufferAttribute(lines, 3));
+      const outline = new LineSegments(g, new LineBasicMaterial({ color: this.palette.accent }));
+      fillMesh.userData.noPick = outline.userData.noPick = true;
+      fillMesh.userData.role = "pinShape";
+      this.pinGroup.add(fillMesh, outline);
+    }
     const mat = new MeshLambertMaterial({ color: this.palette.accent });
     const stem = new Mesh(new CylinderGeometry(0.18, 0.18, 4, 8), mat);
     stem.position.set(this.pin.at[0], y + 2, -this.pin.at[1]);
@@ -1040,7 +1082,8 @@ export class CampusScene {
     shapes.forEach((rings, k) => {
       const type = plan.types[typeOf[k]!] ?? { text: "", kind: "other" };
       const kind = type.kind;
-      this.planSpaces.push({ rings: rings.map(decodeRing), type });
+      const decoded = rings.map(decodeRing);
+      this.planSpaces.push({ flat: rings, rings: decoded, type, at: interiorPoint(decoded[0]!) });
       let mb = floors.get(kind);
       if (!mb) floors.set(kind, (mb = new MeshBuilder()));
       // From the underside of the slab, so a shape that overhangs the floor outline has a base.
@@ -1179,6 +1222,22 @@ export class CampusScene {
           onClick: () => this.onPick?.({ type: "room", code: r.code }),
         });
       }
+      // Signs on stairs, lifts and toilets. They give way to every room label, and lifts and
+      // stairs to nothing else; a sign cannot be clicked, so a pointer goes through to the space.
+      this.planSpaces.forEach((s, k) => {
+        const icon = s.type.icon;
+        if (!icon) return;
+        specs.push({
+          id: `sign:${b.id}:${floor.i}:${k}`,
+          x: s.at[0],
+          y: y + PLAN_WALL + 0.2,
+          z: -s.at[1],
+          text: "",
+          title: this.opts.signTitle?.(s.type),
+          priority: icon === "stairs" || icon === "lift" ? -1e5 : -2e5,
+          className: `lbl-sign sign-${icon}`,
+        });
+      });
       if (this.pin) {
         specs.push({
           id: "pin",
@@ -1417,14 +1476,16 @@ export class CampusScene {
     if (!cur || !this.planSpaces.length) return undefined;
     const y = this.floorY(cur.b, cur.floor.i) + SLAB + PLAN_FLOOR;
     const hit = this.raycaster.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), -y), new Vector3());
-    if (!hit) return undefined;
-    const pt: [number, number] = [hit.x, -hit.z];
+    const space = hit && this.planSpaceAt([hit.x, -hit.z]);
+    return space ? { type: space.type, distance: this.raycaster.ray.origin.distanceTo(hit) } : undefined;
+  }
+
+  /** The innermost unnamed shape on the open floor holding a point, in metres. */
+  private planSpaceAt(pt: [number, number]): PlanSpace | undefined {
     // Largest first, so the last shape holding the point is the one drawn on top.
     for (let k = this.planSpaces.length - 1; k >= 0; k--) {
       const [outer, ...holes] = this.planSpaces[k]!.rings;
-      if (outer && pointInRing(pt, outer) && !holes.some((h) => pointInRing(pt, h))) {
-        return { type: this.planSpaces[k]!.type, distance: this.raycaster.ray.origin.distanceTo(hit) };
-      }
+      if (outer && pointInRing(pt, outer) && !holes.some((h) => pointInRing(pt, h))) return this.planSpaces[k];
     }
     return undefined;
   }
@@ -1630,6 +1691,11 @@ export class CampusScene {
   /** The type of the unnamed space at a point of the page, if one is there. For tests. */
   spaceAt(x: number, y: number): SpaceType | undefined {
     return this.probeAt(x, y).space;
+  }
+
+  /** The type of the shape outlined under the pin, if there is one. For tests. */
+  pinOutline(): SpaceType | undefined {
+    return this.pinShape;
   }
 
   /**

@@ -119,10 +119,14 @@ export interface CampusData {
 /** The group a space that is not named is drawn in, by its type on the campus map. */
 export type SpaceKind = "office" | "lab" | "learning" | "toilet" | "stairs" | "amenity" | "other";
 
+/** The sign drawn on a space whose type says how to get about or find a toilet. */
+export type SpaceIcon = "stairs" | "lift" | "toilet" | "accessible" | "shower";
+
 /** A space type on the campus map, in its own words, and the group it is drawn in. */
 export interface SpaceType {
   text: string;
   kind: SpaceKind;
+  icon?: SpaceIcon;
 }
 
 /**

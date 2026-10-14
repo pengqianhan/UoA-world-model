@@ -1,7 +1,7 @@
 // Controls shown while a building is open: the floor list, the building bar with the room
 // selector, and the card describing the selected room and what is timetabled in it.
 import { useEffect } from "preact/hooks";
-import type { AppData } from "../app/data.ts";
+import { planShapeAt, type AppData } from "../app/data.ts";
 import { formatDate, pick, t, tn } from "../app/i18n.ts";
 import {
   busyRooms,
@@ -164,11 +164,14 @@ function RoomCard({ d, b }: { d: AppData; b: Building }) {
   const room = d.roomByCode.get(code);
   const m = marker.value;
   const floor = room ? room.f : m?.floor;
-  const precision = room ? "room" : (m?.precision ?? "building");
+  // A room found by its code stands on a shape of the floor plan: the room as the campus map draws it.
+  const plan = plansLoaded.value.get(b.id);
+  const shape = !room && plan && m?.at && m.floor !== undefined ? planShapeAt(plan, m.floor, m.at) : undefined;
+  const precision = room ? "room" : shape ? "indexedOutline" : (m?.precision ?? "building");
   return (
     <section class="room-card" aria-live="polite" id="room-card">
       <header>
-        <span class={`kind-dot kind-${room?.kind ?? "other"}`} aria-hidden="true" />
+        <span class={shape ? `kind-dot space-${shape.kind}` : `kind-dot kind-${room?.kind ?? "other"}`} aria-hidden="true" />
         <h3>
           <b>{code}</b>
           <span>{room ? pick(room.name) : t("search.kind.room")}</span>
@@ -176,6 +179,7 @@ function RoomCard({ d, b }: { d: AppData; b: Building }) {
       </header>
       <p class="room-facts">
         {room && <span>{t(`room.kind.${room.kind}`)}</span>}
+        {shape && <span title={t("space.sourceType", { type: shape.text })}>{t(`space.kind.${shape.kind}`)}</span>}
         {floor !== undefined && <span>{t("room.floor", { name: floorName(b, floor) })}</span>}
         {room && room.area > 0 && <span>{t("room.area", { area: room.area })}</span>}
       </p>

@@ -146,7 +146,12 @@ test("3. search finds real room codes, buildings and course codes, and moves the
   expect(params(page).get("building")).toBe("104");
   expect(params(page).get("room")).toBe("104-G53");
   await expect(page.locator('[data-label="pin"]')).toBeVisible();
-  await expect(page.locator("#precision-note")).toContainText("shown as a pin");
+  // The pin stands on the room as the campus map draws it: that shape is outlined, and the card
+  // gives its type.
+  await page.waitForFunction(() => !!window.__scene!.pinOutline());
+  const outlined = (await page.evaluate(() => window.__scene!.pinOutline()))!;
+  await expect(page.locator("#precision-note")).toContainText("Position and outline from the official campus map");
+  await expect(page.locator("#room-card .room-facts span").first()).toHaveAttribute("title", `Campus map type: ${outlined.text}`);
   await shot(page, "03-search-pin");
 
   // An unknown room in a known building falls back to an inferred floor, and says so.
@@ -436,6 +441,11 @@ test("the rest of a floor is drawn as unnamed shapes that carry the campus map's
   for (const label of ["Office", "Other lab", "Toilet or shower", "Stairs or lift"]) {
     await expect(page.locator("#legend-spaces")).toContainText(label);
   }
+  // Stairs, lifts and toilets carry signs, which give way to room labels and pass the pointer on.
+  await expect(page.locator(".lbl-sign.on").first()).toBeVisible();
+  expect(await page.locator(".lbl-sign.sign-stairs.on, .lbl-sign.sign-lift.on").count()).toBeGreaterThan(1);
+  expect(await page.locator(".lbl-sign.sign-toilet.on, .lbl-sign.sign-accessible.on").count()).toBeGreaterThan(0);
+  await expect(page.locator(".lbl-sign.sign-lift").first()).toHaveAttribute("title", "Lift");
   const at = (await page.evaluate(() => window.__scene!.planPoint()))!;
   await page.mouse.move(at.x, at.y);
   await expect(page.locator("#space-tip")).toContainText("Campus map type:");
