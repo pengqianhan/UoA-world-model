@@ -1,7 +1,7 @@
 // Mounts the three.js scene and keeps it in step with the application state.
 import { effect } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { loadContext, loadPlans } from "../app/data.ts";
+import { loadContext, loadPlans, mergeContexts } from "../app/data.ts";
 import { lang, pick, t } from "../app/i18n.ts";
 import {
   busyBuildings,
@@ -24,11 +24,27 @@ import {
   webglFailed,
 } from "../app/state.ts";
 import { CampusScene } from "../scene/CampusScene.ts";
+import type { Building, ContextData } from "../shared/types.ts";
 import { buildingTitle } from "./common.tsx";
 import { weather } from "./weather.ts";
 
-/** Approximate width in metres to show for each campus that is on the map. */
+/** Approximate width in metres to show for each central campus. */
 const CAMPUS_SPAN: Record<string, number> = { city: 1250, grafton: 520, newmarket: 620 };
+
+/** Width to show for a campus away from the centre: its buildings with room round them. */
+function campusSpan(buildings: Building[]): number {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const b of buildings) {
+    x0 = Math.min(x0, b.center[0]);
+    x1 = Math.max(x1, b.center[0]);
+    y0 = Math.min(y0, b.center[1]);
+    y1 = Math.max(y1, b.center[1]);
+  }
+  return Number.isFinite(x0) ? Math.max(260, Math.hypot(x1 - x0, y1 - y0) * 1.6) : 900;
+}
 
 export const isLite = () => window.matchMedia("(max-width: 720px), (pointer: coarse)").matches;
 
@@ -73,8 +89,27 @@ export function SceneHost() {
     };
 
     const showCampus = (animate: boolean) => {
-      const c = data.value?.campusById.get(selCampus.peek());
-      if (c?.onMap) scene.showCampus(c.center, CAMPUS_SPAN[c.id] ?? 900, animate);
+      const d = data.value;
+      const c = d?.campusById.get(selCampus.peek());
+      if (c?.onMap) scene.showCampus(c.center, CAMPUS_SPAN[c.id] ?? campusSpan(d!.campus.buildings.filter((b) => b.campus === c.id && !b.offMap)), animate);
+    };
+
+    // The surroundings of every area shown so far, the central one first.
+    const areas: string[] = [];
+    const areaContexts = new Map<string, ContextData>();
+    const showArea = (area: string | undefined) => {
+      const key = area ?? "";
+      if (areas.includes(key)) return;
+      areas.push(key);
+      scene.loading++;
+      void loadContext(area)
+        .then((ctx) => {
+          areaContexts.set(key, ctx);
+          const loaded = areas.filter((a) => areaContexts.has(a)).map((a) => areaContexts.get(a)!);
+          scene.setContext(loaded.length === 1 ? loaded[0]! : mergeContexts(loaded));
+        })
+        .catch((e) => console.error("context", area ?? "central", e))
+        .finally(() => scene.loading--);
     };
 
     let first = true;
@@ -84,9 +119,15 @@ export function SceneHost() {
         if (!d) return;
         scene.setCampus(d.campus);
         if (!selBuilding.peek()) showCampus(false);
-        void loadContext()
-          .then((ctx) => scene.setContext(ctx))
-          .catch((e) => console.error("context", e));
+        showArea(undefined);
+      }),
+      effect(() => {
+        // A campus or building away from the centre brings its own surroundings.
+        const d = data.value;
+        if (!d) return;
+        const b = selBuilding.value ? d.buildingById.get(selBuilding.value) : undefined;
+        const area = b ? b.area : d.campusById.get(selCampus.value)?.area;
+        if (area) showArea(area);
       }),
       effect(() => {
         if (!data.value) return;

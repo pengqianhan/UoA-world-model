@@ -190,6 +190,20 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
 - Academic calendar: hand-transcribed into `data/academic-calendar.json` from the official 2026
   key-dates PDF (snapshot `data/raw/uoa-calendar/2026-key-dates.pdf`). 2027 only had start dates.
 - Subject list: parsed from the Calendar's "course codes by faculty" page (251 subjects).
+- Campuses away from the centre, since 2026-10-15 (the user asked for every remaining item that has
+  a public source): `scripts/lib/areas.ts` lists the areas the map draws, the central one and one
+  box with 400 m of margin round each of Tai Tokerau, Ardmore, Leigh, Waiheke, Tai Tonga and
+  building 581 (18 Carrick Place, Grafton Campus, 3 km from the rest). Each has its own Overpass
+  snapshot (`data/raw/osm/context-<area>.json`, committed) and its own `context/<area>.json`
+  (6-152 KB), loaded when a campus or building in it is shown. All 194 buildings and all eight
+  campuses are on the map; remote campuses are chosen from "Other campuses…" in the status strip,
+  and the camera jumps rather than flies between areas. The ground and the shadow map follow the
+  campus shown. One flat projection about the City Campus is kept for every area: at Tai Tokerau
+  (125 km north) shapes are about 1% too wide east to west, which About says. The sea is not
+  drawn: OpenStreetMap's coastline is a line, and turning it into water was not attempted. The
+  public Overpass instances answered 504 or nothing for most of an hour on 2026-10-15; the fetch now
+  times out after 240 s (`scripts/lib/snapshot.ts`) and goes round all three instances up to three
+  times, a minute apart.
 - Context: OpenStreetMap via one Overpass query (`data/raw/osm/context.json`, committed, ODbL).
   Since 2026-10-13 the pipeline also uses what that snapshot already held and had ignored: the
   `building:part` ways (341 drawn; they replace 20 outlines and stand on 74 others) with their

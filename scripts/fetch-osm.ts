@@ -1,13 +1,12 @@
-// Snapshot OpenStreetMap context geometry (surrounding buildings, streets, parks, trees)
-// for the City / Grafton / Newmarket area with a single Overpass query.
-// OSM data is © OpenStreetMap contributors, ODbL 1.0, so this snapshot is committed.
+// Snapshot OpenStreetMap context geometry (surrounding buildings, streets, parks, trees) with one
+// Overpass query for each area the map draws (scripts/lib/areas.ts): the City / Grafton /
+// Newmarket area, and each campus or building away from it.
+// OSM data is © OpenStreetMap contributors, ODbL 1.0, so these snapshots are committed.
+import { AREAS, type SceneArea } from "./lib/areas.ts";
 import { snapshot } from "./lib/snapshot.ts";
 
-// south, west, north, east: the three central campuses plus roughly 150 m of margin.
-export const OSM_BBOX = [-36.8689, 174.7608, -36.8441, 174.7797] as const;
-
-const query = `
-[out:json][timeout:180][bbox:${OSM_BBOX.join(",")}];
+const query = (area: SceneArea) => `
+[out:json][timeout:180][bbox:${area.bbox.join(",")}];
 (
   way["building"];
   relation["building"];
@@ -32,30 +31,36 @@ const ENDPOINTS = [
   "https://overpass.kumi.systems/api/interpreter",
 ];
 
-let buf: Buffer | undefined;
-for (const url of ENDPOINTS) {
-  try {
-    buf = await snapshot({
-      source: "osm",
-      file: "osm/context.json",
-      url,
-      method: "POST",
-      body: "data=" + encodeURIComponent(query),
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      refresh: process.argv.includes("--refresh"),
-    });
-    break;
-  } catch (e) {
-    console.warn(String(e));
-    await new Promise((r) => setTimeout(r, 5000));
+for (const area of AREAS) {
+  let buf: Buffer | undefined;
+  // A busy instance answers 504; go round them all up to three times, a minute apart.
+  for (let round = 0; round < 3 && !buf; round++) {
+    if (round > 0) await new Promise((r) => setTimeout(r, 60_000));
+    for (const url of ENDPOINTS) {
+      try {
+        buf = await snapshot({
+          source: "osm",
+          file: area.osm,
+          url,
+          method: "POST",
+          body: "data=" + encodeURIComponent(query(area)),
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          refresh: process.argv.includes("--refresh"),
+        });
+        break;
+      } catch (e) {
+        console.warn(String(e));
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+    }
   }
+  if (!buf) throw new Error(`all Overpass endpoints failed for ${area.id}`);
+  const data = JSON.parse(buf.toString("utf8")) as { elements: { type: string; tags?: Record<string, string> }[] };
+  const count: Record<string, number> = {};
+  for (const e of data.elements) {
+    const t = e.tags ?? {};
+    const k = t.building ? "building" : t["building:part"] ? "building:part" : t.highway ? "highway" : t.natural === "tree" ? "tree" : t.leisure ? "leisure" : t.landuse ? "landuse" : t.natural ? "natural" : t.railway ? "railway" : t.waterway ? "waterway" : "other";
+    count[`${e.type}:${k}`] = (count[`${e.type}:${k}`] ?? 0) + 1;
+  }
+  console.log(area.id, buf.length, "bytes", data.elements.length, "elements", count);
 }
-if (!buf) throw new Error("all Overpass endpoints failed");
-const data = JSON.parse(buf.toString("utf8")) as { elements: { type: string; tags?: Record<string, string> }[] };
-const count: Record<string, number> = {};
-for (const e of data.elements) {
-  const t = e.tags ?? {};
-  const k = t.building ? "building" : t["building:part"] ? "building:part" : t.highway ? "highway" : t.natural === "tree" ? "tree" : t.leisure ? "leisure" : t.landuse ? "landuse" : t.natural ? "natural" : t.railway ? "railway" : t.waterway ? "waterway" : "other";
-  count[`${e.type}:${k}`] = (count[`${e.type}:${k}`] ?? 0) + 1;
-}
-console.log(buf.length, "bytes", data.elements.length, "elements", count);

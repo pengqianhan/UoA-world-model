@@ -6,12 +6,16 @@ what the grep cannot tell you.
 
 ## Data seams (step 3)
 
-**Geography.** `ORIGIN` and `SCENE_BBOX` in `scripts/build-data.ts`, `OSM_BBOX` in
-`scripts/fetch-osm.ts`. Every published coordinate is metres east and north of the origin, so put it
-at the centre of the main campus. The box sets how much city surrounds the campus and the size of
-`context.json`: Auckland's box, 1.7 km wide and 2.8 km tall, gives 612 KB. Budget: the whole deploy
-under 50 MB, the first load a few MB. `CAMPUS_IDS` names the campuses; one outside the box is
-published with `onMap: false`, searchable and marked as not on the map.
+**Geography.** `ORIGIN` in `scripts/build-data.ts` and the areas in `scripts/lib/areas.ts`: `CENTRAL`
+round the main campus, and one small box (`REMOTE`) for each campus or outlying building away
+from it. Every published coordinate is metres east and north of the origin, so put it at the
+centre of the main campus. `fetch-osm.ts` snapshots each area's surroundings; `build-data.ts`
+writes `context.json` for the central area and `context/<area>.json` for each other one, and marks
+a building or campus outside the central box with its `area`, which the app loads when that campus
+or building is shown. A building in no area is published with `offMap: true`. The central box sets
+how much city surrounds the main campus and the size of `context.json`: Auckland's box, 1.7 km wide
+and 2.8 km tall, gives 612 KB. Budget: the whole deploy under 50 MB, the first load a few MB.
+`CAMPUS_IDS` names the campuses.
 
 **Sources.** `scripts/fetch-mapsindoors.ts`, `fetch-calendar.ts`, `fetch-classes.ts`;
 `scripts/lib/classes.ts`; in `build-data.ts` the `Mi*` types, `buildCampus`, `buildSubjects` and the

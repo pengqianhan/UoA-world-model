@@ -67,6 +67,11 @@ export interface SceneWeather {
   fog: number;
 }
 
+/** The middle of the shadow map over the three central campuses, in scene coordinates. */
+const CENTRAL_SHADOW = new Vector3(130, 0, 500);
+/** A camera move longer than this, in metres, goes to another area of the map and jumps. */
+const JUMP_DISTANCE = 5000;
+
 /** The lowest the sun is drawn, degrees; a real sun lower than this casts shadows off the map. */
 const SUN_MIN_ELEVATION = 10;
 /** Crowns of deciduous trees in April and May, in winter, and in early spring. */
@@ -755,8 +760,15 @@ export class CampusScene {
       sc.right = half;
       sc.top = half;
       sc.bottom = -half;
+    } else if (this.campusCentre.distanceTo(CENTRAL_SHADOW) > JUMP_DISTANCE) {
+      // A campus in an area of its own: a few hundred metres across at most.
+      this.shadowCentre.copy(this.campusCentre);
+      sc.left = -800;
+      sc.right = 800;
+      sc.top = 800;
+      sc.bottom = -800;
     } else {
-      this.shadowCentre.set(130, 0, 500);
+      this.shadowCentre.copy(CENTRAL_SHADOW);
       sc.left = -1300;
       sc.right = 1300;
       sc.top = 1500;
@@ -766,7 +778,9 @@ export class CampusScene {
     this.placeSun();
     this.needsShadow = true;
   }
-  private shadowCentre = new Vector3(130, 0, 500);
+  private shadowCentre = CENTRAL_SHADOW.clone();
+  /** The middle of the campus last shown, in scene coordinates. */
+  private campusCentre = CENTRAL_SHADOW.clone();
 
   /** Colours of the University building masses, depending on hover and whether they hold learning spaces. */
   private restyle(): void {
@@ -1225,6 +1239,13 @@ export class CampusScene {
 
   /** Moves the camera target and zoom, keeping the viewing angle. */
   flyTo(target: Vector3, zoom: number, animate = true): void {
+    // Between areas of the map there is nothing drawn to fly over: jump.
+    if (target.distanceTo(this.controls.target) > JUMP_DISTANCE) animate = false;
+    // The ground is a square round what is shown; it follows a move to another area.
+    if (Math.hypot(target.x - this.ground.position.x, target.z - this.ground.position.z) > 2000) {
+      this.ground.position.set(target.x, 0, target.z);
+      this.needsShadow = true;
+    }
     const fromT = this.controls.target.clone();
     const fromZ = this.camera.zoom;
     const offset = this.camera.position.clone().sub(this.controls.target);
@@ -1357,6 +1378,8 @@ export class CampusScene {
     // On a portrait phone the campus cannot fit across, so frame its central strip instead.
     const aspect = this.width / this.height;
     const zoom = Math.min((VIEW_HEIGHT * aspect) / (span * 0.56), VIEW_HEIGHT / (span * 0.72));
+    this.campusCentre.set(center[0], 0, -center[1]);
+    if (!this.currentFloor()) this.fitShadow();
     this.flyTo(new Vector3(center[0], 0, -center[1]), zoom, animate);
   }
 
