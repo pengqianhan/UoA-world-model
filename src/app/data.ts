@@ -13,9 +13,11 @@ import type {
   RoomIndex,
   Schedule,
   Session,
+  SpaceType,
   Subject,
   TerrainData,
 } from "../shared/types.ts";
+import { decodeRing, pointInRing } from "../shared/geo.ts";
 
 export interface AppData {
   campus: CampusData;
@@ -166,6 +168,17 @@ export function loadPlans(building: string): Promise<FloorPlans> {
     plansPromises.set(building, promise);
   }
   return promise;
+}
+
+/** The type of the innermost floor-plan shape holding a point, in metres, on one floor. */
+export function planShapeAt(plan: FloorPlans, floor: number, at: [number, number]): SpaceType | undefined {
+  const shapes = plan.floors[floor] ?? [];
+  // Largest first, so the last shape holding the point is the one drawn on top.
+  for (let k = shapes.length - 1; k >= 0; k--) {
+    const [outer, ...holes] = shapes[k]!.map(decodeRing);
+    if (outer && pointInRing(at, outer) && !holes.some((h) => pointInRing(at, h))) return plan.types[plan.typeOf[floor]![k]!];
+  }
+  return undefined;
 }
 
 export interface IndexedRoom {

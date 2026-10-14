@@ -1,1 +1,1 @@
-{"version":2,"building":"126","types":[{"text":"Non Usable Area","kind":"other"},{"text":"Stairs","kind":"stairs"}],"floors":{"-10":[[[1478,953,1467,964,1454,964,1436,945,1453,928]],[[1454,964,1442,976,1423,958,1436,945]]]},"typeOf":{"-10":[0,1]}}
+{"version":2,"building":"126","types":[{"text":"Non Usable Area","kind":"other"},{"text":"Stairs","kind":"stairs","icon":"stairs"}],"floors":{"-10":[[[1478,953,1467,964,1454,964,1436,945,1453,928]],[[1454,964,1442,976,1423,958,1436,945]]]},"typeOf":{"-10":[0,1]}}

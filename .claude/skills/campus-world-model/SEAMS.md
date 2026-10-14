@@ -40,7 +40,8 @@ for it and no code or name. Which floors stay blank is spelled in Auckland's wor
 `PLAN_CHILDCARE_BUILDINGS` is a pattern on building names because the source has no type for
 childcare, and `PLAN_SKIPPED_TYPES` holds shapes that are not rooms. `SPACE_KINDS` sorts the other
 types into the groups that tint a shape's floor (office, other lab, toilet, stairs or lift, service);
-a type it does not list is "other". List the new source's room types with their counts, and its
+a type it does not list is "other". `SPACE_ICONS` puts a sign on stairs, lifts, toilets and showers;
+check what the new source's toilet types are named before mapping them. List the new source's room types with their counts, and its
 building names, and find its words for each of the four.
 
 **Surroundings.** `buildContext` draws what the OpenStreetMap snapshot holds: building parts with

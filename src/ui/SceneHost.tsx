@@ -68,6 +68,7 @@ export function SceneHost() {
           text: r.code.slice(r.b.length + 1),
           title: `${r.code} · ${pick(r.name)}`,
         }),
+        signTitle: (type) => (type.icon ? t(`space.icon.${type.icon}`) : t(`space.kind.${type.kind}`)),
       });
       if (!scene.ok) throw new Error("no WebGL context");
     } catch (e) {
