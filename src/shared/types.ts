@@ -281,6 +281,24 @@ export interface Schedule {
   exclusions: Exclusion[];
 }
 
+/**
+ * The height of the ground over one area of the map, on a square grid in the local frame:
+ * public/data/terrain/<area>.json. From the LINZ 8 m DEM as the AWS Terrain Tiles carry it.
+ */
+export interface TerrainData {
+  version: 1;
+  area: string;
+  /** South-west corner of the grid, metres east and north of the origin. */
+  x0: number;
+  y0: number;
+  /** Grid spacing, metres. */
+  step: number;
+  cols: number;
+  rows: number;
+  /** Heights above sea level in decimetres, row by row from the south, as little-endian Int16, base64. */
+  h: string;
+}
+
 export interface Subject {
   code: string;
   name: LocalizedText;

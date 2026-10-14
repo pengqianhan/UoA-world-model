@@ -38,7 +38,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room, SpaceKind, SpaceType } from "../shared/types.ts";
 import { decodeRing, interiorPoint, pointInRing } from "../shared/geo.ts";
 import { massing, roofRims } from "../shared/massing.ts";
-import { MeshBuilder, ringsBounds } from "./geometry.ts";
+import { MeshBuilder, drape, ringsBounds } from "./geometry.ts";
+import { SEA_PLANE, Terrain } from "./terrain.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
@@ -217,7 +218,6 @@ export class CampusScene {
   private uniGroup = new Group();
   private detailGroup = new Group();
   private contextMaterials: { mat: MeshLambertMaterial; key: (p: Palette) => number }[] = [];
-  private contextBuildings?: Mesh;
   private trees?: Group;
   private wallTexture: CanvasTexture;
   private glowTexture: CanvasTexture;
@@ -231,6 +231,16 @@ export class CampusScene {
   private roomMeshes = new Map<string, Mesh>();
   private plans = new Map<string, FloorPlans>();
   private planObjects: (Mesh | LineSegments)[] = [];
+  private terrain?: Terrain;
+  private terrainMeshes: Mesh[] = [];
+  /** Where each University building stands on the ground, by id. */
+  private bases = new Map<string, { base: number; low: number }>();
+  private lastContext?: ContextData;
+  /**
+   * Heights of the surrounding buildings' vertices as built, and of the ground under each, so
+   * that they can sink to their footprints where they stand.
+   */
+  private contextSquash?: { mesh: Mesh; y: Float32Array; base: Float32Array; scale: number };
   /** The unnamed shapes on the open floor; largest first. */
   private planSpaces: PlanSpace[] = [];
   /** The shape under the pin, outlined: the room the pin stands for, as the campus map draws it. */
@@ -372,6 +382,9 @@ export class CampusScene {
         };
         for (const poly of block.outline) mb.extrude(poly, block.y0, block.y1, ROOF_TINT, WALL_TINT, true, wall);
       }
+      // On a slope, a footing from the ground floor down to the lowest corner.
+      const { base, low } = this.footingOf(b);
+      if (base - low > 0.05) mb.extrude(b.outline, low - base, 0, ROOF_TINT, PLINTH_TINT, false);
       // The creases of the blocks themselves, before the parapets go on: a parapet has no
       // thickness, and its two faces would read as creases everywhere.
       const creases = new EdgesGeometry(mb.build(), 35);
@@ -393,6 +406,8 @@ export class CampusScene {
         emissiveIntensity: 0,
       });
       const mesh = new Mesh(geometry, [walls, new MeshLambertMaterial({ color: 0xffffff })]);
+      // The building stands on the lowest ground under it; squashing it keeps it there.
+      mesh.position.y = this.baseOf(b);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.pick = { type: "building", id: b.id } satisfies Pick;
@@ -402,6 +417,7 @@ export class CampusScene {
       const edgeGeometry = new BufferGeometry();
       edgeGeometry.setAttribute("position", new Float32BufferAttribute(lines, 3));
       const edges = new LineSegments(edgeGeometry, new LineBasicMaterial({ color: 0, transparent: true, opacity: 0.55 }));
+      edges.position.y = mesh.position.y;
       edges.userData.noPick = true;
       this.uniGroup.add(edges);
       this.buildingEdges.set(b.id, edges);
@@ -426,11 +442,34 @@ export class CampusScene {
   }
 
   setContext(ctx: ContextData): void {
+    this.lastContext = ctx;
     this.contextGroup.clear();
     this.contextMaterials = [];
-    const add = (geometry: BufferGeometry, key: (p: Palette) => number, opts: { shadow?: boolean; receive?: boolean; vertexColors?: boolean } = {}) => {
+    const terrain = this.terrain;
+    // Paint on the ground follows it. Layers a few centimetres apart cannot keep their order over
+    // a slope once each is split its own way, so on terrain they are lifted further and pulled
+    // forward in depth, the later the more.
+    let layer = 0;
+    const onGround = (geometry: BufferGeometry): BufferGeometry => {
+      if (!terrain) return geometry;
+      geometry.translate(0, 0.15 + layer * 0.04, 0);
+      const draped = drape(geometry, (x, y) => terrain.height(x, y));
+      geometry.dispose();
+      return draped;
+    };
+    const add = (
+      geometry: BufferGeometry,
+      key: (p: Palette) => number,
+      opts: { shadow?: boolean; receive?: boolean; vertexColors?: boolean; ground?: boolean } = {},
+    ) => {
       const mat = new MeshLambertMaterial({ color: key(this.palette), vertexColors: !!opts.vertexColors });
-      const mesh = new Mesh(geometry, mat);
+      if (opts.ground && terrain) {
+        layer++;
+        mat.polygonOffset = true;
+        mat.polygonOffsetFactor = -1 - layer * 0.5;
+        mat.polygonOffsetUnits = -2 - layer * 2;
+      }
+      const mesh = new Mesh(opts.ground ? onGround(geometry) : geometry, mat);
       mesh.castShadow = !!opts.shadow;
       mesh.receiveShadow = opts.receive ?? true;
       mesh.userData.noPick = true;
@@ -443,34 +482,45 @@ export class CampusScene {
     for (const k of ["park", "grass", "wood", "pitch", "water"] as const) {
       const mb = new MeshBuilder();
       for (const a of ctx.areas) if (a.k === k) mb.flat(a.p, AREA_Y[k]);
-      if (mb.vertexCount) add(mb.build(), (p) => p.area[k]);
+      if (mb.vertexCount) add(mb.build(), (p) => p.area[k], { ground: true });
     }
     {
       const mb = new MeshBuilder();
       for (const r of ctx.roads) if (r.k === "street" || r.k === "major" || r.k === "motorway") mb.ribbon(r.p, ROAD_WIDTH[r.k] + ROAD_EDGE_WIDTH, ROAD_EDGE_Y);
-      if (mb.vertexCount) add(mb.build(), (p) => p.roadEdge);
+      if (mb.vertexCount) add(mb.build(), (p) => p.roadEdge, { ground: true });
     }
     for (const k of ["path", "steps", "service", "street", "major", "motorway"] as const) {
       const mb = new MeshBuilder();
       for (const r of ctx.roads) if (r.k === k) mb.ribbon(r.p, ROAD_WIDTH[k], ROAD_Y[k]);
-      if (mb.vertexCount) add(mb.build(), (p) => p.road[k]);
+      if (mb.vertexCount) add(mb.build(), (p) => p.road[k], { ground: true });
     }
     {
       const mb = new MeshBuilder();
       for (const r of ctx.rails) mb.ribbon(r, 2.6, 0.11);
-      if (mb.vertexCount) add(mb.build(), (p) => p.rail);
+      if (mb.vertexCount) add(mb.build(), (p) => p.rail, { ground: true });
     }
     {
       const mb = new MeshBuilder(true);
       const rand = mulberry32(7);
+      // The ground under each building's vertices, for standing it there and sinking it there.
+      const bases: number[] = [];
       for (const b of ctx.buildings) {
         const shade = 0.93 + rand() * 0.1;
+        const foot = terrain ? terrain.footing(b.p) : { base: 0, low: 0 };
+        const g = foot.base;
+        const start = mb.vertexCount;
         const base = b.b ?? 0;
-        mb.extrude([b.p], base, b.h, [shade, shade, shade], [shade * 0.97, shade * 0.97, shade * 0.97], !b.roof, { bottom: base > 0 });
+        mb.extrude([b.p], g + base, g + b.h, [shade, shade, shade], [shade * 0.97, shade * 0.97, shade * 0.97], !b.roof, { bottom: base > 0 });
+        if (!base && g - foot.low > 0.05) mb.extrude([b.p], foot.low, g, undefined, [shade * 0.9, shade * 0.9, shade * 0.9], false);
         // A shaped roof is a tone darker than the walls it sits on.
-        if (b.roof) mb.roof(b.p, b.h, b.roof, [shade * 0.88, shade * 0.88, shade * 0.9]);
+        if (b.roof) mb.roof(b.p, g + b.h, b.roof, [shade * 0.88, shade * 0.88, shade * 0.9]);
+        for (let k = start; k < mb.vertexCount; k++) bases.push(g);
       }
-      this.contextBuildings = add(mb.build(), (p) => p.context, { shadow: true, vertexColors: true });
+      const mesh = add(mb.build(), (p) => p.context, { shadow: true, vertexColors: true });
+      const pos = mesh.geometry.getAttribute("position");
+      const y = new Float32Array(pos.count);
+      for (let k = 0; k < pos.count; k++) y[k] = pos.getY(k);
+      this.contextSquash = { mesh, y, base: Float32Array.from(bases), scale: 1 };
     }
     this.buildTrees(ctx);
     this.applyFocus();
@@ -538,7 +588,7 @@ export class CampusScene {
       const height = width * (0.95 + vary() * 0.6);
       m.makeScale(width, height, width);
       m.multiply(turn.makeRotationY(vary() * Math.PI * 2));
-      m.setPosition(x, 0, -y);
+      m.setPosition(x, this.groundAt(x, y), -y);
       trunks?.setMatrixAt(i, m);
       // Lighter and darker greens, and now and then one turned towards yellow.
       const light = 0.84 + vary() * 0.34;
@@ -904,15 +954,16 @@ export class CampusScene {
       mesh.scale.y = scale;
       edges.scale.y = scale;
     }
-    if (this.contextBuildings) {
-      this.contextBuildings.scale.y = scale;
-      this.contextBuildings.updateMatrix();
+    // Surrounding buildings sink to their footprints where they stand.
+    const sq = this.contextSquash;
+    if (sq && sq.scale !== scale) {
+      const pos = sq.mesh.geometry.getAttribute("position");
+      for (let k = 0; k < pos.count; k++) pos.setY(k, sq.base[k]! + (sq.y[k]! - sq.base[k]!) * scale);
+      pos.needsUpdate = true;
+      sq.scale = scale;
     }
-    if (this.trees) {
-      this.trees.scale.y = Math.max(0.02, 1 - this.focus);
-      this.trees.visible = this.focus < 0.98;
-      this.trees.updateMatrix();
-    }
+    // Trees stand at different heights, so they go rather than shrink.
+    if (this.trees) this.trees.visible = this.focus < 0.5;
     this.detailGroup.visible = this.focus > 0;
     this.pinGroup.visible = this.focus > 0;
     this.restyle();
@@ -927,7 +978,55 @@ export class CampusScene {
   /** Height of a floor's slab in building view. The lowest floor sits on the ground. */
   private floorY(b: Building, i: number): number {
     const min = b.floors[0]?.i ?? 0;
-    return ((i - min) / 10) * (this.campus?.floorHeight ?? 3.6);
+    return this.baseOf(b) + ((i - min) / 10) * (this.campus?.floorHeight ?? 3.6);
+  }
+
+  /** Height of the ground at a point, metres east and north; 0 until the terrain has come. */
+  private groundAt(x: number, y: number): number {
+    return this.terrain?.height(x, y) ?? 0;
+  }
+
+  /** The ground a University building stands on (see Terrain.footing). */
+  private baseOf(b: Building): number {
+    return this.footingOf(b).base;
+  }
+
+  private footingOf(b: Building): { base: number; low: number } {
+    if (!this.terrain) return { base: 0, low: 0 };
+    let f = this.bases.get(b.id);
+    if (!f) this.bases.set(b.id, (f = this.terrain.footing(b.outline[0]!)));
+    return f;
+  }
+
+  /**
+   * The ground under the map. Rebuilds whatever stands on it: the University buildings, the
+   * surroundings, and the open floor.
+   */
+  setTerrain(terrain: Terrain): void {
+    this.terrain = terrain;
+    this.bases.clear();
+    for (const m of this.terrainMeshes) {
+      this.scene.remove(m);
+      m.geometry.dispose();
+    }
+    this.terrainMeshes = terrain.meshes().map((g) => {
+      const m = new Mesh(g, this.ground.material);
+      m.receiveShadow = true;
+      m.userData.noPick = true;
+      this.scene.add(m);
+      return m;
+    });
+    this.ground.position.y = SEA_PLANE;
+    if (this.campus) this.setCampus(this.campus);
+    if (this.lastContext) this.setContext(this.lastContext);
+    if (this.selection.building) {
+      this.rebuildDetail();
+      this.rebuildPin();
+      this.rebuildLabels();
+      this.frameSelection(true);
+    }
+    this.needsShadow = true;
+    this.needsRender = true;
   }
 
   private floorOutline(b: Building, index: number): FlatRing[][] {
@@ -1258,7 +1357,7 @@ export class CampusScene {
         specs.push({
           id: `b:${b.id}`,
           x: b.center[0],
-          y: b.height + 2,
+          y: this.baseOf(b) + b.height + 2,
           z: -b.center[1],
           text: l.text,
           sub: l.sub,
@@ -1439,7 +1538,7 @@ export class CampusScene {
     const zoom = Math.min((VIEW_HEIGHT * aspect) / (span * 0.56), VIEW_HEIGHT / (span * 0.72));
     this.campusCentre.set(center[0], 0, -center[1]);
     if (!this.currentFloor()) this.fitShadow();
-    this.flyTo(new Vector3(center[0], 0, -center[1]), zoom, animate);
+    this.flyTo(new Vector3(center[0], this.groundAt(center[0], center[1]), -center[1]), zoom, animate);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -1699,6 +1798,19 @@ export class CampusScene {
   }
 
   /**
+   * The ground at a point, metres east and north, and where a University building stands on it:
+   * its floor and its lowest corner, and the height of its mesh. For tests.
+   */
+  groundState(x: number, y: number, building?: string): { terrain: boolean; ground: number; base?: number; low?: number; meshY?: number } {
+    const b = building ? this.buildings.get(building) : undefined;
+    return {
+      terrain: !!this.terrain && this.terrainMeshes.length > 0,
+      ground: this.groundAt(x, y),
+      ...(b ? { ...this.footingOf(b), meshY: this.buildingMeshes.get(b.id)?.position.y } : {}),
+    };
+  }
+
+  /**
    * The light as drawn: where the sun stands, degrees, the weather, and the colour of the crowns
    * of deciduous trees and how many there are. For tests.
    */
@@ -1763,7 +1875,7 @@ export class CampusScene {
       if (!b || !mesh) return undefined;
       // Another building may stand in front of the roof centre, so try several roof points and
       // return the first one where a click really lands on this building and not on a label.
-      const top = b.height * mesh.scale.y;
+      const top = mesh.position.y + b.height * mesh.scale.y;
       const ring = b.outline[0]!;
       const candidates: [number, number][] = [b.center];
       for (let i = 0; i + 1 < ring.length; i += 2) {

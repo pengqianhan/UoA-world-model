@@ -264,6 +264,9 @@ test("7. About carries the unofficial notice, every source with link and snapsho
   }
   await expect(about.locator("#data-sources")).toContainText("OpenStreetMap");
   await expect(about.locator("#data-sources")).toContainText("maps.auckland.ac.nz");
+  // The ground's heights, with the Crown copyright and licence its source asks for.
+  await expect(about.locator("#data-sources")).toContainText("Land Information New Zealand");
+  await expect(about.locator("#data-sources")).toContainText("CC BY 3.0 NZ");
   await expect(about.locator("#osm-attribution")).toContainText("© OpenStreetMap contributors");
   await expect(about.locator("#osm-attribution a")).toHaveAttribute("href", "https://www.openstreetmap.org/copyright");
   await expect(about.locator("#limitations")).toContainText("No class times yet");
@@ -275,6 +278,7 @@ test("7. About carries the unofficial notice, every source with link and snapsho
   await page.keyboard.press("Escape");
   await expect(about).toHaveCount(0);
   await expect(page.locator("#attribution")).toContainText("© OpenStreetMap");
+  await expect(page.locator("#attribution")).toContainText("LINZ");
 });
 
 test("8. ?lang= is honoured and unknown languages fall back to English", async ({ page }) => {

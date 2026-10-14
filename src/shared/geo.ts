@@ -17,6 +17,14 @@ export function makeProjector(origin: Origin): (lon: number, lat: number) => Pt 
   return (lon, lat) => [(lon - origin.lon) * mPerDegLon, (lat - origin.lat) * mPerDegLat];
 }
 
+/** The inverse of makeProjector: metres east and north of the origin back to [lon, lat]. */
+export function makeUnprojector(origin: Origin): (x: number, y: number) => [number, number] {
+  const phi = (origin.lat * Math.PI) / 180;
+  const mPerDegLat = 111132.92 - 559.82 * Math.cos(2 * phi) + 1.175 * Math.cos(4 * phi);
+  const mPerDegLon = 111412.84 * Math.cos(phi) - 93.5 * Math.cos(3 * phi);
+  return (x, y) => [origin.lon + x / mPerDegLon, origin.lat + y / mPerDegLat];
+}
+
 /** Great-circle distance in kilometres on a sphere of the Earth's mean radius. */
 export function greatCircleKm(a: Origin, b: Origin): number {
   const rad = Math.PI / 180;

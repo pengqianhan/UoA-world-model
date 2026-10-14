@@ -4,7 +4,8 @@ import { REMOTE } from "../scripts/lib/areas.ts";
 import { buildSchedule, parseDate, parseDays, parseTime, type RawClass } from "../scripts/lib/classes.ts";
 import { decodeRing, makeProjector, pointInRing, shareInside } from "../src/shared/geo.ts";
 import { buildIndex, compact, fold, search } from "../src/shared/search.ts";
-import type { CampusData, ContextData, FloorPlans, Meta, RoomIndex, Schedule, Subject } from "../src/shared/types.ts";
+import { Terrain } from "../src/scene/terrain.ts";
+import type { CampusData, ContextData, FloorPlans, Meta, RoomIndex, Schedule, Subject, TerrainData } from "../src/shared/types.ts";
 
 const read = <T>(name: string) => JSON.parse(fs.readFileSync(`public/data/${name}`, "utf8")) as T;
 const campus = read<CampusData>("campus.json");
@@ -162,6 +163,51 @@ describe("published campus data is self-consistent", () => {
       expect(schedule.snapshotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       for (const s of schedule.sessions) expect(s.sourceText.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("the ground under the map", () => {
+  const areas = ["central", ...REMOTE.map((r) => r.id)];
+  const grid = (a: string) => read<TerrainData>(`terrain/${a}.json`);
+  const project = makeProjector(campus.origin);
+
+  it("is published for every area, on a whole grid", () => {
+    for (const a of areas) {
+      const g = grid(a);
+      expect(g.area).toBe(a);
+      expect(g.step).toBe(10);
+      expect(Buffer.from(g.h, "base64").length, a).toBe(g.cols * g.rows * 2);
+    }
+  });
+  it("reads as Auckland: the City Campus on its ridge, the harbour low, no pits where land meets sea", () => {
+    const ground = new Terrain(areas.map(grid));
+    const at = (lat: number, lon: number) => ground.height(...project(lon, lat));
+    // Symonds Street by the University, Albert Park, lower Queen Street, and the Grafton Gully motorway.
+    expect(at(-36.852, 174.769)).toBeGreaterThan(36);
+    expect(at(-36.852, 174.769)).toBeLessThan(48);
+    expect(at(-36.8508, 174.768)).toBeGreaterThan(35);
+    expect(at(-36.8443, 174.7675)).toBeLessThan(15);
+    expect(at(-36.856, 174.772)).toBeLessThan(at(-36.852, 174.769) - 15);
+    for (const a of areas) {
+      const h = new Int16Array(Uint8Array.from(Buffer.from(grid(a).h, "base64")).buffer);
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (const v of h) {
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
+      }
+      expect(lo / 10, a).toBeGreaterThanOrEqual(-2);
+      expect(hi / 10, a).toBeLessThan(250);
+    }
+  });
+  it("stands University buildings on it: a floor no more than 4 m above the lowest corner", () => {
+    const ground = new Terrain(areas.map(grid));
+    for (const b of campus.buildings) {
+      const { base, low } = ground.footing(b.outline[0]!);
+      expect(base - low, b.id).toBeGreaterThanOrEqual(0);
+      expect(base - low, b.id).toBeLessThanOrEqual(4 + 1e-9);
+    }
+    expect(ground.footing(campus.buildings.find((b) => b.id === "303")!.outline[0]!).base).toBeGreaterThan(30);
   });
 });
 
