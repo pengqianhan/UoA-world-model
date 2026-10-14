@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { decodeRing, overlap, ringArea, type Ring } from "../src/shared/geo.ts";
-import { massing, type MassingBlock } from "../src/shared/massing.ts";
+import { massing, roofRims, type MassingBlock, type RimSegment } from "../src/shared/massing.ts";
 import type { Building, CampusData, FlatRing, Floor } from "../src/shared/types.ts";
 
 const campus = JSON.parse(fs.readFileSync("public/data/campus.json", "utf8")) as CampusData;
@@ -21,6 +21,10 @@ const building = (floors: Floor[], height: number): Building => ({
   roomCount: 0,
 });
 const area = (block: MassingBlock) => block.outline.reduce((sum, poly) => sum + ringArea(decodeRing(poly[0]!)), 0);
+/** A rectangle in metres as a flat ring in decimetres. */
+const rect = (x0: number, y0: number, x1: number, y1: number): FlatRing => [x0, y0, x1, y0, x1, y1, x0, y1].map((v) => v * 10);
+const block = (outline: FlatRing[][], y0 = 0, y1 = 3.6): MassingBlock => ({ outline, y0, y1 });
+const length = (rims: RimSegment[]) => rims.reduce((sum, [ax, ay, bx, by]) => sum + Math.hypot(bx - ax, by - ay), 0);
 
 describe("building massing from floor outlines", () => {
   it("stacks floors with their own outlines and merges floors that share one", () => {
@@ -140,5 +144,63 @@ describe("building massing from floor outlines", () => {
     const onMap = campus.buildings.filter((b) => !b.offMap);
     const stepped = onMap.filter((b) => massing(b, H).length > 1);
     expect(stepped.length / onMap.length).toBeGreaterThan(0.4);
+  });
+});
+
+describe("the edges of a roof that stand in the open", () => {
+  it("are all of them on a block with nothing on it, courtyard included", () => {
+    expect(length(roofRims(block([[rect(0, 0, 40, 20)]])))).toBeCloseTo(120, 6);
+    expect(length(roofRims(block([[rect(0, 0, 40, 40), rect(10, 10, 30, 30)]])))).toBeCloseTo(160 + 80, 6);
+  });
+  it("keep the roof on the left of each stretch, whichever way the ring was drawn", () => {
+    const clockwise = [0, 0, 0, 200, 400, 200, 400, 0];
+    for (const ring of [rect(0, 0, 40, 20), clockwise]) {
+      for (const [ax, ay, bx, by] of roofRims(block([[ring]]))) {
+        const len = Math.hypot(bx - ax, by - ay);
+        // A step to the left of the middle of the stretch lands on the roof.
+        const x = (ax + bx) / 2 - ((by - ay) / len) * 1;
+        const y = (ay + by) / 2 + ((bx - ax) / len) * 1;
+        expect(x > 0 && x < 40 && y > 0 && y < 20, `${ax},${ay} to ${bx},${by}`).toBe(true);
+      }
+    }
+  });
+  it("go all the way round a podium whose tower stands back from every edge", () => {
+    const podium = block([[rect(0, 0, 40, 40)]]);
+    const tower = block([[rect(10, 10, 30, 30)]], 3.6, 7.2);
+    expect(length(roofRims(podium, tower))).toBeCloseTo(160, 6);
+    expect(length(roofRims(tower))).toBeCloseTo(80, 6);
+  });
+  it("stop where the block above rises flush from the edge", () => {
+    const podium = block([[rect(0, 0, 40, 40)]]);
+    // Flush with the west edge between 10 m and 30 m north.
+    const tower = block([[rect(0, 10, 20, 30)]], 3.6, 7.2);
+    const rims = roofRims(podium, tower);
+    expect(length(rims)).toBeCloseTo(160 - 20, 6);
+    const west = rims.filter(([ax, , bx]) => ax === 0 && bx === 0).map(([, ay, , by]) => [Math.min(ay, by), Math.max(ay, by)]);
+    expect(west.sort((a, b) => a[0]! - b[0]!)).toEqual([
+      [0, 10],
+      [30, 40],
+    ]);
+  });
+  it("leave out a ledge too narrow to stand on", () => {
+    const lower = block([[rect(0, 0, 40, 20)]]);
+    const upper = block([[rect(0.3, 0.3, 39.7, 19.7)]], 3.6, 7.2);
+    expect(roofRims(lower, upper)).toEqual([]);
+  });
+  it("are never longer than the outlines they run along, on every published building", () => {
+    let total = 0;
+    for (const b of campus.buildings) {
+      const blocks = massing(b, H);
+      blocks.forEach((bl, k) => {
+        const rims = roofRims(bl, blocks[k + 1]);
+        const around = bl.outline.reduce((sum, poly) => sum + poly.reduce((s, ring) => s + length(decodeRing(ring).map((p, i, all) => [...p, ...all[(i + 1) % all.length]!] as RimSegment)), 0), 0);
+        expect(length(rims), `${b.id} block ${k}`).toBeLessThanOrEqual(around + 1e-6);
+        for (const seg of rims) for (const v of seg) expect(Number.isFinite(v), b.id).toBe(true);
+        // The top block shows its whole edge.
+        if (k === blocks.length - 1) expect(length(rims), `${b.id} top`).toBeCloseTo(around, 4);
+        total += length(rims);
+      });
+    }
+    expect(total).toBeGreaterThan(10_000);
   });
 });

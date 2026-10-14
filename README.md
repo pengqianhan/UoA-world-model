@@ -195,7 +195,7 @@ the floor plan draws for it. Plain shapes carry no code, name or type. A room th
 map does not know is placed on a floor inferred from its number and marked as inferred. A building's
 shape comes from the campus map's outline of each floor, with floors that are alike within a
 twentieth of their area drawn as one block; its height is an estimate of 3.6 m a floor, and its
-windows are drawn by rule.
+windows and roof rims are drawn by rule.
 
 ## Data sources and licences
 
