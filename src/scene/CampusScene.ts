@@ -82,7 +82,7 @@ const SLAB = 0.35;
 const ROOM_HEIGHT = 1.5;
 /** Metres between window centres on University buildings. A drawing convention, like the storey height. */
 const WINDOW_BAY = 3.2;
-/** Roofs keep the building colour; walls are a step darker so that terraces and setbacks read. */
+/** Walls are a step darker than the building colour so that terraces and setbacks read. Roofs have a material of their own. */
 const ROOF_TINT = [1, 1, 1] as const;
 const WALL_TINT = [0.96, 0.95, 0.93] as const;
 /** The unnamed shapes of a floor plan stand lower than the rooms that can be selected. */
@@ -256,11 +256,11 @@ export class CampusScene {
       if (b.offMap) continue;
       const mb = new MeshBuilder(true, true);
       for (const block of massing(b, campus.floorHeight)) {
-        const wall = { storey: campus.floorHeight, bay: WINDOW_BAY, bottom: block.y0 > 0 };
+        const wall = { storey: campus.floorHeight, bay: WINDOW_BAY, bottom: block.y0 > 0, roofGroup: true };
         for (const poly of block.outline) mb.extrude(poly, block.y0, block.y1, ROOF_TINT, WALL_TINT, true, wall);
       }
       const geometry = mb.build();
-      const mat = new MeshLambertMaterial({
+      const walls = new MeshLambertMaterial({
         color: 0xffffff,
         vertexColors: true,
         map: this.wallTexture,
@@ -268,7 +268,7 @@ export class CampusScene {
         emissiveMap: this.glowTexture,
         emissiveIntensity: 0,
       });
-      const mesh = new Mesh(geometry, mat);
+      const mesh = new Mesh(geometry, [walls, new MeshLambertMaterial({ color: 0xffffff })]);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.pick = { type: "building", id: b.id } satisfies Pick;
@@ -557,15 +557,18 @@ export class CampusScene {
     const p = this.palette;
     for (const [id, mesh] of this.buildingMeshes) {
       const b = this.buildings.get(id)!;
-      const mat = mesh.material as MeshLambertMaterial;
-      let colour = b.roomCount > 0 ? p.uniTeaching : p.uni;
+      const [walls, roof] = mesh.material as [MeshLambertMaterial, MeshLambertMaterial];
+      const hovered = this.hovered?.type === "building" && this.hovered.id === id;
       // While a building is open its neighbours are flat footprints: tone them towards the ground
       // so the open floor stands out.
-      colour = lerpColour(colour, p.ground, 0.5 * this.focus);
-      if (this.hovered?.type === "building" && this.hovered.id === id) colour = lerpColour(colour, p.hover, 0.55);
-      mat.color.setHex(colour);
+      const tone = (colour: number) => {
+        const toned = lerpColour(colour, p.ground, 0.5 * this.focus);
+        return hovered ? lerpColour(toned, p.hover, 0.55) : toned;
+      };
+      walls.color.setHex(tone(b.roomCount > 0 ? p.uniTeaching : p.uni));
+      roof.color.setHex(tone(b.roomCount > 0 ? p.uniRoofTeaching : p.uniRoof));
       // Windows glow after dark, a little more in buildings that hold learning spaces.
-      mat.emissiveIntensity = this.night * (1 - this.focus) * (b.roomCount > 0 ? 0.7 : 0.4);
+      walls.emissiveIntensity = this.night * (1 - this.focus) * (b.roomCount > 0 ? 0.7 : 0.4);
       (this.buildingEdges.get(id)!.material as LineBasicMaterial).color.setHex(p.uniEdge);
     }
   }

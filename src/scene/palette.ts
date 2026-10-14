@@ -14,6 +14,9 @@ export interface Palette {
   uni: number;
   /** University buildings that have published learning spaces. */
   uniTeaching: number;
+  /** Roofs of University buildings: a hue apart from the walls and from the ground, so that a building reads from above. */
+  uniRoof: number;
+  uniRoofTeaching: number;
   uniEdge: number;
   accent: number;
   hover: number;
@@ -44,6 +47,8 @@ export const DAY: Palette = {
   context: 0xd3d0c8,
   uni: 0xf3ead9,
   uniTeaching: 0xfaf1dc,
+  uniRoof: 0xb1bcbd,
+  uniRoofTeaching: 0x9db0b5,
   uniEdge: 0x8b7b62,
   accent: 0xe2592d,
   hover: 0xf2a65a,
@@ -72,6 +77,8 @@ export const NIGHT: Palette = {
   context: 0x2a3a4c,
   uni: 0x4a6183,
   uniTeaching: 0x5b78a3,
+  uniRoof: 0x2f4460,
+  uniRoofTeaching: 0x36506f,
   uniEdge: 0x9fb4cf,
   accent: 0xffb454,
   hover: 0xffd08a,
@@ -136,6 +143,8 @@ export function mixPalette(a: Palette, b: Palette, t: number): Palette {
     context: c(a.context, b.context),
     uni: c(a.uni, b.uni),
     uniTeaching: c(a.uniTeaching, b.uniTeaching),
+    uniRoof: c(a.uniRoof, b.uniRoof),
+    uniRoofTeaching: c(a.uniRoofTeaching, b.uniRoofTeaching),
     uniEdge: c(a.uniEdge, b.uniEdge),
     accent: c(a.accent, b.accent),
     hover: c(a.hover, b.hover),
