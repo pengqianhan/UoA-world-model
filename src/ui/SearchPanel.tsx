@@ -1,8 +1,8 @@
 // Search drawer: rooms, buildings, courses, subjects and campuses.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { AppData } from "../app/data.ts";
+import { loadCatalogue, type AppData } from "../app/data.ts";
 import { pick, t, tn } from "../app/i18n.ts";
-import { browseBuildings, runSearch, type SearchItem } from "../app/searchIndex.ts";
+import { browseBuildings, runSearch, type CatalogueCourse, type SearchItem } from "../app/searchIndex.ts";
 import {
   clock,
   data,
@@ -21,7 +21,7 @@ import {
 import { representativeTeachingDate } from "../shared/calendar.ts";
 import { runsOnDate } from "../shared/schedule.ts";
 import { addDays, mondayOf } from "../shared/time.ts";
-import type { Session } from "../shared/types.ts";
+import type { CatalogueData, Session } from "../shared/types.ts";
 import { Icon, IconButton, buildingTitle, campusName, componentName, sessionDates, sessionDay, sessionTimes } from "./common.tsx";
 
 /** Query text survives closing and reopening the panel. */
@@ -42,11 +42,26 @@ function choose(item: SearchItem): void {
       if (item.campus.onMap) goHome(item.campus.id);
       else return;
       break;
+    case "catalogue": {
+      // The catalogue knows the campus, not the room: show the first campus it names that is on the map.
+      const campus = catalogueCampus(item.course);
+      if (campus) goHome(campus);
+      else return;
+      break;
+    }
     default:
       return;
   }
   panel.value = "none";
 }
+
+/** The first campus on the map that a catalogue course is offered at. */
+function catalogueCampus(course: CatalogueCourse): string | undefined {
+  return course.campuses.find((c) => c.campus && data.value?.campusById.get(c.campus)?.onMap)?.campus;
+}
+
+/** The catalogue, kept across openings of the panel once it has loaded. */
+let catalogueLoaded: CatalogueData | undefined;
 
 /** A date on which the session actually runs: this week if possible, else a typical teaching week. */
 function sessionDate(d: AppData, s: Session): string {
@@ -160,6 +175,16 @@ function Result({ d, item, active, onHover }: { d: AppData; item: SearchItem; ac
       detail = open ? <SessionList d={d} sessions={sessions} /> : null;
       break;
     }
+    case "catalogue": {
+      const c = item.course;
+      kind = t("search.kind.course");
+      code = c.code;
+      title = c.title;
+      meta = c.terms.length ? t("search.catalogueTerms", { terms: c.terms.join(" · "), year: c.year }) : t("search.catalogueNoTerm", { year: c.year });
+      note = c.campuses.length ? t("search.catalogueCampuses", { campuses: c.campuses.map((x) => x.text).join(", ") }) : t("search.catalogueNoCampus");
+      disabled = !catalogueCampus(c);
+      break;
+    }
     case "subject": {
       const s = item.subject;
       const courses = d.schedule.courses.filter((c) => c.subject === s.code).length;
@@ -214,12 +239,20 @@ export function SearchPanel() {
   const [pending, setPending] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
+  const [catalogue, setCatalogue] = useState(catalogueLoaded);
+
   useEffect(() => {
     input.current?.focus();
     input.current?.select();
+    // Course titles come with the first search; until they arrive, codes still find subjects.
+    if (!catalogueLoaded) {
+      void loadCatalogue()
+        .then((c) => setCatalogue((catalogueLoaded = c)))
+        .catch((e) => console.error("catalogue", e));
+    }
   }, []);
 
-  const results = useMemo(() => (d && query.trim() ? runSearch(d, query) : undefined), [d, query]);
+  const results = useMemo(() => (d && query.trim() ? runSearch(d, query, 40, catalogue) : undefined), [d, query, catalogue]);
 
   useEffect(() => {
     lastQuery = query;

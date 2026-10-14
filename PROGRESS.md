@@ -224,9 +224,24 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
 - Seasons: the 21 trees OpenStreetMap tags `leaf_cycle=deciduous` (of 1,819 mapped) are kept apart
   in `context.json` and turn in April and May, stand bare from June to August and come into leaf
   in September and October. No other tree is tagged either way, so the rest stay evergreen.
-- Not done: course-level catalogue (the Curriculum Catalogue's lists are lazy-loaded APEX regions;
-  many requests for little value while there is no timetable). Terrain (AWS open "terrarium" tiles
-  need no key) is a possible bonus.
+- Course catalogue, since 2026-10-15 (the user asked for every remaining item that has a public
+  source): `scripts/fetch-catalogue.ts` takes the 2026 course list of the Curriculum Catalogue
+  (`study.auckland.ac.nz`, Oracle APEX, public, no sign-in; robots.txt answers 404). The app hands
+  out its lists only inside a session, so one GET of the browse page for the award type "Course"
+  opens one (`politeFetch` in `snapshot.ts`, paced, not kept), and each list is then one POST to
+  `wwv_flow.ajax` for the whole list at once: all 6,982 courses, the filter values, and one list
+  per term (11) and per campus (15). 29 requests, about 9 MB, snapshot in gitignored `data/raw/`.
+  `courses.json` (358 KB, loaded with the first search) keeps code, title and bit masks of terms
+  and campuses; six of the catalogue's campus names match a campus on the map, and choosing a
+  course goes to the first of them. Not kept: the prescriptions (prose; the University's
+  disclaimer page limits its information to private study), and points, which are only on each
+  course's own 240 KB page. The session tokens change on every visit and the region ids could
+  change when the app is redeployed; the script stops with a plain error if the page no longer
+  has what it reads.
+  The research for this, by a sub-agent on 2026-10-15, let a headless browser send up to six
+  requests in one second to `study.auckland.ac.nz` and about 22 to third-party analytics before it
+  blocked them. Exploration of a site goes through the same pacing as fetching.
+- Not done: terrain (AWS open "terrarium" tiles need no key) is a possible bonus.
 
 ## Decisions (and why) — do not re-litigate without new information
 
@@ -301,7 +316,8 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
 ## Tried and did not work
 
 - Screenshotting the reference site with SwiftShader: timed out. The real GPU works.
-- `study.auckland.ac.nz` browse pages via plain HTTP: course lists are lazy-loaded, HTML has none.
+- `study.auckland.ac.nz` browse pages via plain HTTP GET: course lists are lazy-loaded, HTML has
+  none. Solved 2026-10-15 by replaying the page's own POST inside its session (see "Other sources").
 - "Ghosting" neighbouring buildings (transparent) in building view: they overlapped the open floor.
   Replaced by sinking them to footprints.
 - One CI run failed (commit 4d97b04) because scripts imported `./x.ts` before

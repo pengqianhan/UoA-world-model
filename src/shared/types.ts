@@ -207,6 +207,8 @@ export interface Coverage {
   /** Other spaces drawn as shapes in the floor plans, each with its type on the campus map. */
   planShapes: number;
   subjects: number;
+  /** Courses in the Curriculum Catalogue for the year in courses.json. */
+  catalogueCourses: number;
   courses: number;
   sessions: number;
   sessionsLocatedToRoom: number;
@@ -275,6 +277,22 @@ export interface Schedule {
   courses: Course[];
   sessions: Session[];
   exclusions: Exclusion[];
+}
+
+/**
+ * The courses of one year in the University's Curriculum Catalogue: code and title, and the terms
+ * and campuses each is offered in, in the catalogue's own words. No class times or rooms; the
+ * catalogue has none. public/data/courses.json, loaded when search is first opened.
+ */
+export interface CatalogueData {
+  version: 1;
+  year: number;
+  /** Terms as the catalogue names them, e.g. "Semester One", "Summer Semester". */
+  terms: string[];
+  /** Campuses as the catalogue names them, with the id of the campus on the map where one matches. */
+  campuses: { text: string; campus?: string }[];
+  /** [code, title, terms as a bit mask over `terms`, campuses as a bit mask over `campuses`]. */
+  courses: [string, string, number, number][];
 }
 
 export interface Subject {

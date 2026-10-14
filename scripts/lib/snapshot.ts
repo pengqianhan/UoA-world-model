@@ -105,6 +105,20 @@ export async function snapshot(opts: FetchOptions): Promise<Buffer> {
   return buf;
 }
 
+/**
+ * One paced, honestly named request whose answer is not kept: the page that opens a session on a
+ * site that hands out its data only inside one (a cookie, a form token). The data itself is then
+ * fetched with snapshot().
+ */
+export async function politeFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  await throttle();
+  return fetch(url, {
+    ...init,
+    headers: { "User-Agent": USER_AGENT, ...(init.headers as Record<string, string> | undefined) },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+}
+
 export function readSnapshot(file: string): Buffer {
   return fs.readFileSync(path.join(RAW_DIR, file));
 }

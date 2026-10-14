@@ -129,12 +129,26 @@ test("3. search finds real room codes, buildings and course codes, and moves the
   await input.fill("maori");
   await expect(page.locator(".results")).toContainText("Māori Studies");
 
-  // A real course code: with no public timetable the site says so instead of guessing a room.
+  // A real course code: the Curriculum Catalogue gives its title, terms and campus; with no public
+  // timetable the site says so instead of guessing a room.
   await input.fill("COMPSCI 101");
+  const course = page.locator(".result.type-catalogue").first();
+  await expect(course).toContainText("COMPSCI 101");
+  await expect(course).toContainText("Principles of Programming");
+  await expect(course).toContainText("Semester One");
+  await expect(course).toContainText("Offered at City");
+  await expect(course).toContainText("Class times and rooms are not public");
+  await shot(page, "03-search-course");
+  // A title finds its course too.
+  await input.fill("principles of programming");
+  await expect(page.locator(".result.type-catalogue").first()).toContainText("COMPSCI 101");
+  // A code the catalogue does not hold still says what its subject is.
+  await input.fill("COMPSCI 999");
   const subject = page.locator(".result.type-subject").first();
-  await expect(subject).toContainText("COMPSCI 101");
+  await expect(subject).toContainText("COMPSCI 999");
   await expect(subject).toContainText("Computer Science");
   await expect(subject).toContainText("timetable is not public");
+  await input.fill("COMPSCI 101");
 
   // A room the campus map knows but that is not named on the floor: found and pinned.
   await input.fill("104-G53");

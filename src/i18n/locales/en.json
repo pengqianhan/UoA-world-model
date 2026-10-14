@@ -58,6 +58,10 @@
     "subjectCourses_other": "{count} courses with scheduled classes",
     "courseSessions_one": "{count} scheduled class",
     "courseSessions_other": "{count} scheduled classes",
+    "catalogueTerms": "{year}: {terms}",
+    "catalogueNoTerm": "No term listed for {year}",
+    "catalogueCampuses": "Offered at {campuses}. Class times and rooms are not public.",
+    "catalogueNoCampus": "No campus listed. Class times and rooms are not public.",
     "browseTitle": "Buildings with the most learning spaces",
     "lookingUp": "Looking the room up on the campus map…",
     "sessionGo": "Show this class on the map"
@@ -233,6 +237,7 @@
       "indexedRooms": "Other rooms that can be located",
       "planShapes": "Other spaces drawn with their type, without a name",
       "subjects": "Subject codes",
+      "catalogueCourses": "Courses in the Curriculum Catalogue",
       "courses": "Courses with scheduled classes",
       "sessions": "Scheduled classes",
       "sessionsRoom": "located to a room",
@@ -242,7 +247,7 @@
     },
     "limitsTitle": "Known limitations",
     "limits": {
-      "timetable": "No class times yet. The University's timetable can no longer be read without signing in: the guest class search has been retired and the official Classes API needs credentials. Until the site's maintainer supplies those, this site shows rooms and buildings but cannot say what is scheduled in them. Nothing here is made up to fill the gap.",
+      "timetable": "No class times yet. The University's timetable can no longer be read without signing in: the guest class search has been retired and the official Classes API needs credentials. Until the site's maintainer supplies those, this site shows rooms and buildings but cannot say what is scheduled in them. Nothing here is made up to fill the gap. Search knows every course in the University's 2026 Curriculum Catalogue by code and title, with the terms and campuses the catalogue lists for it; the catalogue gives no class times or rooms, and its course descriptions are not copied here.",
       "timetableLoaded": "Class times come from a snapshot of the timetable taken on {date}. Rooms and times change during the semester; your own timetable is the authority.",
       "scheduled": "A timetabled class is not the same as an occupied room. Classes are cancelled, moved and recorded online, and rooms are used for things that are not on the timetable.",
       "heights": "Each building is stacked floor by floor from the outlines on the official campus map, so its podiums, towers, setbacks and courtyards are real. Floors whose outlines differ by less than a twentieth of their area are drawn as one block. Its height is not surveyed: every floor is drawn {height} m high. The windows and the rim round each roof are drawn by rule and say nothing about the real walls and roofs. The ground is drawn flat although the campus sits on a ridge.",

@@ -5,6 +5,7 @@ import type {
   Building,
   Campus,
   CampusData,
+  CatalogueData,
   ContextData,
   FloorPlans,
   Meta,
@@ -111,6 +112,17 @@ export function mergeContexts(parts: ContextData[]): ContextData {
     out.deciduous.push(...(c.deciduous ?? []));
   }
   return out;
+}
+
+let cataloguePromise: Promise<CatalogueData> | undefined;
+
+/** The courses of the Curriculum Catalogue. Loaded when search is first opened. */
+export function loadCatalogue(): Promise<CatalogueData> {
+  cataloguePromise ??= getJson<CatalogueData>("courses.json").catch((e) => {
+    cataloguePromise = undefined;
+    throw e;
+  });
+  return cataloguePromise;
 }
 
 let roomIndexPromise: Promise<RoomIndex> | undefined;

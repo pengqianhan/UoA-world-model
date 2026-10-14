@@ -28,6 +28,7 @@ import type {
   Building,
   Campus,
   CampusData,
+  CatalogueData,
   ContextBuilding,
   ContextData,
   ContextRoof,
@@ -48,6 +49,7 @@ import type {
   Subject,
 } from "../src/shared/types.ts";
 import { AREAS, CENTRAL, type SceneArea } from "./lib/areas.ts";
+import { CATALOGUE_DIR, CATALOGUE_YEAR, facetFile } from "./lib/catalogue.ts";
 import { buildSchedule, loadClassSnapshots } from "./lib/classes.ts";
 import { hasSnapshot, manifest, readSnapshot } from "./lib/snapshot.ts";
 
@@ -993,6 +995,91 @@ function decodeEntities(s: string): string {
     .replace(/&ndash;/g, "–");
 }
 
+/** Campuses in the Curriculum Catalogue's words that are campuses on the map. Others stay as text. */
+const CATALOGUE_CAMPUSES: Record<string, string> = {
+  City: "city",
+  Grafton: "grafton",
+  Newmarket: "newmarket",
+  "Tai Tokerau": "tai-tokerau",
+  "Leigh Marine": "leigh",
+  "Waiheke Island": "waiheke",
+};
+
+/** The catalogue's terms in the order they come in a year; Summer Semester runs in January and February. */
+const CATALOGUE_TERM_ORDER = [
+  "Summer Semester",
+  "Semester One",
+  "Quarter One",
+  "Quarter Two",
+  "Semester Two",
+  "Quarter Three",
+  "Quarter Four",
+  "Late Year",
+  "Academic Year",
+  "All Terms",
+  "Doctoral Term",
+];
+
+/**
+ * Course codes and titles from the Curriculum Catalogue snapshot (scripts/fetch-catalogue.ts),
+ * with the terms and campuses each is offered in. Only facts are kept: the prescriptions, which
+ * are prose, are dropped here, and the catalogue gives no points in its lists.
+ */
+function buildCourses(): { data?: CatalogueData; stats: Record<string, number> } {
+  const stats: Record<string, number> = {};
+  const filtersFile = `${CATALOGUE_DIR}/filters.json`;
+  const coursesFile = `${CATALOGUE_DIR}/courses.json`;
+  if (!hasSnapshot(filtersFile) || !hasSnapshot(coursesFile)) return { stats };
+  type Rows = { regions: { fetchedData: { values: string[][] } }[] };
+  const rows = (file: string) => readJson<Rows>(file).regions[0]!.fetchedData.values;
+  const filters = readJson<{ counts: Record<string, Record<string, number>> }>(filtersFile).counts;
+  const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+
+  const courses = new Map<string, [string, string, number, number]>();
+  for (const [code, heading] of rows(coursesFile)) {
+    if (!code || !/^[A-Z][A-Z0-9]* \S+$/.test(code)) {
+      stats["catalogue.skipped.code"] = (stats["catalogue.skipped.code"] ?? 0) + 1;
+      continue;
+    }
+    const title = decode((heading ?? "").startsWith(`${code} - `) ? heading!.slice(code.length + 3) : (heading ?? "")).trim();
+    courses.set(code, [code, title, 0, 0]);
+  }
+  // One list per term and per campus: each course found in it gets that bit.
+  const mark = (facet: "terms" | "campuses", values: string[], slot: 2 | 3) =>
+    values.forEach((value, bit) => {
+      if (!hasSnapshot(facetFile(facet, value))) throw new Error(`catalogue: no list for ${facet} "${value}"`);
+      for (const [code] of rows(facetFile(facet, value))) {
+        const c = courses.get(code ?? "");
+        if (c) c[slot] |= 1 << bit;
+      }
+    });
+  // Terms through the year, and campuses on the map first; anything else after, as the source gives it.
+  const order = (values: string[], first: string[]) => [...first.filter((v) => values.includes(v)), ...values.filter((v) => !first.includes(v))];
+  const terms = order(Object.keys(filters.P4_SEMESTER ?? {}), CATALOGUE_TERM_ORDER);
+  const campusNames = order(
+    Object.keys(filters.P4_CAMPUS ?? {}),
+    Object.keys(CATALOGUE_CAMPUSES),
+  );
+  if (terms.length > 31 || campusNames.length > 31) throw new Error("catalogue: too many terms or campuses for a bit mask");
+  mark("terms", terms, 2);
+  mark("campuses", campusNames, 3);
+
+  const list = [...courses.values()].sort((a, z) => a[0].localeCompare(z[0], "en", { numeric: true }));
+  stats["catalogue.courses"] = list.length;
+  stats["catalogue.withoutTerm"] = list.filter((c) => !c[2]).length;
+  stats["catalogue.withoutCampus"] = list.filter((c) => !c[3]).length;
+  return {
+    data: {
+      version: 1,
+      year: Number(CATALOGUE_YEAR),
+      terms: terms.map((t) => t.trim()),
+      campuses: campusNames.map((text) => ({ text: text.trim(), ...(CATALOGUE_CAMPUSES[text.trim()] ? { campus: CATALOGUE_CAMPUSES[text.trim()] } : {}) })),
+      courses: list,
+    },
+    stats,
+  };
+}
+
 function buildSubjects(): Subject[] {
   if (!hasSnapshot("uoa-calendar/courses.html")) return [];
   const html = readSnapshot("uoa-calendar/courses.html").toString("utf8");
@@ -1042,6 +1129,7 @@ const { data: campus, index, plans, stats: campusStats } = buildCampus();
 const contexts = areaBoxes.map((box) => ({ area: box.area, ...buildContext(campus, box) }));
 const contextStats = Object.assign({}, ...contexts.map((c) => c.stats)) as Record<string, number>;
 const subjects = buildSubjects();
+const { data: catalogue, stats: catalogueStats } = buildCourses();
 const calendar = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "academic-calendar.json"), "utf8")) as AcademicCalendar;
 
 const classSnapshots = loadClassSnapshots();
@@ -1055,6 +1143,7 @@ const coverage: Coverage = {
   indexedRooms: Object.values(index).reduce((n, l) => n + l.length, 0),
   planShapes: campus.buildings.reduce((n, b) => n + (b.planShapes ?? 0), 0),
   subjects: subjects.length,
+  catalogueCourses: catalogue?.courses.length ?? 0,
   courses: schedule.courses.length,
   sessions: schedule.sessions.length,
   sessionsLocatedToRoom: count("room"),
@@ -1089,6 +1178,16 @@ const sources: SourceInfo[] = [
     provides: "Semester dates, breaks, holidays and the list of subject codes",
   },
 ];
+if (catalogue) {
+  sources.push({
+    id: "uoa-catalogue",
+    name: `University of Auckland Curriculum Catalogue ${CATALOGUE_YEAR} (study.auckland.ac.nz)`,
+    url: "https://study.auckland.ac.nz/",
+    licence: "© University of Auckland. Course codes, titles, terms and campuses are quoted as facts with a link to the source; course descriptions are not copied.",
+    snapshotDate: snapshotDate("uoa-catalogue"),
+    provides: "Course titles, and the terms and campuses each course is offered in (no class times or rooms)",
+  });
+}
 if (schedule.available) {
   sources.push({
     id: "uoa-classes",
@@ -1120,11 +1219,12 @@ const sizes = {
   ...contextBytes,
   "rooms-index.json": write("rooms-index.json", index),
   "subjects.json": write("subjects.json", subjects),
+  ...(catalogue ? { "courses.json": write("courses.json", catalogue) } : {}),
   "calendar.json": write("calendar.json", calendar),
   "schedule.json": write("schedule.json", schedule),
   "meta.json": write("meta.json", meta),
 };
 
 console.log("coverage", coverage);
-console.log("stats", { ...campusStats, ...contextStats, ...scheduleStats });
+console.log("stats", { ...campusStats, ...contextStats, ...catalogueStats, ...scheduleStats });
 console.log("bytes", sizes);
