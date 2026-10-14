@@ -94,7 +94,8 @@ resume from `PROGRESS.md`, and delete it after the final report.
    test that fails twice is a failure.
 
 7. **Report.** Rewrite `README.md` for the new school (what it is, sources and licences, limitations,
-   how to add an absent layer) and retake `docs/*.jpg` from the public URL. Then give the final
+   how to add an absent layer) and retake `docs/*.jpg` from the public URL. Start `CHANGELOG.md`
+   afresh with the first release, and the README's "What's new" with it. Then give the final
    report, as the last message and under "Final report" in `PROGRESS.md`, leading with what was not
    achieved: public URL and repository; each acceptance criterion as met, partly met or not met, with
    its evidence; coverage numbers and snapshot dates from `meta.json`; each absent layer with the

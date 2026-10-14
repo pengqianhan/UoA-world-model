@@ -30,7 +30,11 @@ The report is answered when the reporter's own link shows the right thing on the
    the ones the change affects, desktop and phone. A green run over a black canvas is a failure.
 5. **Green on the commit.** `npm run typecheck`, `npm test` and `npm run e2e` pass, and the CI run
    for the exact commit being merged finished green. A cancelled or superseded run is not green.
-6. **Not run.** A check that was not run is listed as not run, with the reason.
+6. **Changelog.** A change to what the site does or shows adds its line to `CHANGELOG.md`, under the
+   day's date in New Zealand time and with its pull-request number, and says it in a few words in
+   the README's "What's new", which keeps the three latest days. A change only to documents, tests
+   or the pipeline's insides may add a line but need not.
+7. **Not run.** A check that was not run is listed as not run, with the reason.
 
 The numbered tests in `e2e/` are the product's acceptance criteria. Each keeps its number and what
 it proves; behaviour that is new gets a test of its own.

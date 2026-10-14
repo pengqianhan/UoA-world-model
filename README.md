@@ -1,11 +1,23 @@
+<div align="center">
+
 # UoA World Model
 
 An **unofficial**, student-made 3D map of University of Auckland buildings, floors and teaching rooms.
-It is not affiliated with, endorsed by or maintained by the University of Auckland, and uses no
-University logos or branding.
 
-**Live site: https://campusworldmodel.com/uoa/**
+**Live site: https://campusworldmodel.com/uoa/**<br>
 (also at https://pengqianhan.github.io/campus-world-model/)
+
+[![Deploy](https://github.com/pengqianhan/campus-world-model/actions/workflows/deploy.yml/badge.svg)](https://github.com/pengqianhan/campus-world-model/actions/workflows/deploy.yml)
+[![Code: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
+
+[What's new](#whats-new) · [Changelog](CHANGELOG.md) · [Run it locally](#run-it-locally) ·
+[Data sources](#data-sources-and-licences) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+> [!NOTE]
+> It is not affiliated with, endorsed by or maintained by the University of Auckland, and uses no
+> University logos or branding.
 
 ![The City Campus by day](docs/campus-day.jpg)
 
@@ -22,30 +34,57 @@ It is built to answer two questions a student actually has:
    without signing in. See [Adding the class timetable](#adding-the-class-timetable). Nothing is made up
    to fill the gap.
 
+## What's new
+
+- **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
+  the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
+  lifts and toilets.
+- **2026-10-14:** every space on a floor shows its type, rooms stand as walls, and buildings gain
+  roof colours, rims, storeys and windows; a flight to the Tsinghua World Model.
+- **2026-10-13:** first release.
+
+Everything, with its pull request, is in the [changelog](CHANGELOG.md).
+
+<details>
+<summary><strong>Contents</strong></summary>
+
+- [What you get](#what-you-get)
+- [Run it locally](#run-it-locally)
+- [Updating the data snapshot](#updating-the-data-snapshot)
+- [Adding the class timetable](#adding-the-class-timetable)
+- [Adding a language](#adding-a-language)
+- [Porting to another university](#porting-to-another-university)
+- [Contributing](#contributing)
+- [How it is put together](#how-it-is-put-together)
+- [Data sources and licences](#data-sources-and-licences)
+- [Known limitations](#known-limitations)
+- [Inspiration](#inspiration)
+
+</details>
+
 ## What you get
 
-- A rotatable miniature of every campus on the campus map: 139 University buildings across the City,
-  Grafton and Newmarket campuses, and 55 more at Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore and
-  one Grafton building on Carrick Place, each on a base of OpenStreetMap streets, parks, trees and
-  surrounding buildings. Each University building is
-  stacked floor by floor from the campus map, so its podium, tower, setbacks and courtyards show.
-  The city around it is drawn with the parts, heights and roof shapes OpenStreetMap holds, from
-  house gables to the Sky Tower.
-- A cut-away view of every building: pick a floor, see its learning spaces (lecture theatres, teaching
-  rooms, labs, studios, study spaces) drawn from the outlines on the official campus map, set in the
-  rest of the floor plan: 14,508 other spaces without names, each tinted by its type on the campus
-  map (office, other lab, toilet, stairs or lift, service) and showing that type when pointed at or
-  tapped. Stairs, lifts and toilets carry a sign.
-- Search over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings and 251
+- **A rotatable miniature of every campus on the campus map:** 139 University buildings across the
+  City, Grafton and Newmarket campuses, and 55 more at Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore
+  and one Grafton building on Carrick Place, each on a base of OpenStreetMap streets, parks, trees and
+  surrounding buildings. Each University building is stacked floor by floor from the campus map, so
+  its podium, tower, setbacks and courtyards show. The city around it is drawn with the parts,
+  heights and roof shapes OpenStreetMap holds, from house gables to the Sky Tower.
+- **A cut-away view of every building:** pick a floor, see its learning spaces (lecture theatres,
+  teaching rooms, labs, studios, study spaces) drawn from the outlines on the official campus map, set
+  in the rest of the floor plan: 14,508 other spaces without names, each tinted by its type on the
+  campus map (office, other lab, toilet, stairs or lift, service) and showing that type when pointed
+  at or tapped. Stairs, lifts and toilets carry a sign.
+- **Search** over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings and 251
   subject codes. Māori names match with or without macrons (`Maori` finds `Māori`).
-- "Now" (Auckland time, daylight saving included) and "Preview" (any day and time), with the academic
-  calendar: teaching week, breaks, study break, exams, public holidays.
-- The sun where it stands at the time shown, so winter shadows are long and summer ones short; in
+- **"Now"** (Auckland time, daylight saving included) **and "Preview"** (any day and time), with the
+  academic calendar: teaching week, breaks, study break, exams, public holidays.
+- **The sun where it stands at the time shown,** so winter shadows are long and summer ones short; in
   Now mode, the current cloud, rain and fog from Open-Meteo; deciduous trees that turn and go bare
   with the seasons.
-- Every view is a link: building, floor, room, time and language are all in the URL.
-- A phone layout.
-- All interface text in one locale file, ready for more languages.
+- **Every view is a link:** building, floor, room, time and language are all in the URL.
+- **A phone layout.**
+- **All interface text in one locale file,** ready for more languages.
 
 ## Run it locally
 
@@ -89,13 +128,13 @@ Data is fetched once, cached as raw snapshots under `data/raw/`, and every later
 `data/sources.json` records the URL, fetch time, size and SHA-256 of each snapshot.
 
 ```bash
-npm run data:fetch                         # fetches only what is missing
+npm run data:fetch                               # fetches only what is missing
 npx tsx scripts/fetch-mapsindoors.ts --refresh   # re-download the campus map (4 requests)
 npx tsx scripts/fetch-osm.ts --refresh           # re-download OpenStreetMap context (1 request per area, 7)
 npx tsx scripts/fetch-terrain.ts --refresh       # re-download the elevation tiles (29 at zoom 14)
 npx tsx scripts/fetch-calendar.ts --refresh      # re-download the Calendar pages (3 requests)
-npm run data:build                         # rebuild public/data from the snapshots
-npm test                                   # the data consistency tests must still pass
+npm run data:build                               # rebuild public/data from the snapshots
+npm test                                         # the data consistency tests must still pass
 ```
 
 Then commit `public/data/`, `data/sources.json` and (if refreshed) `data/raw/osm/`.
@@ -132,12 +171,13 @@ requires credentials that only someone with a University account can obtain, so 
 3. Commit `public/data/` and push. Rooms then show what is timetabled at the selected time, buildings
    show a count of classes in progress, and courses become searchable.
 
-`scripts/fetch-classes.ts` was written from the published OpenAPI document and has **not** been run
-against the live API (the project was built without a key), so the key header (`apikey`, which the
-API document does not spell out) or the paging parameters may need a small adjustment on first use.
-The part that turns API records into the
-published timetable (`scripts/lib/classes.ts`) is unit-tested, and the interface is tested end to end
-with a fixture timetable that exists only inside the test browser.
+> [!WARNING]
+> `scripts/fetch-classes.ts` was written from the published OpenAPI document and has **not** been run
+> against the live API (the project was built without a key), so the key header (`apikey`, which the
+> API document does not spell out) or the paging parameters may need a small adjustment on first use.
+> The part that turns API records into the published timetable (`scripts/lib/classes.ts`) is
+> unit-tested, and the interface is tested end to end with a fixture timetable that exists only inside
+> the test browser.
 
 What the pipeline keeps for every class: course code and title, class type and section, day, times,
 date range, the original location text, and how precisely it could be located (room, floor or
@@ -176,7 +216,7 @@ and the checks it passes are written for people and for coding agents alike, in
 
 ## How it is put together
 
-```
+```text
 scripts/            data pipeline (Node + TypeScript, run with tsx)
   lib/snapshot.ts     polite, cache-first fetcher
   fetch-*.ts          one script per source
@@ -199,12 +239,11 @@ e2e/                browser tests (Playwright), numbered after the acceptance cr
 
 Accuracy is labelled wherever it matters. A room drawn with an outline comes from the campus map. A
 room shown as a pin is known to the campus map by its code; the pin stands on the shape that the
-floor plan draws for it, which is outlined. The shapes carry the campus map's type for each, in its own words, and no
-code or name. A room that the map does not know is placed on a floor inferred from its number and
-marked as inferred. A building's
-shape comes from the campus map's outline of each floor, with floors that are alike within a
-twentieth of their area drawn as one block; its height is an estimate of 3.6 m a floor, and its
-windows and roof rims are drawn by rule.
+floor plan draws for it, which is outlined. The shapes carry the campus map's type for each, in its
+own words, and no code or name. A room that the map does not know is placed on a floor inferred from
+its number and marked as inferred. A building's shape comes from the campus map's outline of each
+floor, with floors that are alike within a twentieth of their area drawn as one block; its height is
+an estimate of 3.6 m a floor, and its windows and roof rims are drawn by rule.
 
 ## Data sources and licences
 
@@ -224,23 +263,23 @@ If you represent the University and would like something changed or removed, ple
 
 ## Known limitations
 
-- No class times until a timetable snapshot is added (see above).
-- A timetabled class is not the same as an occupied room.
-- Building heights are estimated and windows are drawn by rule. The ground's heights come from the
-  LINZ 8 m elevation model, drawn from contours: smooth, peaks a few metres low. A building stands
+- **No class times** until a timetable snapshot is added (see above).
+- **A timetabled class is not the same as an occupied room.**
+- **Building heights are estimated and windows are drawn by rule.** The ground's heights come from
+  the LINZ 8 m elevation model, drawn from contours: smooth, peaks a few metres low. A building stands
   at the ground under its middle, with a footing of up to 4 m on a slope.
-- Only learning spaces are named and can be selected. The rest of a floor is shapes that show the
+- **Only learning spaces are named and can be selected.** The rest of a floor is shapes that show the
   campus map's type and nothing more; where the map's type says nothing ("Non Usable Area",
   "Nonasgn Rentable" and the like) the site says "Other area". Floors where people live and
   childcare centres are blank, and the furniture in a selected room is illustrative.
-- The campus map itself draws nothing on 96 floors of the 3D map (most of them in halls of
+- **The campus map itself draws nothing on 96 floors of the 3D map** (most of them in halls of
   residence) and only a few spaces on 34 more. The floor list marks both and the building bar says
   so.
-- The campuses away from the centre (Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore) each stand in
-  a patch of surroundings a few hundred metres across, and the map jumps between them. Everything
+- **The campuses away from the centre** (Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore) each stand
+  in a patch of surroundings a few hundred metres across, and the map jumps between them. Everything
   is drawn on one flat map centred on the City Campus, so shapes 125 km north are about 1% too wide.
   The sea is not drawn (OpenStreetMap's coastline is a line, not an area).
-- The academic calendar covers 2026 only.
+- **The academic calendar covers 2026 only.**
 
 ## Inspiration
 
