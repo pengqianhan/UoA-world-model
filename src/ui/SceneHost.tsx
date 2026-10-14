@@ -12,10 +12,12 @@ import {
   night,
   openBuilding,
   openRoom,
+  plansLoaded,
   selBuilding,
   selCampus,
   selFloor,
   selRoom,
+  spaceTip,
   webglFailed,
 } from "../app/state.ts";
 import { CampusScene } from "../scene/CampusScene.ts";
@@ -58,6 +60,13 @@ export function SceneHost() {
       if (p?.type === "building") openBuilding(p.id);
       else if (p?.type === "room") openRoom(p.code);
     };
+    scene.onSpace = (s) => {
+      const rect = stage.current!.getBoundingClientRect();
+      // The tip stands above the pointer, centred on it; keep it inside the stage.
+      const x = Math.min(Math.max(s ? s.x - rect.left : 0, 120), rect.width - 120);
+      const y = Math.max(s ? s.y - rect.top : 0, 72);
+      spaceTip.value = s ? { type: s.type, x, y } : undefined;
+    };
 
     const showCampus = (animate: boolean) => {
       const c = data.value?.campusById.get(selCampus.peek());
@@ -86,7 +95,10 @@ export function SceneHost() {
         if (!b?.planShapes || b.offMap) return;
         scene.loading++;
         void loadPlans(b.id)
-          .then((plans) => scene.setPlans(plans))
+          .then((plans) => {
+            scene.setPlans(plans);
+            if (!plansLoaded.peek().has(b.id)) plansLoaded.value = new Map(plansLoaded.peek()).set(b.id, plans);
+          })
           .catch((e) => console.error("plans", e))
           .finally(() => scene.loading--);
       }),
@@ -131,6 +143,22 @@ export function SceneHost() {
     <div class="scene">
       <div class="stage" ref={stage} />
       <div class="labels" ref={labels} />
+      <SpaceTip />
+    </div>
+  );
+}
+
+/** What an unnamed space on the open floor is, by the campus map's type for it. */
+function SpaceTip() {
+  const tip = spaceTip.value;
+  if (!tip) return null;
+  return (
+    <div class="space-tip" id="space-tip" role="status" style={{ left: `${tip.x}px`, top: `${tip.y}px` }}>
+      <span class="space-tip-kind">
+        <span class={`kind-dot space-${tip.type.kind}`} aria-hidden="true" />
+        {t(`space.kind.${tip.type.kind}`)}
+      </span>
+      {tip.type.text && <span class="space-tip-source">{t("space.sourceType", { type: tip.type.text })}</span>}
     </div>
   );
 }

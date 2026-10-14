@@ -21,6 +21,7 @@ import {
   Object3D,
   OrthographicCamera,
   PCFShadowMap,
+  Plane,
   PlaneGeometry,
   Raycaster,
   RepeatWrapping,
@@ -33,8 +34,8 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room } from "../shared/types.ts";
-import { decodeRing, interiorPoint } from "../shared/geo.ts";
+import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room, SpaceKind, SpaceType } from "../shared/types.ts";
+import { decodeRing, interiorPoint, pointInRing } from "../shared/geo.ts";
 import { massing, roofRims } from "../shared/massing.ts";
 import { MeshBuilder, ringsBounds } from "./geometry.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
@@ -146,6 +147,11 @@ function mulberry32(seed: number): () => number {
 export class CampusScene {
   onPick?: (pick: Pick) => void;
   onHover?: (pick: Pick) => void;
+  /**
+   * An unnamed space on the open floor under the mouse, or tapped, with the page coordinates of
+   * the pointer; null when there is none. Such a space is never selected.
+   */
+  onSpace?: (space: { type: SpaceType; x: number; y: number } | null) => void;
 
   private renderer: WebGLRenderer;
   private scene = new Scene();
@@ -177,6 +183,10 @@ export class CampusScene {
   private roomMeshes = new Map<string, Mesh>();
   private plans = new Map<string, FloorPlans>();
   private planObjects: (Mesh | LineSegments)[] = [];
+  /** The unnamed shapes on the open floor, in metres, with their types; largest first. */
+  private planSpaces: { rings: [number, number][][]; type: SpaceType }[] = [];
+  /** The space last reported to `onSpace`. */
+  private spaceShown?: SpaceType;
   private selectedOutline?: LineLoop;
   private interior?: Group;
   private pin?: PinSpec;
@@ -234,6 +244,8 @@ export class CampusScene {
     this.controls.addEventListener("change", () => {
       this.needsRender = true;
       this.needsLabels = true;
+      // The space under the pointer has moved away from it.
+      this.showSpace(undefined);
     });
 
     this.hemi = new HemisphereLight(0xffffff, 0xb9b3a4, 1);
@@ -347,7 +359,7 @@ export class CampusScene {
     this.needsRender = true;
   }
 
-  /** The floor plans of one building: the other spaces on its floors, drawn as bare shapes. */
+  /** The floor plans of one building: the other spaces on its floors, drawn as shapes tinted by type. */
   setPlans(plans: FloorPlans): void {
     this.plans.set(plans.building, plans);
     if (this.selection.building !== plans.building) return;
@@ -884,7 +896,10 @@ export class CampusScene {
     this.styleRooms();
   }
 
-  /** One merged mesh and one set of lines for every unnamed shape on the open floor. */
+  /**
+   * A floor mesh for each group of space types and one set of walls and lines for every unnamed
+   * shape on the open floor.
+   */
   private rebuildPlan(): void {
     for (const o of this.planObjects) {
       this.detailGroup.remove(o);
@@ -892,19 +907,29 @@ export class CampusScene {
       (o.material as MeshLambertMaterial | LineBasicMaterial).dispose();
     }
     this.planObjects = [];
+    this.planSpaces = [];
+    this.showSpace(undefined);
     const cur = this.currentFloor();
-    const shapes = cur && this.plans.get(cur.b.id)?.floors[cur.floor.i];
-    if (!cur || !shapes?.length) return;
+    const plan = cur && this.plans.get(cur.b.id);
+    const shapes = plan?.floors[cur!.floor.i];
+    if (!cur || !plan || !shapes?.length) return;
     const p = this.palette;
     const y = this.floorY(cur.b, cur.floor.i);
     const base = y + SLAB + PLAN_FLOOR;
     const top = y + SLAB + PLAN_WALL;
-    const floors = new MeshBuilder();
+    const typeOf = plan.typeOf[cur.floor.i] ?? [];
+    // One floor mesh for each group, so each takes its colour from the palette.
+    const floors = new Map<SpaceKind, MeshBuilder>();
     const walls = new MeshBuilder();
     const lines: number[] = [];
-    for (const rings of shapes) {
+    shapes.forEach((rings, k) => {
+      const type = plan.types[typeOf[k]!] ?? { text: "", kind: "other" };
+      const kind = type.kind;
+      this.planSpaces.push({ rings: rings.map(decodeRing), type });
+      let mb = floors.get(kind);
+      if (!mb) floors.set(kind, (mb = new MeshBuilder()));
       // From the underside of the slab, so a shape that overhangs the floor outline has a base.
-      floors.extrude(rings, y, base);
+      mb.extrude(rings, y, base);
       // Where two shapes share an edge their walls coincide; with one material that cannot show.
       for (const ring of rings) {
         for (let i = 0; i + 1 < ring.length; i += 2) {
@@ -917,12 +942,16 @@ export class CampusScene {
           lines.push(ax, top + 0.02, -ay, bx, top + 0.02, -by);
         }
       }
-    }
-    const floorMesh = new Mesh(floors.build(), new MeshLambertMaterial({ color: p.plan }));
-    floorMesh.castShadow = true;
-    floorMesh.receiveShadow = true;
-    floorMesh.userData.role = "plan";
-    floorMesh.userData.noPick = true;
+    });
+    const floorMeshes = [...floors].map(([kind, mb]) => {
+      const mesh = new Mesh(mb.build(), new MeshLambertMaterial({ color: p.space[kind] }));
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.role = "plan";
+      mesh.userData.kind = kind;
+      mesh.userData.noPick = true;
+      return mesh;
+    });
     const wallMesh = new Mesh(walls.build(), new MeshLambertMaterial({ color: p.planWall }));
     wallMesh.castShadow = true;
     wallMesh.receiveShadow = true;
@@ -933,8 +962,8 @@ export class CampusScene {
     const edges = new LineSegments(g, new LineBasicMaterial({ color: p.planEdge, transparent: true, opacity: 0.6 }));
     edges.userData.role = "planEdges";
     edges.userData.noPick = true;
-    this.planObjects = [floorMesh, wallMesh, edges];
-    this.detailGroup.add(floorMesh, wallMesh, edges);
+    this.planObjects = [...floorMeshes, wallMesh, edges];
+    this.detailGroup.add(...floorMeshes, wallMesh, edges);
   }
 
   private rebuildDetailColours(): void {
@@ -951,7 +980,7 @@ export class CampusScene {
       if (role === "belowEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.uniEdge);
       if (role === "slab") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.slab);
       if (role === "slabEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.uniEdge);
-      if (role === "plan") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.plan);
+      if (role === "plan") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.space[child.userData.kind as SpaceKind]);
       if (role === "planWalls") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.planWall);
       if (role === "planEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.planEdge);
     }
@@ -1235,6 +1264,14 @@ export class CampusScene {
   // -------------------------------------------------------------------------------------------
 
   private pickAt(clientX: number, clientY: number): Pick {
+    return this.probeAt(clientX, clientY).pick;
+  }
+
+  /**
+   * What lies under a point of the page: a room or building to select, or else an unnamed space
+   * on the open floor that is in front of any building there.
+   */
+  private probeAt(clientX: number, clientY: number): { pick: Pick; space?: SpaceType } {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
@@ -1244,7 +1281,34 @@ export class CampusScene {
     const hits = this.raycaster.intersectObjects(targets, false);
     // Rooms sit inside the building being viewed, so prefer them over ghosted neighbours.
     const room = hits.find((h) => (h.object.userData.pick as Pick)?.type === "room");
-    return ((room ?? hits[0])?.object.userData.pick as Pick) ?? null;
+    if (room) return { pick: room.object.userData.pick as Pick };
+    const space = this.spaceUnderRay();
+    if (space && !(hits[0] && hits[0].distance < space.distance)) return { pick: null, space: space.type };
+    return { pick: (hits[0]?.object.userData.pick as Pick) ?? null };
+  }
+
+  /** The innermost unnamed shape on the open floor that the raycaster's ray meets. */
+  private spaceUnderRay(): { type: SpaceType; distance: number } | undefined {
+    const cur = this.currentFloor();
+    if (!cur || !this.planSpaces.length) return undefined;
+    const y = this.floorY(cur.b, cur.floor.i) + SLAB + PLAN_FLOOR;
+    const hit = this.raycaster.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), -y), new Vector3());
+    if (!hit) return undefined;
+    const pt: [number, number] = [hit.x, -hit.z];
+    // Largest first, so the last shape holding the point is the one drawn on top.
+    for (let k = this.planSpaces.length - 1; k >= 0; k--) {
+      const [outer, ...holes] = this.planSpaces[k]!.rings;
+      if (outer && pointInRing(pt, outer) && !holes.some((h) => pointInRing(pt, h))) {
+        return { type: this.planSpaces[k]!.type, distance: this.raycaster.ray.origin.distanceTo(hit) };
+      }
+    }
+    return undefined;
+  }
+
+  private showSpace(type: SpaceType | undefined, clientX = 0, clientY = 0): void {
+    if (!type && !this.spaceShown) return;
+    this.spaceShown = type;
+    this.onSpace?.(type ? { type, x: clientX, y: clientY } : null);
   }
 
   private onPointerDown = (e: PointerEvent): void => {
@@ -1261,7 +1325,9 @@ export class CampusScene {
       label.onClick();
       return;
     }
-    const pick = this.pickAt(e.clientX, e.clientY);
+    const { pick, space } = this.probeAt(e.clientX, e.clientY);
+    // A tapped space says what it is; it is not selected.
+    this.showSpace(space, e.clientX, e.clientY);
     if (pick) this.onPick?.(pick);
   };
 
@@ -1280,15 +1346,20 @@ export class CampusScene {
     this.labels.setHot(label?.onClick ? label.id : undefined);
     if (label?.onClick) {
       this.setHovered(null);
+      this.showSpace(undefined);
       this.renderer.domElement.style.cursor = "pointer";
       return;
     }
-    this.setHovered(this.pickAt(e.clientX, e.clientY));
+    const { pick, space } = this.probeAt(e.clientX, e.clientY);
+    this.setHovered(pick);
+    this.showSpace(space, e.clientX, e.clientY);
   };
 
-  private onPointerLeave = (): void => {
+  private onPointerLeave = (e: PointerEvent): void => {
     this.labels.setHot(undefined);
     this.setHovered(null);
+    // A finger leaves as it lifts; what it tapped stays shown until the next tap or move.
+    if (e.pointerType === "mouse") this.showSpace(undefined);
   };
 
   private setHovered(pick: Pick): void {
@@ -1430,6 +1501,18 @@ export class CampusScene {
       if (!this.pickAt(p.x, p.y) && !this.labelAt(p.x, p.y)) return p;
     }
     return undefined;
+  }
+
+  /** The type of the unnamed space at a point of the page, if one is there. For tests. */
+  spaceAt(x: number, y: number): SpaceType | undefined {
+    return this.probeAt(x, y).space;
+  }
+
+  /** The groups whose floors are drawn on the open floor, each with its colour now. For tests. */
+  spaceFloors(): { kind: SpaceKind; colour: number }[] {
+    return this.planObjects
+      .filter((o) => o.userData.role === "plan")
+      .map((o) => ({ kind: o.userData.kind as SpaceKind, colour: ((o as Mesh).material as MeshLambertMaterial).color.getHex() }));
   }
 
   /** True while a camera or focus animation is running. */

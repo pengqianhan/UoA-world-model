@@ -45,7 +45,8 @@ when the indoor layer is thin.
 Capture the building identifier used in room codes, each floor's outline and name, and for each room
 its code, type, polygon or point, and the source's own "public" or "searchable" flag. Capture the
 spaces that are not rooms too (corridors, stairs, offices), with their types: they become the
-unnamed shapes of each floor plan, and the types tell which floors to leave blank.
+unnamed shapes of each floor plan, each showing its type, and the types tell which floors to leave
+blank.
 
 With this layer absent, rooms come only from the timetable's location text: the building view shows
 floors without room outlines, and every floor is inferred and labelled so.

@@ -109,15 +109,29 @@ export interface CampusData {
   rooms: Room[];
 }
 
+/** The group a space that is not named is drawn in, by its type on the campus map. */
+export type SpaceKind = "office" | "lab" | "learning" | "toilet" | "stairs" | "amenity" | "other";
+
+/** A space type on the campus map, in its own words, and the group it is drawn in. */
+export interface SpaceType {
+  text: string;
+  kind: SpaceKind;
+}
+
 /**
- * The rest of a building's floors: every other space the campus map draws, as a bare shape with
- * no code, name or type. One file per building, public/data/plans/<building id>.json.
+ * The rest of a building's floors: every other space the campus map draws, as a shape with the
+ * campus map's type for it and no code or name. One file per building,
+ * public/data/plans/<building id>.json.
  */
 export interface FloorPlans {
-  version: 1;
+  version: 2;
   building: string;
+  /** Every type the shapes in this file carry. */
+  types: SpaceType[];
   /** Floor index (Floor.i) -> shapes, largest first. Each shape is [ring] -> FlatRing, outer ring first. */
   floors: Record<string, FlatRing[][]>;
+  /** Floor index -> for each shape in `floors`, in the same order, its index in `types`. */
+  typeOf: Record<string, number[]>;
 }
 
 export type RoadClass = "motorway" | "major" | "street" | "service" | "path" | "steps";
@@ -181,7 +195,7 @@ export interface Coverage {
   buildingsOnMap: number;
   rooms: number;
   indexedRooms: number;
-  /** Other spaces drawn as bare shapes in the floor plans. */
+  /** Other spaces drawn as shapes in the floor plans, each with its type on the campus map. */
   planShapes: number;
   subjects: number;
   courses: number;

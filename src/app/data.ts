@@ -96,7 +96,7 @@ export function loadRoomIndex(): Promise<RoomIndex> {
 
 const plansPromises = new Map<string, Promise<FloorPlans>>();
 
-/** The floor plans of one building: its other spaces as bare shapes. Loaded when the building is opened. */
+/** The floor plans of one building: its other spaces as typed shapes. Loaded when the building is opened. */
 export function loadPlans(building: string): Promise<FloorPlans> {
   let promise = plansPromises.get(building);
   if (!promise) {
