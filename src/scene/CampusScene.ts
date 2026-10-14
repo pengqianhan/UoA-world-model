@@ -35,7 +35,7 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room } from "../shared/types.ts";
 import { decodeRing, interiorPoint } from "../shared/geo.ts";
-import { massing } from "../shared/massing.ts";
+import { massing, roofRims } from "../shared/massing.ts";
 import { MeshBuilder, ringsBounds } from "./geometry.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
@@ -85,6 +85,9 @@ const WINDOW_BAY = 3.2;
 /** Walls are a step darker than the building colour so that terraces and setbacks read. Roofs have a material of their own. */
 const ROOF_TINT = [1, 1, 1] as const;
 const WALL_TINT = [0.96, 0.95, 0.93] as const;
+/** Metres. A parapet round every roof that stands in the open: drawn by rule, like the windows. */
+const RIM_HEIGHT = 0.9;
+const RIM_TINT = [1.03, 1.03, 1.02] as const;
 /** The unnamed shapes of a floor plan stand lower than the rooms that can be selected. */
 const PLAN_HEIGHT = 0.45;
 const ROOM_HEIGHT_SELECTED = 3.0;
@@ -255,10 +258,22 @@ export class CampusScene {
     for (const b of campus.buildings) {
       if (b.offMap) continue;
       const mb = new MeshBuilder(true, true);
-      for (const block of massing(b, campus.floorHeight)) {
+      const blocks = massing(b, campus.floorHeight);
+      for (const block of blocks) {
         const wall = { storey: campus.floorHeight, bay: WINDOW_BAY, bottom: block.y0 > 0, roofGroup: true };
         for (const poly of block.outline) mb.extrude(poly, block.y0, block.y1, ROOF_TINT, WALL_TINT, true, wall);
       }
+      // The creases of the blocks themselves, before the parapets go on: a parapet has no
+      // thickness, and its two faces would read as creases everywhere.
+      const creases = new EdgesGeometry(mb.build(), 35);
+      const lines = Array.from(creases.getAttribute("position").array as Float32Array);
+      creases.dispose();
+      blocks.forEach((block, k) => {
+        for (const [ax, ay, bx, by] of roofRims(block, blocks[k + 1])) {
+          mb.fence(ax, ay, bx, by, block.y1, block.y1 + RIM_HEIGHT, RIM_TINT);
+          lines.push(ax, block.y1 + RIM_HEIGHT, -ay, bx, block.y1 + RIM_HEIGHT, -by);
+        }
+      });
       const geometry = mb.build();
       const walls = new MeshLambertMaterial({
         color: 0xffffff,
@@ -275,7 +290,9 @@ export class CampusScene {
       this.uniGroup.add(mesh);
       this.buildingMeshes.set(b.id, mesh);
 
-      const edges = new LineSegments(new EdgesGeometry(geometry, 35), new LineBasicMaterial({ color: 0, transparent: true, opacity: 0.32 }));
+      const edgeGeometry = new BufferGeometry();
+      edgeGeometry.setAttribute("position", new Float32BufferAttribute(lines, 3));
+      const edges = new LineSegments(edgeGeometry, new LineBasicMaterial({ color: 0, transparent: true, opacity: 0.55 }));
       edges.userData.noPick = true;
       this.uniGroup.add(edges);
       this.buildingEdges.set(b.id, edges);

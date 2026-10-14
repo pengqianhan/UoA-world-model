@@ -171,6 +171,27 @@ export class MeshBuilder {
     for (const h of holes) walls(h);
   }
 
+  /**
+   * A wall with no thickness from y0 to y1 along a segment given in metres east and north, drawn
+   * to be seen from both sides: a parapet. Its faces sample the plain part of the wall texture.
+   */
+  fence(ax: number, ay: number, bx: number, by: number, y0: number, y1: number, color?: RGB): void {
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len < 1e-4) return;
+    // The right of the direction of travel, in scene axes (x east, z south).
+    const nx = (by - ay) / len;
+    const nz = (bx - ax) / len;
+    for (const side of [1, -1]) {
+      const i = this.vertexCount;
+      this.vertex(ax, y0, -ay, nx * side, 0, nz * side, color);
+      this.vertex(bx, y0, -by, nx * side, 0, nz * side, color);
+      this.vertex(bx, y1, -by, nx * side, 0, nz * side, color);
+      this.vertex(ax, y1, -ay, nx * side, 0, nz * side, color);
+      if (side > 0) this.indices.push(i, i + 1, i + 2, i, i + 2, i + 3);
+      else this.indices.push(i, i + 2, i + 1, i, i + 3, i + 2);
+    }
+  }
+
   /** One flat-shaded triangle from points given as [east, height, north], wound to face out and up. */
   private face(a: readonly number[], b: readonly number[], c: readonly number[], color?: RGB): void {
     // Scene axes: x is east, y is up, z is south.
