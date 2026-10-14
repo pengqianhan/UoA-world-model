@@ -13,6 +13,14 @@ interface SceneHandle {
   spaceAt(x: number, y: number): { text: string; kind: string } | undefined;
   spaceFloors(): { kind: string; colour: number }[];
   pinOutline(): { text: string; kind: string; icon?: string } | undefined;
+  lightState(): {
+    azimuth: number;
+    elevation: number;
+    weather?: { cloud: number; wet: number; fog: number };
+    fog: boolean;
+    deciduous: number;
+    deciduousTrees: number;
+  };
   floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number; outerWalls: boolean; windowsBelow: boolean };
   openFloorBox(): { left: number; top: number; right: number; bottom: number } | undefined;
   probe(): { width: number; height: number; distinctColours: number; samples: number };

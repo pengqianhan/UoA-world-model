@@ -38,6 +38,9 @@ It is built to answer two questions a student actually has:
   subject codes. Māori names match with or without macrons (`Maori` finds `Māori`).
 - "Now" (Auckland time, daylight saving included) and "Preview" (any day and time), with the academic
   calendar: teaching week, breaks, study break, exams, public holidays.
+- The sun where it stands at the time shown, so winter shadows are long and summer ones short; in
+  Now mode, the current cloud, rain and fog from Open-Meteo; deciduous trees that turn and go bare
+  with the seasons.
 - Every view is a link: building, floor, room, time and language are all in the URL.
 - A phone layout.
 - All interface text in one locale file, ready for more languages.

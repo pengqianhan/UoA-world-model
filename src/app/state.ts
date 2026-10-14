@@ -3,7 +3,9 @@
 // query string, so copying the address bar reproduces the view exactly.
 import { batch, computed, effect, signal } from "@preact/signals";
 import { nextTeachingDay, representativeTeachingDate, termStatus } from "../shared/calendar.ts";
-import { nightAmount } from "../shared/daylight.ts";
+import { nightAmount, sunAt } from "../shared/daylight.ts";
+import type { SceneWeather } from "../scene/CampusScene.ts";
+import { weather, type Weather } from "../ui/weather.ts";
 import { codeKey, inferFloor, parseRoomCode } from "../shared/roomcode.ts";
 import { sessionsAt } from "../shared/schedule.ts";
 import { aucklandWallTime, formatMinutes, isoWeekday, parseIsoDate, parseTimeOfDay, type WallTime } from "../shared/time.ts";
@@ -81,6 +83,33 @@ export const night = computed(() => {
   if (lightMode.value === "day") return 0;
   if (lightMode.value === "night") return 1;
   return nightAmount(shown.value.date, shown.value.minutes);
+});
+
+/**
+ * The sun over the campus at the time shown. When daylight is forced while the real sun is down,
+ * there is no real sun to draw, so none is given and the scene keeps its own afternoon light.
+ */
+export const sun = computed(() => {
+  const s = sunAt(shown.value.date, shown.value.minutes);
+  return lightMode.value === "day" && s.elevation < 0 ? undefined : s;
+});
+
+/** How hard it is raining, 0-1, for the kinds of weather that bring rain. */
+export const RAIN: Partial<Record<Weather["kind"], number>> = { drizzle: 0.55, rain: 1, showers: 0.85, thunder: 1, snow: 1 };
+
+/**
+ * The weather the scene draws: Open-Meteo's current conditions, only while the time shown is now
+ * and the light follows it. Past or future weather is not known here, so Preview stays clear.
+ */
+export const sceneWeather = computed<SceneWeather | undefined>(() => {
+  const w = weather.value;
+  if (!w || timeMode.value !== "now" || lightMode.value !== "auto") return undefined;
+  const rain = RAIN[w.kind] ?? 0;
+  return {
+    cloud: Math.max(w.cloud, rain ? 0.85 : 0, w.kind === "fog" ? 0.9 : 0),
+    wet: rain,
+    fog: w.kind === "fog" ? 1 : 0,
+  };
 });
 
 // ---------------------------------------------------------------------------------------------

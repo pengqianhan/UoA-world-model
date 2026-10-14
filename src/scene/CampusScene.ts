@@ -8,6 +8,7 @@ import {
   DirectionalLight,
   EdgesGeometry,
   Float32BufferAttribute,
+  Fog,
   Group,
   HemisphereLight,
   IcosahedronGeometry,
@@ -57,6 +58,38 @@ export interface PinSpec {
   at: [number, number];
   text: string;
   title?: string;
+}
+
+/** Weather as the scene draws it, each 0-1. */
+export interface SceneWeather {
+  cloud: number;
+  wet: number;
+  fog: number;
+}
+
+/** The lowest the sun is drawn, degrees; a real sun lower than this casts shadows off the map. */
+const SUN_MIN_ELEVATION = 10;
+/** Crowns of deciduous trees in April and May, in winter, and in early spring. */
+const AUTUMN_LEAVES = 0xd38b3c;
+const BARE_BRANCHES = 0x9a8a76;
+const SPRING_LEAVES = 0xaed27f;
+
+/** A palette under weather: cloud greys the sky and dims the sun, rain darkens the ground and streets. */
+function weathered(p: Palette, w: SceneWeather | undefined, night: number): Palette {
+  if (!w) return p;
+  const overcast = lerpColour(0xc2c9cf, 0x17202a, night);
+  const sky = (x: number) => lerpColour(x, overcast, 0.75 * Math.max(w.cloud, w.fog));
+  const wet = (x: number) => lerpColour(x, 0x000000, 0.1 * w.wet);
+  return {
+    ...p,
+    sky: sky(p.sky),
+    fog: sky(p.fog),
+    ground: wet(p.ground),
+    road: Object.fromEntries(Object.entries(p.road).map(([k, v]) => [k, wet(v)])) as Palette["road"],
+    roadEdge: wet(p.roadEdge),
+    sunIntensity: p.sunIntensity * (1 - 0.6 * w.cloud),
+    ambientIntensity: p.ambientIntensity * (1 + 0.15 * w.cloud),
+  };
 }
 
 export interface SceneOptions {
@@ -206,6 +239,10 @@ export class CampusScene {
 
   private palette: Palette = DAY;
   private night = 0;
+  private sunDirection?: { azimuth: number; elevation: number };
+  private weather?: SceneWeather;
+  private month = 0;
+  private deciduousMaterial?: MeshLambertMaterial;
   private selection: Selection = {};
   private hovered: Pick = null;
   private busy = new Map<string, number>();
@@ -468,7 +505,10 @@ export class CampusScene {
         if (inside) pts.push([x, y]);
       }
     }
-    if (!pts.length) return;
+    // Trees OpenStreetMap tags as deciduous get crowns of their own, coloured by the season.
+    const deciduous: [number, number][] = [];
+    for (let i = 0; i + 1 < (ctx.deciduous ?? []).length; i += 2) deciduous.push([ctx.deciduous![i]! / 10, ctx.deciduous![i + 1]! / 10]);
+    if (!pts.length && !deciduous.length) return;
     // A crown on a trunk, one unit tall and one wide before it is sized. The position of a mapped
     // tree is OpenStreetMap's; its size, shape and shade are drawn by rule, since nothing is known
     // of its kind. A cut gem of twenty faces reads as a crown at campus scale and costs little.
@@ -477,31 +517,39 @@ export class CampusScene {
     crownGeometry.translate(0, 0.6, 0);
     const crownMaterial = new MeshLambertMaterial({ color: this.palette.tree, flatShading: true });
     const crowns = new InstancedMesh(crownGeometry, crownMaterial, pts.length);
+    const deciduousMaterial = new MeshLambertMaterial({ color: this.deciduousColour(this.palette), flatShading: true });
+    const deciduousCrowns = new InstancedMesh(crownGeometry, deciduousMaterial, deciduous.length);
     // Phones leave the trunks out: under a crown they are a few pixels at most.
     const trunkGeometry = new CylinderGeometry(0.05, 0.07, 0.4, 5);
     trunkGeometry.translate(0, 0.2, 0);
     const trunkMaterial = new MeshLambertMaterial({ color: lerpColour(this.palette.tree, 0x5b4a3a, 0.75) });
-    const trunks = this.opts.lite ? undefined : new InstancedMesh(trunkGeometry, trunkMaterial, pts.length);
+    const trunks = this.opts.lite ? undefined : new InstancedMesh(trunkGeometry, trunkMaterial, pts.length + deciduous.length);
     const m = new Matrix4();
     const turn = new Matrix4();
     const shade = new Color();
     const vary = mulberry32(99);
-    pts.forEach(([x, y], i) => {
+    [...pts, ...deciduous].forEach(([x, y], i) => {
       const width = 5.5 + vary() * 5;
       const height = width * (0.95 + vary() * 0.6);
       m.makeScale(width, height, width);
       m.multiply(turn.makeRotationY(vary() * Math.PI * 2));
       m.setPosition(x, 0, -y);
-      crowns.setMatrixAt(i, m);
       trunks?.setMatrixAt(i, m);
       // Lighter and darker greens, and now and then one turned towards yellow.
       const light = 0.84 + vary() * 0.34;
       const yellow = vary() < 0.14 ? 0.1 + vary() * 0.14 : 0;
-      crowns.setColorAt(i, shade.setRGB(light * (1 + yellow * 1.6), light * (1 + yellow * 0.5), light * (1 - yellow * 1.2)));
+      if (i < pts.length) {
+        crowns.setMatrixAt(i, m);
+        crowns.setColorAt(i, shade.setRGB(light * (1 + yellow * 1.6), light * (1 + yellow * 0.5), light * (1 - yellow * 1.2)));
+      } else {
+        deciduousCrowns.setMatrixAt(i - pts.length, m);
+        deciduousCrowns.setColorAt(i - pts.length, shade.setRGB(light, light, light));
+      }
     });
+    this.deciduousMaterial = deciduousMaterial;
     const group = new Group();
-    for (const mesh of trunks ? [crowns, trunks] : [crowns]) {
-      mesh.castShadow = !this.opts.lite && mesh === crowns;
+    for (const mesh of trunks ? [crowns, deciduousCrowns, trunks] : [crowns, deciduousCrowns]) {
+      mesh.castShadow = !this.opts.lite && mesh !== trunks;
       mesh.receiveShadow = false;
       mesh.userData.noPick = true;
       group.add(mesh);
@@ -511,6 +559,7 @@ export class CampusScene {
     this.trees = group;
     this.contextGroup.add(group);
     this.contextMaterials.push({ mat: crownMaterial, key: (p) => p.tree });
+    this.contextMaterials.push({ mat: deciduousMaterial, key: (p) => this.deciduousColour(p) });
     this.contextMaterials.push({ mat: trunkMaterial, key: (p) => lerpColour(p.tree, 0x5b4a3a, 0.75) });
   }
 
@@ -655,9 +704,59 @@ export class CampusScene {
     this.needsRender = true;
   }
 
+  /**
+   * The sun's real direction for the time shown, or none to keep the palette's. Below
+   * `SUN_MIN_ELEVATION` it is held there, so that shadows stay on the map.
+   */
+  setSun(sun: { azimuth: number; elevation: number } | undefined): void {
+    this.sunDirection = sun;
+    this.placeSun();
+    this.needsShadow = true;
+    this.needsRender = true;
+  }
+
+  /**
+   * The weather to draw: cloud dims the sun and greys the sky, wet darkens the ground and the
+   * streets, fog hazes the distance. All 0-1; none is a clear day.
+   */
+  setWeather(w: SceneWeather | undefined): void {
+    const same = (a?: SceneWeather, b?: SceneWeather) => a?.cloud === b?.cloud && a?.wet === b?.wet && a?.fog === b?.fog;
+    if (same(w, this.weather)) return;
+    this.weather = w;
+    this.applyPalette();
+    this.restyle();
+    this.rebuildDetailColours();
+    this.needsShadow = true;
+    this.needsRender = true;
+  }
+
+  /** The month shown, 1-12: trees OpenStreetMap tags as deciduous turn and drop their leaves. */
+  setSeason(month: number): void {
+    if (month === this.month) return;
+    this.month = month;
+    if (this.deciduousMaterial) this.deciduousMaterial.color.setHex(this.deciduousColour(this.palette));
+    this.needsRender = true;
+  }
+
+  /** Crowns of deciduous trees through a southern-hemisphere year. */
+  private deciduousColour(p: Palette): number {
+    const m = this.month;
+    const colour = m === 4 || m === 5 ? AUTUMN_LEAVES : m >= 6 && m <= 8 ? BARE_BRANCHES : m === 9 || m === 10 ? SPRING_LEAVES : p.tree;
+    return lerpColour(colour, p.tree, this.night * 0.7);
+  }
+
   private applyPalette(): void {
-    const p = (this.palette = mixPalette(DAY, NIGHT, this.night));
+    const p = (this.palette = weathered(mixPalette(DAY, NIGHT, this.night), this.weather, this.night));
     this.renderer.setClearColor(p.sky);
+    this.sun.shadow.intensity = 1 - 0.7 * (this.weather?.cloud ?? 0);
+    const fog = this.weather?.fog ?? 0;
+    if (fog > 0) {
+      // The camera keeps its distance; zooming changes only the frustum. Haze the far side of the view.
+      const d = this.camera.position.distanceTo(this.controls.target);
+      this.scene.fog = new Fog(p.fog, d - 300 - 900 * (1 - fog), d + 700 - 300 * fog);
+    } else {
+      this.scene.fog = null;
+    }
     (this.ground.material as MeshLambertMaterial).color.setHex(p.ground);
     this.hemi.color.setHex(p.ambient);
     this.hemi.groundColor.setHex(p.ambientGround);
@@ -672,8 +771,10 @@ export class CampusScene {
 
   private placeSun(): void {
     const p = this.palette;
-    const az = (p.sunAzimuth * Math.PI) / 180;
-    const el = (p.sunElevation * Math.PI) / 180;
+    // By night the light is the palette's moon; by day the real sun, when the host gives one.
+    const real = this.night < 0.5 ? this.sunDirection : undefined;
+    const az = ((real?.azimuth ?? p.sunAzimuth) * Math.PI) / 180;
+    const el = ((real ? Math.max(SUN_MIN_ELEVATION, real.elevation) : p.sunElevation) * Math.PI) / 180;
     const t = this.sun.target.position;
     t.copy(this.shadowCentre);
     const d = 3000;
@@ -1572,6 +1673,23 @@ export class CampusScene {
   /** The type of the shape outlined under the pin, if there is one. For tests. */
   pinOutline(): SpaceType | undefined {
     return this.pinShape;
+  }
+
+  /**
+   * The light as drawn: where the sun stands, degrees, the weather, and the colour of the crowns
+   * of deciduous trees and how many there are. For tests.
+   */
+  lightState(): { azimuth: number; elevation: number; weather?: SceneWeather; fog: boolean; deciduous: number; deciduousTrees: number } {
+    const d = this.sun.position.clone().sub(this.sun.target.position).normalize();
+    const crowns = this.trees?.children.find((o) => (o as InstancedMesh).material === this.deciduousMaterial) as InstancedMesh | undefined;
+    return {
+      azimuth: ((Math.atan2(d.x, -d.z) * 180) / Math.PI + 360) % 360,
+      elevation: (Math.asin(d.y) * 180) / Math.PI,
+      weather: this.weather,
+      fog: !!this.scene.fog,
+      deciduous: this.deciduousMaterial?.color.getHex() ?? 0,
+      deciduousTrees: crowns?.count ?? 0,
+    };
   }
 
   /** The groups whose floors are drawn on the open floor, each with its colour now. For tests. */

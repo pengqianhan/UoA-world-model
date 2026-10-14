@@ -787,6 +787,7 @@ function buildContext(campus: CampusData): { data: ContextData; stats: Record<st
     areas: [],
     rails: [],
     trees: [],
+    deciduous: [],
   };
 
   // Building outlines are held back until their parts are known.
@@ -812,7 +813,8 @@ function buildContext(campus: CampusData): { data: ContextData; stats: Record<st
     if (e.type === "node") {
       if (t.natural === "tree" && e.lat != null && e.lon != null) {
         const p = project(e.lon, e.lat);
-        if (inScene(p) && !insideUni(p)) out.trees.push(Math.round(p[0] * 10), Math.round(p[1] * 10));
+        // A tree tagged deciduous is kept apart, so the scene can bare it in winter.
+        if (inScene(p) && !insideUni(p)) (t.leaf_cycle === "deciduous" ? out.deciduous : out.trees).push(Math.round(p[0] * 10), Math.round(p[1] * 10));
       }
       continue;
     }

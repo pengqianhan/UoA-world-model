@@ -13,15 +13,19 @@ import {
   openBuilding,
   openRoom,
   plansLoaded,
+  sceneWeather,
   selBuilding,
   selCampus,
   selFloor,
   selRoom,
+  shown,
   spaceTip,
+  sun,
   webglFailed,
 } from "../app/state.ts";
 import { CampusScene } from "../scene/CampusScene.ts";
 import { buildingTitle } from "./common.tsx";
+import { weather } from "./weather.ts";
 
 /** Approximate width in metres to show for each campus that is on the map. */
 const CAMPUS_SPAN: Record<string, number> = { city: 1250, grafton: 520, newmarket: 620 };
@@ -123,6 +127,9 @@ export function SceneHost() {
       effect(() => scene.setBusyRooms(busyRooms.value)),
       effect(() => scene.setBuildingBadges(busyBuildings.value)),
       effect(() => scene.setNight(night.value)),
+      effect(() => scene.setSun(sun.value)),
+      effect(() => scene.setWeather(sceneWeather.value)),
+      effect(() => scene.setSeason(Number(shown.value.date.slice(5, 7)))),
       effect(() => {
         lang.value;
         scene.refreshLabels();
@@ -143,10 +150,76 @@ export function SceneHost() {
   return (
     <div class="scene">
       <div class="stage" ref={stage} />
+      <RainLayer />
       <div class="labels" ref={labels} />
       <SpaceTip />
     </div>
   );
+}
+
+/**
+ * Rain falling across the view while Open-Meteo reports rain now: streaks on a canvas over the
+ * map, slanted with the wind. Decoration for a reported fact; nothing falls for a visitor who
+ * asked for less motion.
+ */
+function RainLayer() {
+  const amount = sceneWeather.value?.wet ?? 0;
+  const w = weather.value;
+  // Wind from the west carries the rain east, which is to the right in the usual view.
+  const slant = w ? -Math.sin((w.windFrom * Math.PI) / 180) * Math.min(0.4, w.windSpeed / 80) : 0;
+  const dark = night.value > 0.5;
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!amount || !c || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const g = c.getContext("2d");
+    if (!g) return;
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+    const drops: { x: number; y: number; length: number; speed: number }[] = [];
+    let raf = 0;
+    let last = performance.now();
+    const fit = () => {
+      c.width = Math.round(c.clientWidth * scale);
+      c.height = Math.round(c.clientHeight * scale);
+      const want = Math.round(Math.min(isLite() ? 260 : 650, (c.clientWidth * c.clientHeight) / 2600) * amount);
+      drops.length = 0;
+      for (let i = 0; i < want; i++) {
+        drops.push({ x: Math.random() * c.width, y: Math.random() * c.height, length: (12 + Math.random() * 12) * scale, speed: (700 + Math.random() * 500) * scale });
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(c);
+    const frame = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      g.clearRect(0, 0, c.width, c.height);
+      g.strokeStyle = dark ? "rgba(196, 214, 236, 0.3)" : "rgba(66, 84, 104, 0.3)";
+      g.lineWidth = scale;
+      g.beginPath();
+      for (const d of drops) {
+        d.y += d.speed * dt;
+        d.x += d.speed * dt * slant;
+        if (d.y > c.height) {
+          d.y -= c.height + d.length;
+          d.x = Math.random() * c.width;
+        }
+        if (d.x > c.width) d.x -= c.width;
+        if (d.x < 0) d.x += c.width;
+        g.moveTo(d.x, d.y);
+        g.lineTo(d.x - d.length * slant, d.y - d.length);
+      }
+      g.stroke();
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [amount, slant, dark]);
+  if (!amount) return null;
+  return <canvas class="rain" id="rain-layer" ref={ref} aria-hidden="true" data-amount={amount} />;
 }
 
 /** What an unnamed space on the open floor is, by the campus map's type for it. */

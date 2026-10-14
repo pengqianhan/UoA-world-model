@@ -1,10 +1,19 @@
-// Current weather in Auckland from Open-Meteo (no key, no account). Purely decorative context for
-// "Now" mode; if the request fails the weather is simply not shown.
+// Current weather in Auckland from Open-Meteo (no key, no account). Context for "Now" mode: the
+// temperature in the top bar, and the sky, light and rain in the scene. If the request fails the
+// weather is simply not shown, and the scene keeps a clear day.
 import { signal } from "@preact/signals";
 
 export interface Weather {
   temperature: number;
   kind: "clear" | "partlyCloudy" | "cloudy" | "fog" | "drizzle" | "rain" | "showers" | "thunder" | "snow";
+  /** Share of the sky under cloud, 0-1. */
+  cloud: number;
+  /** Rain in the last hour, millimetres. */
+  precipitation: number;
+  /** Compass bearing the wind blows from, degrees. */
+  windFrom: number;
+  /** Wind speed at 10 m, km/h. */
+  windSpeed: number;
 }
 
 export const weather = signal<Weather | undefined>(undefined);
@@ -24,15 +33,35 @@ function kindOf(code: number): Weather["kind"] {
   return "cloudy";
 }
 
+export const WEATHER_URL =
+  "https://api.open-meteo.com/v1/forecast?latitude=-36.8523&longitude=174.7691" +
+  "&current=temperature_2m,weather_code,cloud_cover,precipitation,wind_speed_10m,wind_direction_10m&timezone=Pacific%2FAuckland";
+
 export async function loadWeather(): Promise<void> {
   try {
-    const url = "https://api.open-meteo.com/v1/forecast?latitude=-36.8523&longitude=174.7691&current=temperature_2m,weather_code&timezone=Pacific%2FAuckland";
-    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(WEATHER_URL, { signal: AbortSignal.timeout(6000) });
     if (!res.ok) return;
-    const json = (await res.json()) as { current?: { temperature_2m?: number; weather_code?: number } };
+    const json = (await res.json()) as {
+      current?: {
+        temperature_2m?: number;
+        weather_code?: number;
+        cloud_cover?: number;
+        precipitation?: number;
+        wind_speed_10m?: number;
+        wind_direction_10m?: number;
+      };
+    };
     const c = json.current;
     if (typeof c?.temperature_2m !== "number" || typeof c.weather_code !== "number") return;
-    weather.value = { temperature: c.temperature_2m, kind: kindOf(c.weather_code) };
+    const num = (v: number | undefined, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
+    weather.value = {
+      temperature: c.temperature_2m,
+      kind: kindOf(c.weather_code),
+      cloud: Math.max(0, Math.min(1, num(c.cloud_cover, 0) / 100)),
+      precipitation: Math.max(0, num(c.precipitation, 0)),
+      windFrom: num(c.wind_direction_10m, 225),
+      windSpeed: Math.max(0, num(c.wind_speed_10m, 0)),
+    };
   } catch {
     // Offline or blocked: carry on without weather.
   }

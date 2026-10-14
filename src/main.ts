@@ -25,8 +25,10 @@ loadData()
       readUrl(d);
     });
     startUrlSync();
-    // Decorative and optional: fetched after the map is up.
+    // Decorative and optional: fetched after the map is up, and again each half hour, as often
+    // as Open-Meteo's current conditions change.
     setTimeout(() => void loadWeather(), 1500);
+    setInterval(() => void loadWeather(), 30 * 60 * 1000);
   })
   .catch((e) => {
     console.error(e);
