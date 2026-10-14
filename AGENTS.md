@@ -22,8 +22,9 @@ These bind every change, whoever or whatever wrote it.
 - **Places, not people.** Publish codes, titles, times and rooms. Drop staff names and enrolment
   numbers at parse time. Teaching and study spaces are named and can be selected. Every other
   space is at most a shape on its floor with the source's own type for it: no code, no name,
-  nothing to select. Floors where people live and childcare centres stay blank, and a room the
-  source hides from its own search is never named.
+  nothing to select; a room found by its code in the source's search marks the shape it stands on.
+  Floors where people live and childcare centres stay blank, and a room the source hides from its
+  own search is never named.
 - **Label the precision.** Keep each record's original text. Mark whether it is located to a room, a
   floor or a building. Inferred floors and estimated heights are labelled as such on screen. A
   record that cannot be used goes to `exclusions` with its reason.
