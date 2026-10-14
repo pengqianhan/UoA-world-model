@@ -84,13 +84,13 @@ Verified 2026-10-13 against https://pengqianhan.github.io/campus-world-model/ at
 
 - Courses with timetable data: **0**. Scheduled classes: **0**. Share located to building / floor /
   room: **not applicable** (nothing to locate).
-- What is covered instead: 194 buildings (139 on the 3D map); 786 learning spaces with outlines, every
+- What is covered instead: 194 buildings, all on the 3D map; 786 learning spaces with outlines, every
   one tied to a building and a floor from the official campus map; 4,668 further rooms locatable as a
-  point on their floor; 14,508 other spaces drawn on their floors, each with the campus map's type
+  point on their floor; 14,862 other spaces drawn on their floors, each with the campus map's type
   for it; 251 subject codes; the 2026 academic calendar.
-- What the campus map itself leaves out, of the 722 floors on the 3D map: 96 floors with no shape at
+- What the campus map itself leaves out, of the 794 floors on the 3D map: 98 floors with no shape at
   all (`noPlan: "unmapped"`; 73 of them in halls of residence the source maps as a bare building),
-  and 34 where its shapes cover under 30% of the floor (`partialPlan`; plant levels, mezzanines,
+  and 35 where its shapes cover under 30% of the floor (`partialPlan`; plant levels, mezzanines,
   split-level landings). The floor list marks both and the building bar says so.
 
 ## Done (with evidence)
@@ -202,7 +202,7 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   campuses are on the map; remote campuses are chosen from "Other campuses…" in the status strip,
   and the camera jumps rather than flies between areas. The ground and the shadow map follow the
   campus shown. One flat projection about the City Campus is kept for every area: at Tai Tokerau
-  (125 km north) shapes are about 1% too wide east to west, which About says. The sea is not
+  (125 km north) shapes are about 1.4% too narrow east to west, which About says. The sea is not
   drawn: OpenStreetMap's coastline is a line, and turning it into water was not attempted. The
   public Overpass instances answered 504 or nothing for most of an hour on 2026-10-15; the fetch now
   times out after 240 s (`scripts/lib/snapshot.ts`) and goes round all three instances up to three
