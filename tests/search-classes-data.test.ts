@@ -184,6 +184,31 @@ describe("published floor plans", () => {
       if (/Early Childhood|Kohanga Reo/i.test(b.sourceText)) expect(b.planShapes, b.id).toBeUndefined();
     }
   });
+  it("mark the floors the campus map leaves bare, and only those", () => {
+    const byBuilding = new Map(plans.map((p) => [p.building, p]));
+    const onMap = campus.buildings.filter((b) => !b.offMap);
+    const unmapped = onMap.flatMap((b) => b.floors.filter((f) => f.noPlan === "unmapped").map((f) => [b.id, f.i] as const));
+    // Halls of residence that the source maps as a building and nothing inside.
+    expect(unmapped.filter(([id]) => /^(614|83[2-7])$/.test(id)).length).toBeGreaterThan(40);
+    for (const [id, i] of unmapped) {
+      expect(campus.rooms.some((r) => r.b === id && r.f === i), `${id} floor ${i}`).toBe(false);
+      expect(byBuilding.get(id)?.floors[i], `${id} floor ${i}`).toBeUndefined();
+    }
+    // A floor this site draws nothing on is always explained.
+    for (const b of onMap) {
+      for (const f of b.floors) {
+        const drawn = campus.rooms.some((r) => r.b === b.id && r.f === f.i) || !!byBuilding.get(b.id)?.floors[f.i];
+        if (!drawn) expect(f.noPlan, `${b.id} floor ${f.name}`).toBeDefined();
+        if (f.partialPlan) expect(f.noPlan, `${b.id} floor ${f.name}`).toBeUndefined();
+      }
+    }
+    expect(onMap.flatMap((b) => b.floors).filter((f) => f.partialPlan).length).toBeGreaterThan(10);
+    for (const b of campus.buildings.filter((x) => x.offMap)) {
+      for (const f of b.floors) {
+        expect(f.noPlan === "unmapped" || !!f.partialPlan, `${b.id} floor ${f.name}`).toBe(false);
+      }
+    }
+  });
   it("never lay a shape over a named room", () => {
     const byBuilding = new Map(plans.map((p) => [p.building, p]));
     for (const r of campus.rooms) {
