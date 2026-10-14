@@ -40,10 +40,7 @@ Bonus ideas not done, in rough order of value:
    lazy-loaded and whose course pages are about 240 KB each. Not worth thousands of requests while
    there is no timetable to attach the courses to.
 3. Remote campuses in 3D (building data exists; no OSM context fetched for them).
-4. On the floor plans: icons for stairs, lifts and toilets (their type is shown since 2026-10-14),
-   and an outline round the shape a pinned room stands on. The outline ties a code to a shape, so
-   it reopens the "Places, not people" rule (a gate).
-5. Seasons and weather effects in the scene.
+4. Seasons and weather effects in the scene.
 
 ## Final report (2026-10-13)
 
@@ -170,6 +167,12 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   the open floor. Still no code or name, still nothing to select. "Other area" is what the source
   calls "Non Usable Area", "Ancillary Area", "Nonasgn Rentable", "Unclassified Facilities" and
   "General Facility": it does not say what those hold, so neither does the site.
+- Signs and pinned outlines, since 2026-10-15 (the user asked for every remaining item that has a
+  public source): stairs, lifts, toilets, accessible toilets and showers carry a sign on the floor
+  plan (`SPACE_ICONS` in `build-data.ts`; every "Accessible" shape in the snapshot is named as a
+  toilet). Signs give way to room labels and cannot be clicked. A room found by its code in the
+  source's search is pinned, and the shape it stands on is outlined and tinted, with its type on
+  the room card. Only searchable rooms are in that index, so no hidden room gets a code this way.
 - Room codes are `<building>-<room>`; the true floor comes from the map. Inference from the room
   number (agrees with the map for >85% of rooms, see `tests/roomcode.test.ts`) is only the fallback
   for unknown codes and is labelled "inferred" in the UI.

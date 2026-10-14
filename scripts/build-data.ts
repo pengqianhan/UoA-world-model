@@ -43,6 +43,7 @@ import type {
   RoomKind,
   Schedule,
   SourceInfo,
+  SpaceIcon,
   SpaceKind,
   SpaceType,
   Subject,
@@ -207,6 +208,21 @@ const SPACE_KINDS: Record<string, SpaceKind> = {
   "Accommodation Reception": "amenity",
   Emergency: "amenity",
   "Bike Store": "amenity",
+};
+/**
+ * The sign drawn on a shape of these types. In the snapshot of 2026-10-13 every "Accessible" shape
+ * is named as a toilet ("Accessible - Unisex", "Accessible - Female"), and "Squat" as a squat toilet.
+ */
+const SPACE_ICONS: Record<string, SpaceIcon> = {
+  Stairs: "stairs",
+  Elevator: "lift",
+  Female: "toilet",
+  Male: "toilet",
+  Unisex: "toilet",
+  "Gender Diverse": "toilet",
+  Squat: "toilet",
+  Accessible: "accessible",
+  Shower: "shower",
 };
 /**
  * A floor on which the campus map's shapes, of every kind, cover less of the floor than this is
@@ -484,7 +500,8 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
     const typeOf = (text: string): number => {
       let k = typeIndex.get(text);
       if (k === undefined) {
-        k = plan.types.push({ text, kind: SPACE_KINDS[text] ?? "other" } satisfies SpaceType) - 1;
+        const icon = SPACE_ICONS[text];
+        k = plan.types.push({ text, kind: SPACE_KINDS[text] ?? "other", ...(icon ? { icon } : {}) } satisfies SpaceType) - 1;
         typeIndex.set(text, k);
       }
       return k;

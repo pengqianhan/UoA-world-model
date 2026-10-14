@@ -98,6 +98,7 @@
     "precision": {
       "room": "Position and outline from the official campus map · outline simplified",
       "indexed": "Position from the official campus map · shown as a pin",
+      "indexedOutline": "Position and outline from the official campus map · outline simplified · marked with a pin",
       "floor": "Floor inferred from the room number · position within the floor unknown",
       "building": "Only the building is known"
     },
@@ -133,7 +134,14 @@
       "stairs": "Stairs or lift",
       "other": "Other area"
     },
-    "sourceType": "Campus map type: {type}"
+    "sourceType": "Campus map type: {type}",
+    "icon": {
+      "stairs": "Stairs",
+      "lift": "Lift",
+      "toilet": "Toilet",
+      "accessible": "Accessible toilet",
+      "shower": "Shower"
+    }
   },
   "time": {
     "now": "Now",
@@ -245,7 +253,7 @@
       "timetableLoaded": "Class times come from a snapshot of the timetable taken on {date}. Rooms and times change during the semester; your own timetable is the authority.",
       "scheduled": "A timetabled class is not the same as an occupied room. Classes are cancelled, moved and recorded online, and rooms are used for things that are not on the timetable.",
       "heights": "Each building is stacked floor by floor from the outlines on the official campus map, so its podiums, towers, setbacks and courtyards are real. Floors whose outlines differ by less than a twentieth of their area are drawn as one block. Its height is not surveyed: every floor is drawn {height} m high. The windows and the rim round each roof are drawn by rule and say nothing about the real walls and roofs. The ground is drawn flat although the campus sits on a ridge.",
-      "rooms": "Outlines are simplified from the official campus map. Learning spaces (lecture theatres, teaching rooms, labs, studios, study spaces) are named and can be selected. Every other space on the campus map is drawn as a shape with no code or name, so that a floor reads as a floor plan, and its floor is tinted by the campus map's type for it: offices, other labs, toilets, stairs and lifts, services, and areas the map does not describe. Point at a shape, or tap it, to read that type in the campus map's own words. A room among them is found by its code and marked with a pin. Walls stand on every outline at a height chosen for the drawing; the campus map has no wall heights and no doors, so none are shown. Floors where people live and childcare centres are left blank, and single parking bays are not drawn. Some floors are blank or nearly blank on the campus map itself, most of them in halls of residence; the floor list marks them and the building bar says so. The furniture drawn in a selected room is decoration laid out by rule; it is not a seating plan and says nothing about capacity.",
+      "rooms": "Outlines are simplified from the official campus map. Learning spaces (lecture theatres, teaching rooms, labs, studios, study spaces) are named and can be selected. Every other space on the campus map is drawn as a shape with no code or name, so that a floor reads as a floor plan, and its floor is tinted by the campus map's type for it: offices, other labs, toilets, stairs and lifts, services, and areas the map does not describe. Point at a shape, or tap it, to read that type in the campus map's own words. Stairs, lifts, toilets and showers carry a sign. A room among them is found by its code and marked with a pin, and the shape it stands on is outlined. Walls stand on every outline at a height chosen for the drawing; the campus map has no wall heights and no doors, so none are shown. Floors where people live and childcare centres are left blank, and single parking bays are not drawn. Some floors are blank or nearly blank on the campus map itself, most of them in halls of residence; the floor list marks them and the building bar says so. The furniture drawn in a selected room is decoration laid out by rule; it is not a seating plan and says nothing about capacity.",
       "campuses": "Only the City, Grafton and Newmarket campuses are modelled in 3D. Buildings on other campuses appear in search and are marked as not on the map.",
       "context": "Surrounding buildings, streets and trees come from OpenStreetMap. Where it maps a building in parts or gives a roof a shape, those are drawn, the roof in a simplified form. Where a height is not mapped, a default is used. A tree standing alone is where OpenStreetMap maps it; its size and shape are drawn by rule. Trees OpenStreetMap tags as deciduous turn in April and May, stand bare from June to August and come into leaf in September and October; the rest are drawn evergreen. Trees inside woodland areas are scattered for decoration.",
       "calendar": "Semester dates are transcribed by hand from the 2026 University Calendar. Dates for 2027 were not fully published when this was built.",

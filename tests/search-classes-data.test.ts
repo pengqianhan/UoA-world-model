@@ -170,7 +170,9 @@ describe("published floor plans", () => {
       expect(Object.keys(plan).sort(), plan.building).toEqual(["building", "floors", "typeOf", "types", "version"]);
       expect(plan.version).toBe(2);
       for (const type of plan.types) {
-        expect(Object.keys(type).sort(), plan.building).toEqual(["kind", "text"]);
+        expect(Object.keys(type).sort(), plan.building).toEqual(type.icon ? ["icon", "kind", "text"] : ["kind", "text"]);
+        // Signs go only on the ways about a building and on toilets and showers.
+        if (type.icon) expect(["stairs", "toilet"], type.text).toContain(type.kind);
         expect(type.text.length, plan.building).toBeGreaterThan(0);
         expect(kinds.has(type.kind), type.kind).toBe(true);
         // A type is a type, never a room code, and it means one group everywhere.
@@ -195,6 +197,13 @@ describe("published floor plans", () => {
     expect(seen.get("Office Accommodation")).toBe("office");
     expect(seen.get("Stairs")).toBe("stairs");
     expect(seen.get("Female")).toBe("toilet");
+    const icons = new Map(plans.flatMap((p) => p.types.map((t) => [t.text, t.icon] as const)));
+    expect(icons.get("Stairs")).toBe("stairs");
+    expect(icons.get("Elevator")).toBe("lift");
+    expect(icons.get("Male")).toBe("toilet");
+    expect(icons.get("Accessible")).toBe("accessible");
+    expect(icons.get("Shower")).toBe("shower");
+    expect(icons.get("Office Accommodation")).toBeUndefined();
   });
   it("leave every floor where people live, and every childcare centre, blank", () => {
     const blank = campus.buildings.flatMap((b) => b.floors.filter((f) => f.noPlan).map((f) => [b.id, f.i, f.noPlan] as const));
