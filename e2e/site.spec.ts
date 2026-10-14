@@ -421,6 +421,32 @@ test("the rest of a floor is drawn as unnamed shapes that cannot be selected, an
   await expect(page.locator("#floor-no-plan-note")).toContainText("childcare centre");
 });
 
+test("a floor the campus map leaves bare, or nearly bare, is marked in the floor list and explained", async ({ page }) => {
+  // O'Rorke Hall: the source maps the building and its floors, and no rooms on floors 2 to 13.
+  await open(page, "?building=614&floor=5&light=day");
+  expect(await page.evaluate(() => window.__scene!.planShapes)).toBe(0);
+  await expect(page.locator("#floor-no-plan-note")).toContainText("The campus map has no rooms on this floor");
+  await expect(page.locator('.floor[data-floor="5"] .floor-mark.blank')).toHaveCount(1);
+  await expect(page.locator("#floors-legend")).toContainText("Not drawn");
+  await expectRealRender(page);
+  await shot(page, "14-floor-unmapped");
+
+  // George Mason Biology Building, floor 2: the labs are on the mezzanines; the map draws stairs
+  // and little else here.
+  await open(page, "?building=106&floor=2&light=day");
+  expect(await page.evaluate(() => window.__scene!.planShapes)).toBeGreaterThan(0);
+  await expect(page.locator("#floor-partial-note")).toContainText("only a few spaces on this floor");
+  await expect(page.locator('.floor[data-floor="2"] .floor-mark.partial')).toHaveCount(1);
+  await expect(page.locator('.floor[data-floor="M2"] .floor-mark')).toHaveCount(0);
+  await expect(page.locator("#floors-legend")).toContainText("Partly mapped");
+  await shot(page, "14-floor-partial");
+
+  // A floor drawn in full carries no mark and no note.
+  await open(page, "?building=405&floor=4&light=day");
+  await expect(page.locator("#floor-partial-note")).toHaveCount(0);
+  await expect(page.locator("#floor-no-plan-note")).toHaveCount(0);
+});
+
 test("rooms on the open floor stand as walls on their outlines, the named ones round a floor in their colour", async ({ page }) => {
   await open(page, "?building=303&floor=G&light=day");
   const walls = await page.evaluate(() => window.__scene!.floorWalls());

@@ -89,6 +89,10 @@ Verified 2026-10-13 against https://pengqianhan.github.io/campus-world-model/ at
 - What is covered instead: 194 buildings (139 on the 3D map); 786 learning spaces with outlines, every
   one tied to a building and a floor from the official campus map; 4,668 further rooms locatable as a
   point on their floor; 251 subject codes; the 2026 academic calendar.
+- What the campus map itself leaves out, of the 722 floors on the 3D map: 96 floors with no shape at
+  all (`noPlan: "unmapped"`; 73 of them in halls of residence the source maps as a bare building),
+  and 34 where its shapes cover under 30% of the floor (`partialPlan`; plant levels, mezzanines,
+  split-level landings). The floor list marks both and the building bar says so.
 
 ## Done (with evidence)
 

@@ -168,6 +168,12 @@ const PLAN_RESIDENTIAL_TYPES = new Set(["Stud Residential Accom"]);
 const PLAN_CHILDCARE_BUILDINGS = /Early Childhood|K[oō]hanga Reo/i;
 /** Shapes that are not rooms: single parking bays and the source's own test records. */
 const PLAN_SKIPPED_TYPES = new Set(["Parking For Vehicles", "Void 2.0 test"]);
+/**
+ * A floor on which the campus map's shapes, of every kind, cover less of the floor than this is
+ * marked as partly drawn. In the snapshot of 2026-10-13 such floors hold stairs, lifts, toilets and
+ * plant and little else: roof plant levels, mezzanines, the landings of a split-level building.
+ */
+const PARTIAL_PLAN = 0.3;
 
 const CODE_RE = /^(\d{3}[A-Z]?)-([A-Z0-9]+)$/;
 
@@ -191,6 +197,11 @@ function polygons(g: MiGeometry, tolerance: number): Ring[][] {
     out.push([outer, ...rings.slice(1).filter((r) => ringArea(r) >= 1)]);
   }
   return out;
+}
+
+/** Area of polygons with holes, square metres. */
+function polygonsArea(polys: Ring[][]): number {
+  return polys.reduce((n, [outer, ...holes]) => n + ringArea(outer!) - holes.reduce((h, r) => h + ringArea(r), 0), 0);
 }
 
 function buildingName(raw: string, id: string): string {
@@ -225,6 +236,8 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
   const venueCampus = (name: string) => CAMPUS_IDS[name]?.id ?? name.toLowerCase();
 
   const buildings: Building[] = [];
+  /** Area of the outline each floor has in effect, square metres, by `${building}|${floor}`. */
+  const floorArea = new Map<string, number>();
   for (const b of miBuildings) {
     const venue = venueById.get(b.venueId);
     if (!venue) continue;
@@ -264,6 +277,7 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
       if (polys.length) prevKey = key;
       shapes.push(floor.outline ? rings : shapes[shapes.length - 1]);
       floors.push(floor);
+      floorArea.set(`${id}|${i}`, polygonsArea(shapes[shapes.length - 1] ?? [outline]));
     }
     // Storeys that are alike from outside stand as one block: each run of full levels at or above
     // entry is measured against its lowest floor, so that a slow drift up a tower still shows.
@@ -372,6 +386,8 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
     if (PLAN_CHILDCARE_BUILDINGS.test(b.sourceText)) for (const f of b.floors) f.noPlan = "childcare";
   }
   const placed: { building: Building; floor: Floor; loc: MiLocation }[] = [];
+  // How much of each floor the campus map covers with shapes of any kind, named or not.
+  const drawnArea = new Map<string, number>();
   for (const loc of locations) {
     if (loc.geometry.type !== "Polygon") continue;
     const p = loc.properties;
@@ -379,6 +395,8 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
     const building = (m && byId.get(m[1]!)) ?? byId.get(p.building);
     const floor = building?.floors.find((f) => f.i === Number(p.floor));
     if (!building || !floor) continue;
+    const key = `${building.id}|${floor.i}`;
+    drawnArea.set(key, (drawnArea.get(key) ?? 0) + polygonsArea(polygons(loc.geometry, 0.2)));
     if (PLAN_RESIDENTIAL_TYPES.has(p.type)) floor.noPlan = "residential";
     else if (m && rooms.has(`${building.id}-${m[2]}`)) continue;
     else if (!building.offMap) placed.push({ building, floor, loc });
@@ -427,6 +445,23 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
       bump("plans.floors");
     }
     plans.push(plan);
+  }
+  // Mark what the campus map itself leaves out, so that a bare floor is not taken for one this
+  // site failed to draw.
+  for (const b of buildings) {
+    if (b.offMap) continue;
+    for (const f of b.floors) {
+      if (f.noPlan) continue;
+      const key = `${b.id}|${f.i}`;
+      const drawn = drawnArea.get(key) ?? 0;
+      if (drawn === 0) {
+        f.noPlan = "unmapped";
+        bump("floors.unmapped");
+      } else if (drawn < PARTIAL_PLAN * (floorArea.get(key) ?? 0)) {
+        f.partialPlan = true;
+        bump("floors.partialPlan");
+      }
+    }
   }
 
   const campuses: Campus[] = venues

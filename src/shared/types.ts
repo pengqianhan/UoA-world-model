@@ -47,8 +47,13 @@ export interface Floor {
    * each floor keeps its own.
    */
   stackWith?: number;
-  /** Set when no floor plan is published for this floor: people live on it, or it is a childcare centre. */
-  noPlan?: "residential" | "childcare";
+  /**
+   * Set when no floor plan is published for this floor: people live on it, it is a childcare
+   * centre, or the campus map draws nothing on it.
+   */
+  noPlan?: "residential" | "childcare" | "unmapped";
+  /** Set when the campus map's shapes cover only a small part of this floor. */
+  partialPlan?: true;
 }
 
 export interface Building {
