@@ -446,3 +446,38 @@ test("a floor the campus map leaves bare, or nearly bare, is marked in the floor
   await expect(page.locator("#floor-partial-note")).toHaveCount(0);
   await expect(page.locator("#floor-no-plan-note")).toHaveCount(0);
 });
+
+test("rooms on the open floor stand as walls on their outlines, the named ones round a floor in their colour", async ({ page }) => {
+  await open(page, "?building=303&floor=G&light=day");
+  const walls = await page.evaluate(() => window.__scene!.floorWalls());
+  // Every edge of every unnamed shape is walled, and the learning spaces are open rooms, not blocks.
+  expect(walls.planWallFaces).toBeGreaterThan(300);
+  expect(walls.rooms).toBe(12);
+  expect(walls.walledRooms).toBeGreaterThanOrEqual(10);
+  await expectRealRender(page);
+
+  // A room is still picked by a click inside its walls.
+  const pt = (await page.evaluate(() => window.__scene!.screenPoint("room", "303-G20")))!;
+  await page.mouse.click(pt.x, pt.y);
+  await settle(page);
+  expect(params(page).get("room")).toBe("303-G20");
+  await shot(page, "15-floor-walls");
+});
+
+test("an open building fills the screen beside the panels, keeps its windows below the cut and its outer walls on the open floor", async ({ page }) => {
+  await open(page, "?building=106&floor=M1&light=day");
+  const walls = await page.evaluate(() => window.__scene!.floorWalls());
+  expect(walls.outerWalls).toBe(true);
+  expect(walls.windowsBelow).toBe(true);
+
+  // The open floor takes up a good part of the width, and none of it is under the floor list.
+  const box = (await page.evaluate(() => window.__scene!.openFloorBox()))!;
+  const view = page.viewportSize()!;
+  expect(box.right - box.left).toBeGreaterThan(view.width * 0.45);
+  expect(box.top).toBeGreaterThan(0);
+  expect(box.bottom).toBeLessThan(view.height);
+  const list = (await page.locator(".floors").boundingBox())!;
+  expect(box.right).toBeLessThan(list.x);
+  await expectRealRender(page);
+  await shot(page, "16-building-facade");
+});

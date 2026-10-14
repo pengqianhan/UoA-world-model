@@ -292,14 +292,14 @@ export class MeshBuilder {
     });
   }
 
-  /** A flat polygon at height y (no walls). */
-  flat(ring: FlatRing, y: number, color?: RGB): void {
+  /** A flat polygon at height y (no walls), in the second material group when `second` is set. */
+  flat(ring: FlatRing, y: number, color?: RGB, second = false): void {
     if (ring.length < 6) return;
     const contour: Vector2[] = [];
     for (let i = 0; i + 1 < ring.length; i += 2) contour.push(new Vector2(ring[i]! / 10, ring[i + 1]! / 10));
     const base = this.vertexCount;
     for (const p of contour) this.vertex(p.x, y, -p.y, 0, 1, 0, color);
-    for (const tri of ShapeUtils.triangulateShape(contour, [])) this.upFacing(base, contour, tri);
+    for (const tri of ShapeUtils.triangulateShape(contour, [])) this.upFacing(base, contour, tri, second ? this.roofIndices : this.indices);
   }
 
   /** A flat ribbon of the given width along a polyline. */

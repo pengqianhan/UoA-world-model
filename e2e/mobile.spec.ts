@@ -38,6 +38,13 @@ test("6. phone: search for a room and see the building and class information", a
   await page.locator('.floor[data-floor="1"]').tap();
   await settle(page);
   expect(params(page).get("floor")).toBe("1");
+  // The open floor fills most of the phone's width, between the floor strip and the building bar.
+  const box = (await page.evaluate(() => window.__scene!.openFloorBox()))!;
+  expect(box.right - box.left).toBeGreaterThan(390 * 0.6);
+  const strip = (await page.locator(".floors").boundingBox())!;
+  const dock = (await bar.boundingBox())!;
+  expect(box.top).toBeGreaterThan(strip.y + strip.height - 10);
+  expect(box.bottom).toBeLessThan(dock.y + 10);
   await shot(page, "06-mobile-floor");
   // Every floor of a tall building must be reachable by scrolling the strip, not just the first few.
   const top = page.locator('.floor[data-floor="7"]');
