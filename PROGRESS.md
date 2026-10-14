@@ -209,13 +209,25 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   `campus-world-model` at <https://campusworldmodel.com/uoa/> (also reachable as
   `campus-world-model.pages.dev`), published by the `deploy-cloudflare` CI job (repository variable
   `CLOUDFLARE_PROJECT`, secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`). Cloudflare
-  because the user plans advertising, which GitHub Pages' terms do not suit.
+  because the user planned advertising at the time, which GitHub Pages' terms do not suit.
+- **No advertising (the user, 2026-10-14).** The plan above is dropped: the site is a
+  non-commercial open-source project. The University's copyright page
+  (<https://www.auckland.ac.nz/en/copyright.html>) asks for written permission before any
+  commercial use of its material, so if advertising is ever wanted the University is asked first.
 - **One neutral address, one path per school.** The user plans to add other New Zealand universities
   and registered `campusworldmodel.com` with Cloudflare on 2026-10-13 (expires 2027-10-13,
   auto-renew off), with each school under its own path: `/uoa/` now, a school picker at the root
   later (today the root redirects to `/uoa/`, `cloudflare/_redirects`). Path names are each school's
   own short name, not its city: AUT is in Auckland too. Holding several schools in this one
   repository is a refactor that has not started. `www.campusworldmodel.com` is not set up.
+- **Other worlds (the user, 2026-10-14).** The site names the Tsinghua World Model
+  (`tsinghua-world-model.pages.dev`, an independent student project) as its inspiration, in About
+  and in the README, and offers it on the campus view under "Other worlds". Following that link
+  plays a 2.2 s flight through space, counting the great-circle distance from the City Campus,
+  before the browser leaves for the other site; Escape or "Stay in Auckland" calls it off, and a
+  visitor who asked for less motion gets a plain link. The other site is linked to and nothing is
+  loaded from it. The list is `WORLDS` in `src/app/links.ts`; a school hosted here under its own
+  path is meant to join the same row, which has not been built.
 - **All network fetching goes through `scripts/lib/snapshot.ts`** (cache-first, ≥1.1 s between
   requests, honest User-Agent). Never fetch a URL that already has a snapshot unless `--refresh`.
 - **Labels are HTML, hit-tested by the scene** (`pointer-events: none`) so that a drag starting on a
@@ -251,6 +263,16 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   route checks. Not pursued further; the test credential was deleted from the dashboard afterwards.
 - The OAuth route the student project `SOFTENG310-G7/degree-planner` used in 2023-24 for Course
   Catalog Api V3 (`/courses/v3/oauth2/token`) now answers 401 as well.
+- **Blurring the map during the flight to another world (2026-10-14).** A CSS `filter: blur()` on
+  the WebGL canvas, and a radial gradient repainted on the star canvas every frame, were fine on a
+  GPU and on SwiftShader on this machine. On CI's software renderer (2 cores) a flight that had run
+  for about a second left the page producing almost no frames: after it was called off, the next
+  flight got 1 frame in 1.5 s, and with the departure tied to a frame it never left. Now the map is
+  only scaled, the glow is CSS, the star canvas is capped at 1.5 million pixels, and a timer sends
+  the browser on its way. Two things the tests learned the same day: Playwright holds back every
+  locator, `evaluate` and screenshot while the page has a navigation pending, so the page reports
+  what it showed from its own `beforeunload`; and reading a canvas back there (`getImageData`)
+  holds the departure up when the renderer is behind.
 
 ## Needs the user
 
