@@ -48,6 +48,7 @@ import type {
   SpaceType,
   Subject,
 } from "../src/shared/types.ts";
+import { AREAS, CENTRAL, type SceneArea } from "./lib/areas.ts";
 import { buildSchedule, loadClassSnapshots } from "./lib/classes.ts";
 import { hasSnapshot, manifest, readSnapshot } from "./lib/snapshot.ts";
 
@@ -67,14 +68,30 @@ const MIN_FOOTPRINT_SHARE = 0.2;
  * takes away far more than a twentieth of a floor.
  */
 const STACK_OVERLAP = 0.95;
-/** south, west, north, east of the 3D scene; must match scripts/fetch-osm.ts. */
-const SCENE_BBOX = [-36.8689, 174.7608, -36.8441, 174.7797] as const;
-
 const project = makeProjector(ORIGIN);
-const [sx0, sy0] = project(SCENE_BBOX[1], SCENE_BBOX[0]);
-const [sx1, sy1] = project(SCENE_BBOX[3], SCENE_BBOX[2]);
-const inScene = (p: Pt, margin = 0) =>
-  p[0] >= sx0 - margin && p[0] <= sx1 + margin && p[1] >= sy0 - margin && p[1] <= sy1 + margin;
+
+/**
+ * The areas the 3D map draws (scripts/lib/areas.ts) whose OpenStreetMap snapshot has been taken,
+ * each with its box in the local frame, metres. An area without its snapshot is not drawn.
+ */
+const areaBoxes = AREAS.filter((area) => hasSnapshot(area.osm)).map((area) => {
+  const [x0, y0] = project(area.bbox[1], area.bbox[0]);
+  const [x1, y1] = project(area.bbox[3], area.bbox[2]);
+  return { area, x0, y0, x1, y1 };
+});
+type AreaBox = (typeof areaBoxes)[number];
+const inBox = (b: AreaBox, p: Pt, margin = 0) => p[0] >= b.x0 - margin && p[0] <= b.x1 + margin && p[1] >= b.y0 - margin && p[1] <= b.y1 + margin;
+/** The area of the map a point lies in, if any. */
+const areaOf = (p: Pt): SceneArea | undefined => areaBoxes.find((b) => inBox(b, p))?.area;
+/** The area whose surroundings are being built; `inScene` and `clipLine` ask about it. */
+let sceneBox: AreaBox = areaBoxes.find((b) => b.area === CENTRAL)!;
+const inScene = (p: Pt, margin = 0) => inBox(sceneBox, p, margin);
+
+/** Where a building or campus centred here stands: in the central area, in another one, or off the map. */
+const placeOnMap = (center: Pt): { area?: string; offMap?: true } => {
+  const area = areaOf(center);
+  return !area ? { offMap: true } : area === CENTRAL ? {} : { area: area.id };
+};
 
 const readJson = <T>(file: string): T => JSON.parse(readSnapshot(file).toString("utf8")) as T;
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -118,15 +135,16 @@ interface MiLocation {
   };
 }
 
-const CAMPUS_IDS: Record<string, { id: string; onMap: boolean }> = {
-  CITY_CAMPUS: { id: "city", onMap: true },
-  GRAFTON_CAMPUS: { id: "grafton", onMap: true },
-  NEWMARKET_CAMPUS: { id: "newmarket", onMap: true },
-  LEIGH_CAMPUS: { id: "leigh", onMap: false },
-  ARDMORE_CAMPUS: { id: "ardmore", onMap: false },
-  TAI_TOKERAU_CAMPUS: { id: "tai-tokerau", onMap: false },
-  TAI_TONGA_CAMPUS: { id: "tai-tonga", onMap: false },
-  WAIHEKE_RESEARCH_STATION: { id: "waiheke", onMap: false },
+/** Campus ids by the source's venue name. Whether a campus is on the map follows scripts/lib/areas.ts. */
+const CAMPUS_IDS: Record<string, { id: string }> = {
+  CITY_CAMPUS: { id: "city" },
+  GRAFTON_CAMPUS: { id: "grafton" },
+  NEWMARKET_CAMPUS: { id: "newmarket" },
+  LEIGH_CAMPUS: { id: "leigh" },
+  ARDMORE_CAMPUS: { id: "ardmore" },
+  TAI_TOKERAU_CAMPUS: { id: "tai-tokerau" },
+  TAI_TONGA_CAMPUS: { id: "tai-tonga" },
+  WAIHEKE_RESEARCH_STATION: { id: "waiheke" },
 };
 
 /** Source room types that are published with an outline, and the kind they map to. */
@@ -362,7 +380,7 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
       height,
       heightSource: "floor-count",
       roomCount: 0,
-      ...(inScene(center) ? {} : { offMap: true }),
+      ...placeOnMap(center),
     });
   }
   buildings.sort((a, z) => a.id.localeCompare(z.id, "en", { numeric: true }));
@@ -543,15 +561,20 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
       const xs = own.map((b) => b.center[0]).sort((a, z) => a - z);
       const ys = own.map((b) => b.center[1]).sort((a, z) => a - z);
       const mid = Math.floor(own.length / 2);
+      const center: [number, number] = [round1(xs[mid] ?? 0), round1(ys[mid] ?? 0)];
+      // A campus is on the map when its middle is; a building far from the rest has its own area.
+      const place = placeOnMap(center);
       return {
         id,
         name: { en: v.venueInfo.name },
-        onMap: CAMPUS_IDS[v.name]?.onMap ?? false,
-        center: [round1(xs[mid] ?? 0), round1(ys[mid] ?? 0)] as [number, number],
+        onMap: !place.offMap,
+        ...(place.area ? { area: place.area } : {}),
+        center,
         buildingCount: own.length,
       };
     })
-    .sort((a, z) => Number(z.onMap) - Number(a.onMap) || z.buildingCount - a.buildingCount);
+    // The central campuses first, then those in areas of their own, then any off the map.
+    .sort((a, z) => Number(z.onMap) - Number(a.onMap) || Number(!!a.area) - Number(!!z.area) || z.buildingCount - a.buildingCount);
 
   return {
     data: {
@@ -763,10 +786,14 @@ function outerRings(e: OsmElement): Ring[] {
   return rings.filter((r) => r.length >= 3);
 }
 
-function buildContext(campus: CampusData): { data: ContextData; stats: Record<string, number> } {
-  const osm = readJson<{ elements: OsmElement[] }>("osm/context.json");
+/** The surroundings of one area of the map, from its OpenStreetMap snapshot. */
+function buildContext(campus: CampusData, box: AreaBox): { data: ContextData; stats: Record<string, number> } {
+  sceneBox = box;
+  const osm = readJson<{ elements: OsmElement[] }>(box.area.osm);
   const stats: Record<string, number> = {};
-  const bump = (k: string, n = 1) => (stats[k] = (stats[k] ?? 0) + n);
+  // The central area's counts keep their old names; others are prefixed with the area.
+  const prefix = box.area === CENTRAL ? "" : `${box.area.id}.`;
+  const bump = (k: string, n = 1) => (stats[prefix + k] = (stats[prefix + k] ?? 0) + n);
 
   // University footprints, to drop the OSM copies of the same buildings.
   const uni = campus.buildings.map((b) => {
@@ -884,7 +911,7 @@ function buildContext(campus: CampusData): { data: ContextData; stats: Record<st
         const ring = simplifyRing(ring0, 0.6);
         if (ringArea(ring) < 25) continue;
         const [x0, y0, x1, y1] = bbox(ring);
-        if (x1 < sx0 || x0 > sx1 || y1 < sy0 || y0 > sy1) continue;
+        if (x1 < sceneBox.x0 || x0 > sceneBox.x1 || y1 < sceneBox.y0 || y0 > sceneBox.y1) continue;
         out.areas.push({ k, p: encodeRing(ring) });
       }
     }
@@ -1027,7 +1054,10 @@ function write(name: string, value: unknown): number {
 }
 
 const { data: campus, index, plans, stats: campusStats } = buildCampus();
-const { data: context, stats: contextStats } = buildContext(campus);
+// One file of surroundings per area: the central one loads with the map, the others when a
+// campus or building in them is shown.
+const contexts = areaBoxes.map((box) => ({ area: box.area, ...buildContext(campus, box) }));
+const contextStats = Object.assign({}, ...contexts.map((c) => c.stats)) as Record<string, number>;
 const subjects = buildSubjects();
 const calendar = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "academic-calendar.json"), "utf8")) as AcademicCalendar;
 
@@ -1093,11 +1123,18 @@ const meta: Meta = { version: 1, generatedAt: campus.generatedAt, sources, cover
 // whole: a building that lost its plan must not keep an old file.
 fs.rmSync(path.join(OUT, "plans"), { recursive: true, force: true });
 const planBytes = plans.reduce((n, plan) => n + write(`plans/${plan.building}.json`, plan), 0);
+fs.rmSync(path.join(OUT, "context"), { recursive: true, force: true });
+const contextBytes = Object.fromEntries(
+  contexts.map((c) => {
+    const file = c.area === CENTRAL ? "context.json" : `context/${c.area.id}.json`;
+    return [file, write(file, c.data)];
+  }),
+);
 
 const sizes = {
   [`plans/ (${plans.length} files)`]: planBytes,
   "campus.json": write("campus.json", campus),
-  "context.json": write("context.json", context),
+  ...contextBytes,
   "rooms-index.json": write("rooms-index.json", index),
   "subjects.json": write("subjects.json", subjects),
   "calendar.json": write("calendar.json", calendar),

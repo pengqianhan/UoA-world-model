@@ -24,8 +24,10 @@ It is built to answer two questions a student actually has:
 
 ## What you get
 
-- A rotatable miniature of the City, Grafton and Newmarket campuses: 139 University buildings on a base
-  of OpenStreetMap streets, parks, trees and surrounding buildings. Each University building is
+- A rotatable miniature of every campus on the campus map: 139 University buildings across the City,
+  Grafton and Newmarket campuses, and 55 more at Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore and
+  one Grafton building on Carrick Place, each on a base of OpenStreetMap streets, parks, trees and
+  surrounding buildings. Each University building is
   stacked floor by floor from the campus map, so its podium, tower, setbacks and courtyards show.
   The city around it is drawn with the parts, heights and roof shapes OpenStreetMap holds, from
   house gables to the Sky Tower.
@@ -89,7 +91,7 @@ Data is fetched once, cached as raw snapshots under `data/raw/`, and every later
 ```bash
 npm run data:fetch                         # fetches only what is missing
 npx tsx scripts/fetch-mapsindoors.ts --refresh   # re-download the campus map (4 requests)
-npx tsx scripts/fetch-osm.ts --refresh           # re-download OpenStreetMap context (1 request)
+npx tsx scripts/fetch-osm.ts --refresh           # re-download OpenStreetMap context (1 request per area, 7)
 npx tsx scripts/fetch-calendar.ts --refresh      # re-download the Calendar pages (3 requests)
 npm run data:build                         # rebuild public/data from the snapshots
 npm test                                   # the data consistency tests must still pass
@@ -231,8 +233,10 @@ If you represent the University and would like something changed or removed, ple
 - The campus map itself draws nothing on 96 floors of the 3D map (most of them in halls of
   residence) and only a few spaces on 34 more. The floor list marks both and the building bar says
   so.
-- Only the City, Grafton and Newmarket campuses are in 3D; other campuses' buildings appear in search,
-  marked as not on the map.
+- The campuses away from the centre (Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore) each stand in
+  a patch of surroundings a few hundred metres across, and the map jumps between them. Everything
+  is drawn on one flat map centred on the City Campus, so shapes 125 km north are about 1% too wide.
+  The sea is not drawn (OpenStreetMap's coastline is a line, not an area).
 - The academic calendar covers 2026 only.
 
 ## Inspiration

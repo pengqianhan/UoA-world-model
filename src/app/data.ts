@@ -81,8 +81,38 @@ export async function loadData(): Promise<AppData> {
   };
 }
 
-export function loadContext(): Promise<ContextData> {
-  return getJson<ContextData>("context.json");
+const contextPromises = new Map<string, Promise<ContextData>>();
+
+/**
+ * The surroundings of one area of the map: the central one by default, or the area a campus or
+ * building away from it stands in (Campus.area, Building.area). Each is fetched once.
+ */
+export function loadContext(area?: string): Promise<ContextData> {
+  const key = area ?? "";
+  let promise = contextPromises.get(key);
+  if (!promise) {
+    promise = getJson<ContextData>(area ? `context/${area}.json` : "context.json").catch((e) => {
+      contextPromises.delete(key);
+      throw e;
+    });
+    contextPromises.set(key, promise);
+  }
+  return promise;
+}
+
+/** Several areas' surroundings as one, in the order given. */
+export function mergeContexts(parts: ContextData[]): ContextData {
+  const [first, ...rest] = parts;
+  const out: ContextData = { ...first!, buildings: [...first!.buildings], roads: [...first!.roads], areas: [...first!.areas], rails: [...first!.rails], trees: [...first!.trees], deciduous: [...(first!.deciduous ?? [])] };
+  for (const c of rest) {
+    out.buildings.push(...c.buildings);
+    out.roads.push(...c.roads);
+    out.areas.push(...c.areas);
+    out.rails.push(...c.rails);
+    out.trees.push(...c.trees);
+    out.deciduous.push(...(c.deciduous ?? []));
+  }
+  return out;
 }
 
 let roomIndexPromise: Promise<RoomIndex> | undefined;

@@ -34,6 +34,54 @@
       "source": "mapsindoors"
     },
     {
+      "file": "osm/context-ardmore.json",
+      "url": "https://overpass.kumi.systems/api/interpreter",
+      "fetchedAt": "2026-10-14T11:47:53.439Z",
+      "bytes": 169943,
+      "sha256": "8ff6534191f71148f0f828adb82b11c614cfe3a2325602a1dcfa9b15b90b776e",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-carrick-place.json",
+      "url": "https://overpass-api.de/api/interpreter",
+      "fetchedAt": "2026-10-14T12:20:15.678Z",
+      "bytes": 1439039,
+      "sha256": "ad34bb72abab1e27becf2234a473dd1a0d598ea214b6ac035097448a725d759e",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-leigh.json",
+      "url": "https://overpass.private.coffee/api/interpreter",
+      "fetchedAt": "2026-10-14T12:10:36.525Z",
+      "bytes": 107886,
+      "sha256": "b7d9c1990d6befd5d6cabf4db42b75fcd614d0b26be89ce44d9f1600a982138e",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-tai-tokerau.json",
+      "url": "https://overpass.private.coffee/api/interpreter",
+      "fetchedAt": "2026-10-14T11:31:12.986Z",
+      "bytes": 752803,
+      "sha256": "851424dd5ee9640124307e72913a0accb834a3639d2c8ffe6ed963c8baaf2bd4",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-tai-tonga.json",
+      "url": "https://overpass.kumi.systems/api/interpreter",
+      "fetchedAt": "2026-10-14T12:20:12.094Z",
+      "bytes": 1367730,
+      "sha256": "0058cc4bf5773bfa5c4d49e02cad240302c500e84f590845b489b185f9793e0b",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-waiheke.json",
+      "url": "https://overpass.private.coffee/api/interpreter",
+      "fetchedAt": "2026-10-14T12:12:10.957Z",
+      "bytes": 1021689,
+      "sha256": "79298aa3c739d07074f3734cd80b27abce2c2b985feed372f36399df9801d84b",
+      "source": "osm"
+    },
+    {
       "file": "osm/context.json",
       "url": "https://overpass.kumi.systems/api/interpreter",
       "fetchedAt": "2026-10-12T11:27:35.460Z",

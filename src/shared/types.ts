@@ -27,6 +27,11 @@ export interface Campus {
   name: LocalizedText;
   /** True when the campus is part of the 3D scene. */
   onMap: boolean;
+  /**
+   * The area of the map whose surroundings it stands in, when that is not the central one:
+   * public/data/context/<area>.json.
+   */
+  area?: string;
   /** Centre of the campus buildings in the local frame, metres. */
   center: [number, number];
   buildingCount: number;
@@ -75,8 +80,10 @@ export interface Building {
   roomCount: number;
   /** Number of shapes in this building's floor-plan file. Absent when there is no file. */
   planShapes?: number;
-  /** True when the building lies outside the 3D scene (remote campuses and outliers). */
+  /** True when the building lies outside every area of the 3D map. */
   offMap?: boolean;
+  /** The area of the map it stands in, when that is not the central one (see Campus.area). */
+  area?: string;
 }
 
 export interface Room {
