@@ -4,12 +4,13 @@ import {
   AmbientLight,
   BufferGeometry,
   CanvasTexture,
-  ConeGeometry,
+  Color,
   DirectionalLight,
   EdgesGeometry,
   Float32BufferAttribute,
   Group,
   HemisphereLight,
+  IcosahedronGeometry,
   InstancedMesh,
   LineBasicMaterial,
   LineLoop,
@@ -77,6 +78,9 @@ const CAMERA_DISTANCE = 3200;
 const ROAD_WIDTH = { motorway: 15, major: 11, street: 7.5, service: 4.2, path: 2.2, steps: 2.2 } as const;
 const ROAD_Y = { path: 0.12, steps: 0.12, service: 0.14, street: 0.16, major: 0.18, motorway: 0.2 } as const;
 const AREA_Y = { park: 0.02, grass: 0.04, wood: 0.06, pitch: 0.08, water: 0.1 } as const;
+/** Street edges lie under every carriageway and path, so that a junction stays clean. */
+const ROAD_EDGE_Y = 0.11;
+const ROAD_EDGE_WIDTH = 1.6;
 const SLAB = 0.35;
 const ROOM_HEIGHT = 1.5;
 /** Metres between window centres on University buildings. A drawing convention, like the storey height. */
@@ -128,7 +132,7 @@ export class CampusScene {
   private detailGroup = new Group();
   private contextMaterials: { mat: MeshLambertMaterial; key: (p: Palette) => number }[] = [];
   private contextBuildings?: Mesh;
-  private trees?: InstancedMesh;
+  private trees?: Group;
   private wallTexture: CanvasTexture;
   private glowTexture: CanvasTexture;
 
@@ -340,6 +344,11 @@ export class CampusScene {
       for (const a of ctx.areas) if (a.k === k) mb.flat(a.p, AREA_Y[k]);
       if (mb.vertexCount) add(mb.build(), (p) => p.area[k]);
     }
+    {
+      const mb = new MeshBuilder();
+      for (const r of ctx.roads) if (r.k === "street" || r.k === "major" || r.k === "motorway") mb.ribbon(r.p, ROAD_WIDTH[r.k] + ROAD_EDGE_WIDTH, ROAD_EDGE_Y);
+      if (mb.vertexCount) add(mb.build(), (p) => p.roadEdge);
+    }
     for (const k of ["path", "steps", "service", "street", "major", "motorway"] as const) {
       const mb = new MeshBuilder();
       for (const r of ctx.roads) if (r.k === k) mb.ribbon(r.p, ROAD_WIDTH[k], ROAD_Y[k]);
@@ -401,26 +410,49 @@ export class CampusScene {
       }
     }
     if (!pts.length) return;
-    const geom = new ConeGeometry(1, 1, 6);
-    geom.translate(0, 0.5, 0);
-    const mat = new MeshLambertMaterial({ color: this.palette.tree, flatShading: true });
-    const mesh = new InstancedMesh(geom, mat, pts.length);
+    // A crown on a trunk, one unit tall and one wide before it is sized. The position of a mapped
+    // tree is OpenStreetMap's; its size, shape and shade are drawn by rule, since nothing is known
+    // of its kind. A cut gem of twenty faces reads as a crown at campus scale and costs little.
+    const crownGeometry = new IcosahedronGeometry(0.5, 0);
+    crownGeometry.scale(1, 0.84, 1);
+    crownGeometry.translate(0, 0.6, 0);
+    const crownMaterial = new MeshLambertMaterial({ color: this.palette.tree, flatShading: true });
+    const crowns = new InstancedMesh(crownGeometry, crownMaterial, pts.length);
+    // Phones leave the trunks out: under a crown they are a few pixels at most.
+    const trunkGeometry = new CylinderGeometry(0.05, 0.07, 0.4, 5);
+    trunkGeometry.translate(0, 0.2, 0);
+    const trunkMaterial = new MeshLambertMaterial({ color: lerpColour(this.palette.tree, 0x5b4a3a, 0.75) });
+    const trunks = this.opts.lite ? undefined : new InstancedMesh(trunkGeometry, trunkMaterial, pts.length);
     const m = new Matrix4();
-    const size = mulberry32(99);
+    const turn = new Matrix4();
+    const shade = new Color();
+    const vary = mulberry32(99);
     pts.forEach(([x, y], i) => {
-      const r = 2.2 + size() * 2.2;
-      const h = 5 + size() * 6;
-      m.makeScale(r, h, r);
+      const width = 5.5 + vary() * 5;
+      const height = width * (0.95 + vary() * 0.6);
+      m.makeScale(width, height, width);
+      m.multiply(turn.makeRotationY(vary() * Math.PI * 2));
       m.setPosition(x, 0, -y);
-      mesh.setMatrixAt(i, m);
+      crowns.setMatrixAt(i, m);
+      trunks?.setMatrixAt(i, m);
+      // Lighter and darker greens, and now and then one turned towards yellow.
+      const light = 0.84 + vary() * 0.34;
+      const yellow = vary() < 0.14 ? 0.1 + vary() * 0.14 : 0;
+      crowns.setColorAt(i, shade.setRGB(light * (1 + yellow * 1.6), light * (1 + yellow * 0.5), light * (1 - yellow * 1.2)));
     });
-    mesh.castShadow = !this.opts.lite;
-    mesh.receiveShadow = false;
-    mesh.userData.noPick = true;
-    mesh.matrixAutoUpdate = false;
-    this.trees = mesh;
-    this.contextGroup.add(mesh);
-    this.contextMaterials.push({ mat, key: (p) => p.tree });
+    const group = new Group();
+    for (const mesh of trunks ? [crowns, trunks] : [crowns]) {
+      mesh.castShadow = !this.opts.lite && mesh === crowns;
+      mesh.receiveShadow = false;
+      mesh.userData.noPick = true;
+      group.add(mesh);
+    }
+    group.userData.noPick = true;
+    group.matrixAutoUpdate = false;
+    this.trees = group;
+    this.contextGroup.add(group);
+    this.contextMaterials.push({ mat: crownMaterial, key: (p) => p.tree });
+    this.contextMaterials.push({ mat: trunkMaterial, key: (p) => lerpColour(p.tree, 0x5b4a3a, 0.75) });
   }
 
   /**

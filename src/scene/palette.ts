@@ -7,6 +7,8 @@ export interface Palette {
   ground: number;
   fog: number;
   road: Record<RoadClass, number>;
+  /** The edge of a street: a strip a little wider than the carriageway, under it. */
+  roadEdge: number;
   rail: number;
   area: Record<AreaClass, number>;
   tree: number;
@@ -41,6 +43,7 @@ export const DAY: Palette = {
   ground: 0xe9e5da,
   fog: 0xdfe8ec,
   road: { motorway: 0xf2e2bf, major: 0xfdfcf8, street: 0xf8f6f0, service: 0xf1eee5, path: 0xd9d1bd, steps: 0xc9bfa8 },
+  roadEdge: 0xd3cab6,
   rail: 0xa9a59b,
   area: { park: 0xc9ddb0, grass: 0xd6e2be, wood: 0xb3cf9b, pitch: 0xbcd8a2, water: 0xa6cde0 },
   tree: 0x86ab72,
@@ -71,6 +74,7 @@ export const NIGHT: Palette = {
   ground: 0x1a2735,
   fog: 0x0e1824,
   road: { motorway: 0x4a4636, major: 0x34475a, street: 0x2e4052, service: 0x283847, path: 0x33414f, steps: 0x394755 },
+  roadEdge: 0x16222f,
   rail: 0x33414f,
   area: { park: 0x1d3f2d, grass: 0x21432f, wood: 0x173524, pitch: 0x244a33, water: 0x16364d },
   tree: 0x2a5c40,
@@ -137,6 +141,7 @@ export function mixPalette(a: Palette, b: Palette, t: number): Palette {
     ground: c(a.ground, b.ground),
     fog: c(a.fog, b.fog),
     road: lerpRecord(a.road, b.road, t),
+    roadEdge: c(a.roadEdge, b.roadEdge),
     rail: c(a.rail, b.rail),
     area: lerpRecord(a.area, b.area, t),
     tree: c(a.tree, b.tree),
