@@ -24,8 +24,10 @@ It is built to answer two questions a student actually has:
 
 ## What you get
 
-- A rotatable miniature of the City, Grafton and Newmarket campuses: 139 University buildings on a base
-  of OpenStreetMap streets, parks, trees and surrounding buildings. Each University building is
+- A rotatable miniature of every campus on the campus map: 139 University buildings across the City,
+  Grafton and Newmarket campuses, and 55 more at Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore and
+  one Grafton building on Carrick Place, each on a base of OpenStreetMap streets, parks, trees and
+  surrounding buildings. Each University building is
   stacked floor by floor from the campus map, so its podium, tower, setbacks and courtyards show.
   The city around it is drawn with the parts, heights and roof shapes OpenStreetMap holds, from
   house gables to the Sky Tower.
@@ -34,8 +36,10 @@ It is built to answer two questions a student actually has:
   rest of the floor plan: 14,508 other spaces without names, each tinted by its type on the campus
   map (office, other lab, toilet, stairs or lift, service) and showing that type when pointed at or
   tapped. Stairs, lifts and toilets carry a sign.
-- Search over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings and 251
-  subject codes. Māori names match with or without macrons (`Maori` finds `Māori`).
+- Search over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings, 251
+  subject codes and the 6,982 courses of the 2026 Curriculum Catalogue, by code or title, with the
+  terms and campuses each is offered in. Māori names match with or without macrons (`Maori` finds
+  `Māori`).
 - "Now" (Auckland time, daylight saving included) and "Preview" (any day and time), with the academic
   calendar: teaching week, breaks, study break, exams, public holidays.
 - The sun where it stands at the time shown, so winter shadows are long and summer ones short; in
@@ -89,7 +93,8 @@ Data is fetched once, cached as raw snapshots under `data/raw/`, and every later
 ```bash
 npm run data:fetch                         # fetches only what is missing
 npx tsx scripts/fetch-mapsindoors.ts --refresh   # re-download the campus map (4 requests)
-npx tsx scripts/fetch-osm.ts --refresh           # re-download OpenStreetMap context (1 request)
+npx tsx scripts/fetch-osm.ts --refresh           # re-download OpenStreetMap context (1 request per area, 7)
+npx tsx scripts/fetch-catalogue.ts --refresh     # re-download the Curriculum Catalogue's course list (about 30 requests)
 npx tsx scripts/fetch-calendar.ts --refresh      # re-download the Calendar pages (3 requests)
 npm run data:build                         # rebuild public/data from the snapshots
 npm test                                   # the data consistency tests must still pass
@@ -210,6 +215,7 @@ windows and roof rims are drawn by rule.
 | [University of Auckland campus maps](https://maps.auckland.ac.nz/) (the public map, served by MapsIndoors) | Buildings, floors, room codes, room types and positions | © University of Auckland. Only derived facts are published here: learning spaces with their names and simplified outlines; other searchable rooms as a code, floor and point; every other space as a simplified outline with the map's type for it and no code or name. Floors with student accommodation, childcare centres and single parking bays are left out, and a room the map marks as not searchable is never named. |
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) via the Overpass API | Surrounding buildings, streets, paths, parks, trees | © OpenStreetMap contributors, [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The snapshot in `data/raw/osm/` and the derived `public/data/context.json` are under the same licence. |
 | [University of Auckland Calendar 2026](https://www.auckland.ac.nz/en/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar.html) | Semester dates, breaks, holidays; list of subject codes | © University of Auckland. Dates and codes are quoted as facts with a link to the source. |
+| [University of Auckland Curriculum Catalogue 2026](https://study.auckland.ac.nz/) | Course codes and titles, and the terms and campuses each course is offered in | © University of Auckland. Codes, titles, terms and campuses are quoted as facts with a link to the source; course descriptions are not copied. No class times or rooms are in it. |
 | [Open-Meteo](https://open-meteo.com/) | Current temperature in Auckland, fetched by the visitor's browser | [CC BY 4.0](https://open-meteo.com/en/licence) |
 
 Snapshot dates are shown in the site's About panel and recorded in `public/data/meta.json`.
@@ -231,8 +237,10 @@ If you represent the University and would like something changed or removed, ple
 - The campus map itself draws nothing on 96 floors of the 3D map (most of them in halls of
   residence) and only a few spaces on 34 more. The floor list marks both and the building bar says
   so.
-- Only the City, Grafton and Newmarket campuses are in 3D; other campuses' buildings appear in search,
-  marked as not on the map.
+- The campuses away from the centre (Tai Tokerau, Tai Tonga, Leigh, Waiheke, Ardmore) each stand in
+  a patch of surroundings a few hundred metres across, and the map jumps between them. Everything
+  is drawn on one flat map centred on the City Campus, so shapes 125 km north are about 1% too wide.
+  The sea is not drawn (OpenStreetMap's coastline is a line, not an area).
 - The academic calendar covers 2026 only.
 
 ## Inspiration

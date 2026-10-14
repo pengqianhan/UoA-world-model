@@ -16,6 +16,8 @@ function StatusStrip() {
   if (!d || selBuilding.value) return null;
   const reason = notTeachingReason();
   const count = sessionsNow.value.length;
+  // Campuses in areas of their own, away from the centre.
+  const remote = d.campus.campuses.filter((c) => c.onMap && c.area);
   return (
     <section class="status" id="status-strip" aria-live="polite">
       <p class="status-term">{statusLine()}</p>
@@ -43,12 +45,30 @@ function StatusStrip() {
       <p class="status-hint">{t("status.hintCampus")}</p>
       <div class="campus-tabs" role="group" aria-label={t("campus.label")}>
         {d.campus.campuses
-          .filter((c) => c.onMap)
+          .filter((c) => c.onMap && !c.area)
           .map((c) => (
             <button type="button" class={c.id === selCampus.value ? "on" : ""} aria-pressed={c.id === selCampus.value} data-campus={c.id} onClick={() => goHome(c.id)}>
               {pick(c.name)}
             </button>
           ))}
+        {remote.length > 0 && (
+          <label class={`campus-more ${remote.some((c) => c.id === selCampus.value) ? "on" : ""}`}>
+            <span class="sr-only">{t("campus.more")}</span>
+            <select
+              id="campus-more"
+              value={remote.some((c) => c.id === selCampus.value) ? selCampus.value : ""}
+              onChange={(e) => {
+                const v = (e.target as HTMLSelectElement).value;
+                if (v) goHome(v);
+              }}
+            >
+              <option value="">{t("campus.more")}</option>
+              {remote.map((c) => (
+                <option value={c.id}>{pick(c.name)}</option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
       <Worlds />
     </section>

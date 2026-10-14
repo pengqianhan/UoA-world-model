@@ -97,6 +97,10 @@ export function AboutPanel() {
                   <td>{n(c.subjects)}</td>
                 </tr>
                 <tr>
+                  <th>{t("about.coverage.catalogueCourses")}</th>
+                  <td>{n(c.catalogueCourses ?? 0)}</td>
+                </tr>
+                <tr>
                   <th>{t("about.coverage.courses")}</th>
                   <td>{n(c.courses)}</td>
                 </tr>

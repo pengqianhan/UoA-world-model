@@ -27,6 +27,11 @@ export interface Campus {
   name: LocalizedText;
   /** True when the campus is part of the 3D scene. */
   onMap: boolean;
+  /**
+   * The area of the map whose surroundings it stands in, when that is not the central one:
+   * public/data/context/<area>.json.
+   */
+  area?: string;
   /** Centre of the campus buildings in the local frame, metres. */
   center: [number, number];
   buildingCount: number;
@@ -75,8 +80,10 @@ export interface Building {
   roomCount: number;
   /** Number of shapes in this building's floor-plan file. Absent when there is no file. */
   planShapes?: number;
-  /** True when the building lies outside the 3D scene (remote campuses and outliers). */
+  /** True when the building lies outside every area of the 3D map. */
   offMap?: boolean;
+  /** The area of the map it stands in, when that is not the central one (see Campus.area). */
+  area?: string;
 }
 
 export interface Room {
@@ -204,6 +211,8 @@ export interface Coverage {
   /** Other spaces drawn as shapes in the floor plans, each with its type on the campus map. */
   planShapes: number;
   subjects: number;
+  /** Courses in the Curriculum Catalogue for the year in courses.json. */
+  catalogueCourses: number;
   courses: number;
   sessions: number;
   sessionsLocatedToRoom: number;
@@ -272,6 +281,22 @@ export interface Schedule {
   courses: Course[];
   sessions: Session[];
   exclusions: Exclusion[];
+}
+
+/**
+ * The courses of one year in the University's Curriculum Catalogue: code and title, and the terms
+ * and campuses each is offered in, in the catalogue's own words. No class times or rooms; the
+ * catalogue has none. public/data/courses.json, loaded when search is first opened.
+ */
+export interface CatalogueData {
+  version: 1;
+  year: number;
+  /** Terms as the catalogue names them, e.g. "Semester One", "Summer Semester". */
+  terms: string[];
+  /** Campuses as the catalogue names them, with the id of the campus on the map where one matches. */
+  campuses: { text: string; campus?: string }[];
+  /** [code, title, terms as a bit mask over `terms`, campuses as a bit mask over `campuses`]. */
+  courses: [string, string, number, number][];
 }
 
 export interface Subject {

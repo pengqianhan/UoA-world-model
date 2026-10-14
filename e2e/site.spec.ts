@@ -129,12 +129,26 @@ test("3. search finds real room codes, buildings and course codes, and moves the
   await input.fill("maori");
   await expect(page.locator(".results")).toContainText("Māori Studies");
 
-  // A real course code: with no public timetable the site says so instead of guessing a room.
+  // A real course code: the Curriculum Catalogue gives its title, terms and campus; with no public
+  // timetable the site says so instead of guessing a room.
   await input.fill("COMPSCI 101");
+  const course = page.locator(".result.type-catalogue").first();
+  await expect(course).toContainText("COMPSCI 101");
+  await expect(course).toContainText("Principles of Programming");
+  await expect(course).toContainText("Semester One");
+  await expect(course).toContainText("Offered at City");
+  await expect(course).toContainText("Class times and rooms are not public");
+  await shot(page, "03-search-course");
+  // A title finds its course too.
+  await input.fill("principles of programming");
+  await expect(page.locator(".result.type-catalogue").first()).toContainText("COMPSCI 101");
+  // A code the catalogue does not hold still says what its subject is.
+  await input.fill("COMPSCI 999");
   const subject = page.locator(".result.type-subject").first();
-  await expect(subject).toContainText("COMPSCI 101");
+  await expect(subject).toContainText("COMPSCI 999");
   await expect(subject).toContainText("Computer Science");
   await expect(subject).toContainText("timetable is not public");
+  await input.fill("COMPSCI 101");
 
   // A room the campus map knows but that is not named on the floor: found and pinned.
   await input.fill("104-G53");
@@ -347,7 +361,7 @@ test("timetable features work end to end when a schedule is present (fixture sch
   await expect(card.locator(".empty")).toContainText("Mid-semester break");
 });
 
-test("other campuses: Grafton and Newmarket are on the map; remote campuses are searchable and marked as not on the map", async ({ page }) => {
+test("other campuses: Grafton and Newmarket beside the City Campus, and the campuses further away each in a place of their own", async ({ page }) => {
   await open(page, "?light=day");
   const city = await page.evaluate(() => window.__scene!.cameraState());
 
@@ -369,19 +383,31 @@ test("other campuses: Grafton and Newmarket are on the map; remote campuses are 
   await expect(page.locator("#building-bar")).toContainText("Grafton Campus");
   await expect(page.locator("#room-card")).toContainText("505-011");
 
-  // A campus that is not modelled: listed, labelled, and not placed anywhere on the map.
+  // A campus far from the centre is chosen from the list, and the map goes there with its own
+  // surroundings: Leigh is about 65 km north of the City Campus.
+  await open(page, "?light=day");
+  await page.locator("#campus-more").selectOption("leigh");
+  await settle(page);
+  expect(params(page).get("campus")).toBe("leigh");
+  const leigh = await page.evaluate(() => window.__scene!.cameraState());
+  expect(city.target[2] - leigh.target[2]).toBeGreaterThan(60_000);
+  await expect(page.locator('[data-label="b:604"]')).toBeVisible();
+  await expectRealRender(page);
+  await shot(page, "10-leigh");
+
+  // A room on a campus of its own is found, opened and drawn like any other.
   await page.locator("#search-button").click();
-  await input.fill("Tai Tonga");
-  const campus = page.locator(".result.type-campus").first();
-  await expect(campus).toContainText("Tai Tonga Campus");
-  await expect(campus).toContainText("only the City, Grafton and Newmarket campuses are modelled");
   await input.fill("654-G01");
   const room = page.locator(".result.type-room").first();
   await expect(room).toContainText("654-G01");
-  await expect(room).toContainText("Not on the 3D map yet");
+  await expect(room).not.toContainText("Not on the 3D map yet");
   await room.locator(".result-main").click();
-  await expect(page.locator("#building-bar")).toContainText("outside the 3D map");
+  await settle(page);
   await expect(page.locator("#building-bar")).toContainText("Tai Tonga Campus");
+  await expect(page.locator("#building-bar")).not.toContainText("outside the 3D map");
+  await expect(page.locator("#room-card")).toContainText("654-G01");
+  await expectRealRender(page);
+  await shot(page, "10-tai-tonga-room");
 });
 
 test("a floor whose outline the campus map puts under another building is drawn over its own, and says so", async ({ page }) => {

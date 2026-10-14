@@ -34,6 +34,54 @@
       "source": "mapsindoors"
     },
     {
+      "file": "osm/context-ardmore.json",
+      "url": "https://overpass.kumi.systems/api/interpreter",
+      "fetchedAt": "2026-10-14T11:47:53.439Z",
+      "bytes": 169943,
+      "sha256": "8ff6534191f71148f0f828adb82b11c614cfe3a2325602a1dcfa9b15b90b776e",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-carrick-place.json",
+      "url": "https://overpass-api.de/api/interpreter",
+      "fetchedAt": "2026-10-14T12:20:15.678Z",
+      "bytes": 1439039,
+      "sha256": "ad34bb72abab1e27becf2234a473dd1a0d598ea214b6ac035097448a725d759e",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-leigh.json",
+      "url": "https://overpass.private.coffee/api/interpreter",
+      "fetchedAt": "2026-10-14T12:10:36.525Z",
+      "bytes": 107886,
+      "sha256": "b7d9c1990d6befd5d6cabf4db42b75fcd614d0b26be89ce44d9f1600a982138e",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-tai-tokerau.json",
+      "url": "https://overpass.private.coffee/api/interpreter",
+      "fetchedAt": "2026-10-14T11:31:12.986Z",
+      "bytes": 752803,
+      "sha256": "851424dd5ee9640124307e72913a0accb834a3639d2c8ffe6ed963c8baaf2bd4",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-tai-tonga.json",
+      "url": "https://overpass.kumi.systems/api/interpreter",
+      "fetchedAt": "2026-10-14T12:20:12.094Z",
+      "bytes": 1367730,
+      "sha256": "0058cc4bf5773bfa5c4d49e02cad240302c500e84f590845b489b185f9793e0b",
+      "source": "osm"
+    },
+    {
+      "file": "osm/context-waiheke.json",
+      "url": "https://overpass.private.coffee/api/interpreter",
+      "fetchedAt": "2026-10-14T12:12:10.957Z",
+      "bytes": 1021689,
+      "sha256": "79298aa3c739d07074f3734cd80b27abce2c2b985feed372f36399df9801d84b",
+      "source": "osm"
+    },
+    {
       "file": "osm/context.json",
       "url": "https://overpass.kumi.systems/api/interpreter",
       "fetchedAt": "2026-10-12T11:27:35.460Z",
@@ -64,6 +112,230 @@
       "bytes": 185680,
       "sha256": "401264e73e0aaacbfba669671cd2e7ca1337537ac55b9841853710b7ebc8f49f",
       "source": "uoa-calendar"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/City.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:29:05.790Z",
+      "bytes": 1940150,
+      "sha256": "9b2f4036382cfecbac34098d9b52b6a8b1f9d585b255ee7f0235189636f8b647",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Grafton.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:29:00.102Z",
+      "bytes": 227560,
+      "sha256": "4591e29685bddf0917f1f91b14c8897035fc67b46db7a4775413cf02a3a49c25",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/International-Offshore.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:47.804Z",
+      "bytes": 1967,
+      "sha256": "0420f39839dd82248ddc6da519d5600cd73d0f1e645a86c8d4fe69486459f748",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Leigh-Marine.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:52.458Z",
+      "bytes": 878,
+      "sha256": "8f82d000d7ca43d4429e991d63fe76b19003c7c335e456c921a57fcc66ec65e1",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Newmarket.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:54.866Z",
+      "bytes": 28534,
+      "sha256": "a97a45b1966d6553fb0f4f77b7b502983607f7908048aeef5598380d0455c291",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Online.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:43.064Z",
+      "bytes": 86482,
+      "sha256": "090b0ccbdc9df324f64cec38f66883d768faae77bb0996430e122f46965a772d",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Overseas.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:29:08.198Z",
+      "bytes": 17020,
+      "sha256": "b1b982a9e3c7c7a939300124316a16524b8775c2c39cdc5bc9f3a1ccbf6ef030",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Rotorua.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:57.337Z",
+      "bytes": 873,
+      "sha256": "2bccafab9f4341b397ddfa19a7d350d106639f5eaf5e4ccf7f7ee6cf045f21f4",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/South-Auckland.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:29:13.016Z",
+      "bytes": 15904,
+      "sha256": "db66bb5aaf2c2ab6894fa2ab69359b8b09a0b1abdb06338ff2f579117e72ee58",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/T-maki-.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:29:17.695Z",
+      "bytes": 773,
+      "sha256": "16eac0cceec025c47e71113c9a42307eb8c340685838bebb060240cfcc922c24",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Tai-Tokerau.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:50.154Z",
+      "bytes": 36398,
+      "sha256": "e2ebbe1845dac0d1f7f2d813f88b12d1a992b4d7362dc2b57fd1c7bafe6f1015",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Unspecified-within-New-Zealand.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:29:10.580Z",
+      "bytes": 16975,
+      "sha256": "39438ff7dba7dd63939a83acaec1a536b83a0116b6465a942480bf93f13dbd62",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/UoA-Online.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:45.510Z",
+      "bytes": 83938,
+      "sha256": "d37389ca6eb30839fc39acb9053f1f0799dd1c58bbf3e8ff912035d01e2c594a",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Waiheke-Island.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:29:20.124Z",
+      "bytes": 7480,
+      "sha256": "c8f68192f8b6b87c23cd4f9db42a1fef77ffc2448dc0be9e0b1ab1f30ef5a8cc",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/campuses/Waikato.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:29:15.400Z",
+      "bytes": 1503,
+      "sha256": "c5c32b91d2bb0d40c9fbff7e56cc123dc2ec147bfe3d44987d7dc016dd816335",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/courses.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:09.089Z",
+      "bytes": 3273439,
+      "sha256": "31992f9d9a1702f05367043613627eb7886c3e03a12b6dcc6110e401a0afae6c",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/filters.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:01.770Z",
+      "bytes": 9460,
+      "sha256": "e93d838999591f1b5e91bdcf40f89e89754f0cb3d217573ce5ac11e43396ce8f",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Academic-Year.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:30.726Z",
+      "bytes": 882,
+      "sha256": "d1146cafbd33fdee642a8fd2363b23608c609c1916243a9d1870943a730f6bcf",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/All-Terms.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:21.381Z",
+      "bytes": 487,
+      "sha256": "6b4231bf6392ae2d83096c3ccf7c428d26d6990884fa8b1fc89e6aea856d6853",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Doctoral-Term.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:16.535Z",
+      "bytes": 882,
+      "sha256": "d1146cafbd33fdee642a8fd2363b23608c609c1916243a9d1870943a730f6bcf",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Late-Year.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:33.111Z",
+      "bytes": 6178,
+      "sha256": "40b8c54b6ad614ba48b3df7c063cb38c63492231af2c54db1a3822749725eff9",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Quarter-Four.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:19.038Z",
+      "bytes": 29720,
+      "sha256": "81c94b88a7aa861a2dfae5af8c871334e951172fd6c346cb4276056e9620ee16",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Quarter-One.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:37.998Z",
+      "bytes": 32411,
+      "sha256": "570503e26b5ef230b3589334e8db7fc96cfdf2f67412712ea19cfb8d6d75cb1d",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Quarter-Three.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:35.562Z",
+      "bytes": 30011,
+      "sha256": "1ed478d742f1bf4925059265740e15362de87e32bef71b0fd7bfd7deb01e047e",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Quarter-Two.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:40.393Z",
+      "bytes": 33216,
+      "sha256": "1a8b42198ede1bdb4252f7e62e948bcd101dcdba7575acd700db82b022e4a4da",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Semester-One.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:28.276Z",
+      "bytes": 1145978,
+      "sha256": "ee42a3ba6c59746b3a705b6e169084b75badf94de3f7f4612d77c86822062044",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Semester-Two.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:14.123Z",
+      "bytes": 1140732,
+      "sha256": "1f62ae98c051714bdcd991200a6967d03aa3a71542a3a21e06f2924cbb4f5b2f",
+      "source": "uoa-catalogue"
+    },
+    {
+      "file": "uoa-catalogue/2026/terms/Summer-Semester.json",
+      "url": "https://study.auckland.ac.nz/ords/wwv_flow.ajax?p_context=catalogue/browse2/504688235569232",
+      "fetchedAt": "2026-10-14T12:28:24.087Z",
+      "bytes": 91301,
+      "sha256": "c484639b1b211cacb4ed5e7241ef1f9361ac6952da72bd071f65e4b7f2ae69ec",
+      "source": "uoa-catalogue"
     }
   ]
 }

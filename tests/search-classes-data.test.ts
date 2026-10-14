@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
+import { REMOTE } from "../scripts/lib/areas.ts";
 import { buildSchedule, parseDate, parseDays, parseTime, type RawClass } from "../scripts/lib/classes.ts";
-import { decodeRing, pointInRing, shareInside } from "../src/shared/geo.ts";
+import { decodeRing, makeProjector, pointInRing, shareInside } from "../src/shared/geo.ts";
 import { buildIndex, compact, fold, search } from "../src/shared/search.ts";
-import type { CampusData, ContextData, FloorPlans, Meta, RoomIndex, Schedule, Subject } from "../src/shared/types.ts";
+import type { CampusData, CatalogueData, ContextData, FloorPlans, Meta, RoomIndex, Schedule, Subject } from "../src/shared/types.ts";
 
 const read = <T>(name: string) => JSON.parse(fs.readFileSync(`public/data/${name}`, "utf8")) as T;
 const campus = read<CampusData>("campus.json");
@@ -104,9 +105,9 @@ describe("published campus data is self-consistent", () => {
       }
     }
   });
-  it("on-map buildings sit within a couple of kilometres of the origin", () => {
+  it("buildings in the central area sit within a couple of kilometres of the origin", () => {
     for (const b of campus.buildings) {
-      if (b.offMap) continue;
+      if (b.offMap || b.area) continue;
       expect(Math.abs(b.center[0]), b.id).toBeLessThan(1200);
       expect(Math.abs(b.center[1]), b.id).toBeLessThan(2200);
       expect(b.height, b.id).toBeGreaterThan(0);
@@ -117,6 +118,26 @@ describe("published campus data is self-consistent", () => {
     for (const r of campus.rooms) expect(r.sourceType).not.toMatch(/Residential|Accom/i);
     const text = JSON.stringify(campus) + JSON.stringify(read<Schedule>("schedule.json"));
     expect(text).not.toMatch(/instructor|lecturer|coordinator/i);
+  });
+  it("puts every campus on the map, each one away from the centre in surroundings of its own", () => {
+    for (const c of campus.campuses) expect(c.onMap, c.id).toBe(true);
+    expect(campus.buildings.filter((b) => b.offMap).map((b) => b.id)).toEqual([]);
+    const areas = new Set<string>();
+    for (const x of [...campus.campuses, ...campus.buildings]) if (x.area) areas.add(x.area);
+    expect([...areas].sort()).toEqual(["ardmore", "carrick-place", "leigh", "tai-tokerau", "tai-tonga", "waiheke"]);
+    const project = makeProjector(campus.origin);
+    for (const a of areas) {
+      const ctx = read<ContextData>(`context/${a}.json`);
+      expect(ctx.attribution, a).toMatch(/OpenStreetMap contributors/);
+      expect(ctx.roads.length + ctx.buildings.length, a).toBeGreaterThan(5);
+      // Each building of the area stands inside the box its surroundings were fetched for.
+      const box = REMOTE.find((r) => r.id === a)!.bbox;
+      const [x0, y0] = project(box[1], box[0]);
+      const [x1, y1] = project(box[3], box[2]);
+      for (const b of campus.buildings.filter((x) => x.area === a)) {
+        expect(b.center[0] > x0 && b.center[0] < x1 && b.center[1] > y0 && b.center[1] < y1, `${a} ${b.id}`).toBe(true);
+      }
+    }
   });
   it("context data carries the OpenStreetMap attribution", () => {
     const ctx = read<ContextData>("context.json");
@@ -141,6 +162,40 @@ describe("published campus data is self-consistent", () => {
       expect(schedule.snapshotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       for (const s of schedule.sessions) expect(s.sourceText.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("the Curriculum Catalogue's courses", () => {
+  const cat = read<CatalogueData>("courses.json");
+  const byCode = new Map(cat.courses.map((c) => [c[0], c]));
+
+  it("hold every course with a code and a title, and nothing more than facts", () => {
+    expect(cat.courses.length).toBeGreaterThan(6000);
+    for (const c of cat.courses) {
+      expect(c, c[0]).toHaveLength(4);
+      expect(c[0], c[0]).toMatch(/^[A-Z][A-Z0-9]* \S+$/);
+      expect(c[1].length, c[0]).toBeGreaterThan(1);
+      // A title, not a prescription.
+      expect(c[1].length, c[0]).toBeLessThan(200);
+    }
+    expect(new Set(cat.courses.map((c) => c[0])).size).toBe(cat.courses.length);
+    expect(Object.keys(cat).sort()).toEqual(["campuses", "courses", "terms", "version", "year"]);
+  });
+  it("say which terms and campuses offer a course, in the catalogue's words", () => {
+    const spell = (mask: number, list: string[]) => list.filter((_, bit) => mask & (1 << bit));
+    const c = byCode.get("COMPSCI 101")!;
+    expect(c[1]).toBe("Principles of Programming");
+    expect(spell(c[2], cat.terms)).toEqual(expect.arrayContaining(["Semester One", "Semester Two"]));
+    expect(spell(c[3], cat.campuses.map((x) => x.text))).toContain("City");
+    // Only campuses the catalogue names exactly are tied to the map.
+    expect(cat.campuses.filter((x) => x.campus).map((x) => x.campus).sort()).toEqual(["city", "grafton", "leigh", "newmarket", "tai-tokerau", "waiheke"]);
+    expect(cat.campuses.find((x) => x.text === "Online")?.campus).toBeUndefined();
+  });
+  it("use the same subject prefixes as the Calendar's subject list, nearly all of them", () => {
+    const subjects = new Set(read<Subject[]>("subjects.json").map((s) => s.code));
+    const prefixes = new Set(cat.courses.map((c) => c[0].split(" ")[0]!));
+    const known = [...prefixes].filter((p) => subjects.has(p));
+    expect(known.length / prefixes.size).toBeGreaterThan(0.9);
   });
 });
 

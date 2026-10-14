@@ -28,6 +28,7 @@ import type {
   Building,
   Campus,
   CampusData,
+  CatalogueData,
   ContextBuilding,
   ContextData,
   ContextRoof,
@@ -48,6 +49,8 @@ import type {
   SpaceType,
   Subject,
 } from "../src/shared/types.ts";
+import { AREAS, CENTRAL, type SceneArea } from "./lib/areas.ts";
+import { CATALOGUE_DIR, CATALOGUE_YEAR, facetFile } from "./lib/catalogue.ts";
 import { buildSchedule, loadClassSnapshots } from "./lib/classes.ts";
 import { hasSnapshot, manifest, readSnapshot } from "./lib/snapshot.ts";
 
@@ -67,14 +70,30 @@ const MIN_FOOTPRINT_SHARE = 0.2;
  * takes away far more than a twentieth of a floor.
  */
 const STACK_OVERLAP = 0.95;
-/** south, west, north, east of the 3D scene; must match scripts/fetch-osm.ts. */
-const SCENE_BBOX = [-36.8689, 174.7608, -36.8441, 174.7797] as const;
-
 const project = makeProjector(ORIGIN);
-const [sx0, sy0] = project(SCENE_BBOX[1], SCENE_BBOX[0]);
-const [sx1, sy1] = project(SCENE_BBOX[3], SCENE_BBOX[2]);
-const inScene = (p: Pt, margin = 0) =>
-  p[0] >= sx0 - margin && p[0] <= sx1 + margin && p[1] >= sy0 - margin && p[1] <= sy1 + margin;
+
+/**
+ * The areas the 3D map draws (scripts/lib/areas.ts) whose OpenStreetMap snapshot has been taken,
+ * each with its box in the local frame, metres. An area without its snapshot is not drawn.
+ */
+const areaBoxes = AREAS.filter((area) => hasSnapshot(area.osm)).map((area) => {
+  const [x0, y0] = project(area.bbox[1], area.bbox[0]);
+  const [x1, y1] = project(area.bbox[3], area.bbox[2]);
+  return { area, x0, y0, x1, y1 };
+});
+type AreaBox = (typeof areaBoxes)[number];
+const inBox = (b: AreaBox, p: Pt, margin = 0) => p[0] >= b.x0 - margin && p[0] <= b.x1 + margin && p[1] >= b.y0 - margin && p[1] <= b.y1 + margin;
+/** The area of the map a point lies in, if any. */
+const areaOf = (p: Pt): SceneArea | undefined => areaBoxes.find((b) => inBox(b, p))?.area;
+/** The area whose surroundings are being built; `inScene` and `clipLine` ask about it. */
+let sceneBox: AreaBox = areaBoxes.find((b) => b.area === CENTRAL)!;
+const inScene = (p: Pt, margin = 0) => inBox(sceneBox, p, margin);
+
+/** Where a building or campus centred here stands: in the central area, in another one, or off the map. */
+const placeOnMap = (center: Pt): { area?: string; offMap?: true } => {
+  const area = areaOf(center);
+  return !area ? { offMap: true } : area === CENTRAL ? {} : { area: area.id };
+};
 
 const readJson = <T>(file: string): T => JSON.parse(readSnapshot(file).toString("utf8")) as T;
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -118,15 +137,16 @@ interface MiLocation {
   };
 }
 
-const CAMPUS_IDS: Record<string, { id: string; onMap: boolean }> = {
-  CITY_CAMPUS: { id: "city", onMap: true },
-  GRAFTON_CAMPUS: { id: "grafton", onMap: true },
-  NEWMARKET_CAMPUS: { id: "newmarket", onMap: true },
-  LEIGH_CAMPUS: { id: "leigh", onMap: false },
-  ARDMORE_CAMPUS: { id: "ardmore", onMap: false },
-  TAI_TOKERAU_CAMPUS: { id: "tai-tokerau", onMap: false },
-  TAI_TONGA_CAMPUS: { id: "tai-tonga", onMap: false },
-  WAIHEKE_RESEARCH_STATION: { id: "waiheke", onMap: false },
+/** Campus ids by the source's venue name. Whether a campus is on the map follows scripts/lib/areas.ts. */
+const CAMPUS_IDS: Record<string, { id: string }> = {
+  CITY_CAMPUS: { id: "city" },
+  GRAFTON_CAMPUS: { id: "grafton" },
+  NEWMARKET_CAMPUS: { id: "newmarket" },
+  LEIGH_CAMPUS: { id: "leigh" },
+  ARDMORE_CAMPUS: { id: "ardmore" },
+  TAI_TOKERAU_CAMPUS: { id: "tai-tokerau" },
+  TAI_TONGA_CAMPUS: { id: "tai-tonga" },
+  WAIHEKE_RESEARCH_STATION: { id: "waiheke" },
 };
 
 /** Source room types that are published with an outline, and the kind they map to. */
@@ -362,7 +382,7 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
       height,
       heightSource: "floor-count",
       roomCount: 0,
-      ...(inScene(center) ? {} : { offMap: true }),
+      ...placeOnMap(center),
     });
   }
   buildings.sort((a, z) => a.id.localeCompare(z.id, "en", { numeric: true }));
@@ -543,15 +563,20 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
       const xs = own.map((b) => b.center[0]).sort((a, z) => a - z);
       const ys = own.map((b) => b.center[1]).sort((a, z) => a - z);
       const mid = Math.floor(own.length / 2);
+      const center: [number, number] = [round1(xs[mid] ?? 0), round1(ys[mid] ?? 0)];
+      // A campus is on the map when its middle is; a building far from the rest has its own area.
+      const place = placeOnMap(center);
       return {
         id,
         name: { en: v.venueInfo.name },
-        onMap: CAMPUS_IDS[v.name]?.onMap ?? false,
-        center: [round1(xs[mid] ?? 0), round1(ys[mid] ?? 0)] as [number, number],
+        onMap: !place.offMap,
+        ...(place.area ? { area: place.area } : {}),
+        center,
         buildingCount: own.length,
       };
     })
-    .sort((a, z) => Number(z.onMap) - Number(a.onMap) || z.buildingCount - a.buildingCount);
+    // The central campuses first, then those in areas of their own, then any off the map.
+    .sort((a, z) => Number(z.onMap) - Number(a.onMap) || Number(!!a.area) - Number(!!z.area) || z.buildingCount - a.buildingCount);
 
   return {
     data: {
@@ -763,10 +788,14 @@ function outerRings(e: OsmElement): Ring[] {
   return rings.filter((r) => r.length >= 3);
 }
 
-function buildContext(campus: CampusData): { data: ContextData; stats: Record<string, number> } {
-  const osm = readJson<{ elements: OsmElement[] }>("osm/context.json");
+/** The surroundings of one area of the map, from its OpenStreetMap snapshot. */
+function buildContext(campus: CampusData, box: AreaBox): { data: ContextData; stats: Record<string, number> } {
+  sceneBox = box;
+  const osm = readJson<{ elements: OsmElement[] }>(box.area.osm);
   const stats: Record<string, number> = {};
-  const bump = (k: string, n = 1) => (stats[k] = (stats[k] ?? 0) + n);
+  // The central area's counts keep their old names; others are prefixed with the area.
+  const prefix = box.area === CENTRAL ? "" : `${box.area.id}.`;
+  const bump = (k: string, n = 1) => (stats[prefix + k] = (stats[prefix + k] ?? 0) + n);
 
   // University footprints, to drop the OSM copies of the same buildings.
   const uni = campus.buildings.map((b) => {
@@ -884,7 +913,7 @@ function buildContext(campus: CampusData): { data: ContextData; stats: Record<st
         const ring = simplifyRing(ring0, 0.6);
         if (ringArea(ring) < 25) continue;
         const [x0, y0, x1, y1] = bbox(ring);
-        if (x1 < sx0 || x0 > sx1 || y1 < sy0 || y0 > sy1) continue;
+        if (x1 < sceneBox.x0 || x0 > sceneBox.x1 || y1 < sceneBox.y0 || y0 > sceneBox.y1) continue;
         out.areas.push({ k, p: encodeRing(ring) });
       }
     }
@@ -983,6 +1012,91 @@ function decodeEntities(s: string): string {
     .replace(/&ndash;/g, "–");
 }
 
+/** Campuses in the Curriculum Catalogue's words that are campuses on the map. Others stay as text. */
+const CATALOGUE_CAMPUSES: Record<string, string> = {
+  City: "city",
+  Grafton: "grafton",
+  Newmarket: "newmarket",
+  "Tai Tokerau": "tai-tokerau",
+  "Leigh Marine": "leigh",
+  "Waiheke Island": "waiheke",
+};
+
+/** The catalogue's terms in the order they come in a year; Summer Semester runs in January and February. */
+const CATALOGUE_TERM_ORDER = [
+  "Summer Semester",
+  "Semester One",
+  "Quarter One",
+  "Quarter Two",
+  "Semester Two",
+  "Quarter Three",
+  "Quarter Four",
+  "Late Year",
+  "Academic Year",
+  "All Terms",
+  "Doctoral Term",
+];
+
+/**
+ * Course codes and titles from the Curriculum Catalogue snapshot (scripts/fetch-catalogue.ts),
+ * with the terms and campuses each is offered in. Only facts are kept: the prescriptions, which
+ * are prose, are dropped here, and the catalogue gives no points in its lists.
+ */
+function buildCourses(): { data?: CatalogueData; stats: Record<string, number> } {
+  const stats: Record<string, number> = {};
+  const filtersFile = `${CATALOGUE_DIR}/filters.json`;
+  const coursesFile = `${CATALOGUE_DIR}/courses.json`;
+  if (!hasSnapshot(filtersFile) || !hasSnapshot(coursesFile)) return { stats };
+  type Rows = { regions: { fetchedData: { values: string[][] } }[] };
+  const rows = (file: string) => readJson<Rows>(file).regions[0]!.fetchedData.values;
+  const filters = readJson<{ counts: Record<string, Record<string, number>> }>(filtersFile).counts;
+  const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+
+  const courses = new Map<string, [string, string, number, number]>();
+  for (const [code, heading] of rows(coursesFile)) {
+    if (!code || !/^[A-Z][A-Z0-9]* \S+$/.test(code)) {
+      stats["catalogue.skipped.code"] = (stats["catalogue.skipped.code"] ?? 0) + 1;
+      continue;
+    }
+    const title = decode((heading ?? "").startsWith(`${code} - `) ? heading!.slice(code.length + 3) : (heading ?? "")).trim();
+    courses.set(code, [code, title, 0, 0]);
+  }
+  // One list per term and per campus: each course found in it gets that bit.
+  const mark = (facet: "terms" | "campuses", values: string[], slot: 2 | 3) =>
+    values.forEach((value, bit) => {
+      if (!hasSnapshot(facetFile(facet, value))) throw new Error(`catalogue: no list for ${facet} "${value}"`);
+      for (const [code] of rows(facetFile(facet, value))) {
+        const c = courses.get(code ?? "");
+        if (c) c[slot] |= 1 << bit;
+      }
+    });
+  // Terms through the year, and campuses on the map first; anything else after, as the source gives it.
+  const order = (values: string[], first: string[]) => [...first.filter((v) => values.includes(v)), ...values.filter((v) => !first.includes(v))];
+  const terms = order(Object.keys(filters.P4_SEMESTER ?? {}), CATALOGUE_TERM_ORDER);
+  const campusNames = order(
+    Object.keys(filters.P4_CAMPUS ?? {}),
+    Object.keys(CATALOGUE_CAMPUSES),
+  );
+  if (terms.length > 31 || campusNames.length > 31) throw new Error("catalogue: too many terms or campuses for a bit mask");
+  mark("terms", terms, 2);
+  mark("campuses", campusNames, 3);
+
+  const list = [...courses.values()].sort((a, z) => a[0].localeCompare(z[0], "en", { numeric: true }));
+  stats["catalogue.courses"] = list.length;
+  stats["catalogue.withoutTerm"] = list.filter((c) => !c[2]).length;
+  stats["catalogue.withoutCampus"] = list.filter((c) => !c[3]).length;
+  return {
+    data: {
+      version: 1,
+      year: Number(CATALOGUE_YEAR),
+      terms: terms.map((t) => t.trim()),
+      campuses: campusNames.map((text) => ({ text: text.trim(), ...(CATALOGUE_CAMPUSES[text.trim()] ? { campus: CATALOGUE_CAMPUSES[text.trim()] } : {}) })),
+      courses: list,
+    },
+    stats,
+  };
+}
+
 function buildSubjects(): Subject[] {
   if (!hasSnapshot("uoa-calendar/courses.html")) return [];
   const html = readSnapshot("uoa-calendar/courses.html").toString("utf8");
@@ -1027,8 +1141,12 @@ function write(name: string, value: unknown): number {
 }
 
 const { data: campus, index, plans, stats: campusStats } = buildCampus();
-const { data: context, stats: contextStats } = buildContext(campus);
+// One file of surroundings per area: the central one loads with the map, the others when a
+// campus or building in them is shown.
+const contexts = areaBoxes.map((box) => ({ area: box.area, ...buildContext(campus, box) }));
+const contextStats = Object.assign({}, ...contexts.map((c) => c.stats)) as Record<string, number>;
 const subjects = buildSubjects();
+const { data: catalogue, stats: catalogueStats } = buildCourses();
 const calendar = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "academic-calendar.json"), "utf8")) as AcademicCalendar;
 
 const classSnapshots = loadClassSnapshots();
@@ -1042,6 +1160,7 @@ const coverage: Coverage = {
   indexedRooms: Object.values(index).reduce((n, l) => n + l.length, 0),
   planShapes: campus.buildings.reduce((n, b) => n + (b.planShapes ?? 0), 0),
   subjects: subjects.length,
+  catalogueCourses: catalogue?.courses.length ?? 0,
   courses: schedule.courses.length,
   sessions: schedule.sessions.length,
   sessionsLocatedToRoom: count("room"),
@@ -1076,6 +1195,16 @@ const sources: SourceInfo[] = [
     provides: "Semester dates, breaks, holidays and the list of subject codes",
   },
 ];
+if (catalogue) {
+  sources.push({
+    id: "uoa-catalogue",
+    name: `University of Auckland Curriculum Catalogue ${CATALOGUE_YEAR} (study.auckland.ac.nz)`,
+    url: "https://study.auckland.ac.nz/",
+    licence: "© University of Auckland. Course codes, titles, terms and campuses are quoted as facts with a link to the source; course descriptions are not copied.",
+    snapshotDate: snapshotDate("uoa-catalogue"),
+    provides: "Course titles, and the terms and campuses each course is offered in (no class times or rooms)",
+  });
+}
 if (schedule.available) {
   sources.push({
     id: "uoa-classes",
@@ -1093,18 +1222,26 @@ const meta: Meta = { version: 1, generatedAt: campus.generatedAt, sources, cover
 // whole: a building that lost its plan must not keep an old file.
 fs.rmSync(path.join(OUT, "plans"), { recursive: true, force: true });
 const planBytes = plans.reduce((n, plan) => n + write(`plans/${plan.building}.json`, plan), 0);
+fs.rmSync(path.join(OUT, "context"), { recursive: true, force: true });
+const contextBytes = Object.fromEntries(
+  contexts.map((c) => {
+    const file = c.area === CENTRAL ? "context.json" : `context/${c.area.id}.json`;
+    return [file, write(file, c.data)];
+  }),
+);
 
 const sizes = {
   [`plans/ (${plans.length} files)`]: planBytes,
   "campus.json": write("campus.json", campus),
-  "context.json": write("context.json", context),
+  ...contextBytes,
   "rooms-index.json": write("rooms-index.json", index),
   "subjects.json": write("subjects.json", subjects),
+  ...(catalogue ? { "courses.json": write("courses.json", catalogue) } : {}),
   "calendar.json": write("calendar.json", calendar),
   "schedule.json": write("schedule.json", schedule),
   "meta.json": write("meta.json", meta),
 };
 
 console.log("coverage", coverage);
-console.log("stats", { ...campusStats, ...contextStats, ...scheduleStats });
+console.log("stats", { ...campusStats, ...contextStats, ...catalogueStats, ...scheduleStats });
 console.log("bytes", sizes);

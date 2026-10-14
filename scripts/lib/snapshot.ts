@@ -18,6 +18,8 @@ const ROOT = path.resolve(import.meta.dirname, "..", "..");
 export const RAW_DIR = path.join(ROOT, "data", "raw");
 const MANIFEST = path.join(ROOT, "data", "sources.json");
 const MIN_INTERVAL_MS = 1100;
+/** Longer than Overpass's own 180 s query limit. */
+const TIMEOUT_MS = 240_000;
 
 export interface SnapshotRecord {
   /** Path relative to data/raw, forward slashes. */
@@ -79,6 +81,8 @@ export async function snapshot(opts: FetchOptions): Promise<Buffer> {
     method: opts.method ?? "GET",
     body: opts.body,
     headers: { "User-Agent": USER_AGENT, Accept: "application/json, */*;q=0.5", ...opts.headers },
+    // A server that never answers is a failure like any other, not a wait without end.
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`${opts.url} -> HTTP ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
@@ -99,6 +103,20 @@ export async function snapshot(opts: FetchOptions): Promise<Buffer> {
   writeManifest(m);
   console.log(`fetched ${rec.file} (${rec.bytes} B)`);
   return buf;
+}
+
+/**
+ * One paced, honestly named request whose answer is not kept: the page that opens a session on a
+ * site that hands out its data only inside one (a cookie, a form token). The data itself is then
+ * fetched with snapshot().
+ */
+export async function politeFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  await throttle();
+  return fetch(url, {
+    ...init,
+    headers: { "User-Agent": USER_AGENT, ...(init.headers as Record<string, string> | undefined) },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
 }
 
 export function readSnapshot(file: string): Buffer {

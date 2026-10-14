@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
-    "data:fetch": "tsx scripts/fetch-mapsindoors.ts && tsx scripts/fetch-osm.ts && tsx scripts/fetch-calendar.ts",
+    "data:fetch": "tsx scripts/fetch-mapsindoors.ts && tsx scripts/fetch-osm.ts && tsx scripts/fetch-calendar.ts && tsx scripts/fetch-catalogue.ts",
     "data:build": "tsx scripts/build-data.ts",
     "data:classes": "tsx scripts/fetch-classes.ts"
   },

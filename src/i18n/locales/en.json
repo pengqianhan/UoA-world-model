@@ -26,8 +26,9 @@
   },
   "campus": {
     "label": "Campus",
+    "more": "Other campuses…",
     "notOnMap": "Not on the 3D map yet",
-    "notOnMapLong": "This campus is in the data, but only the City, Grafton and Newmarket campuses are modelled in 3D so far."
+    "notOnMapLong": "This campus is in the data, but not modelled in 3D."
   },
   "search": {
     "title": "Find a room, building or course",
@@ -57,6 +58,10 @@
     "subjectCourses_other": "{count} courses with scheduled classes",
     "courseSessions_one": "{count} scheduled class",
     "courseSessions_other": "{count} scheduled classes",
+    "catalogueTerms": "{year}: {terms}",
+    "catalogueNoTerm": "No term listed for {year}",
+    "catalogueCampuses": "Offered at {campuses}. Class times and rooms are not public.",
+    "catalogueNoCampus": "No campus listed. Class times and rooms are not public.",
     "browseTitle": "Buildings with the most learning spaces",
     "lookingUp": "Looking the room up on the campus map…",
     "sessionGo": "Show this class on the map"
@@ -240,6 +245,7 @@
       "indexedRooms": "Other rooms that can be located",
       "planShapes": "Other spaces drawn with their type, without a name",
       "subjects": "Subject codes",
+      "catalogueCourses": "Courses in the Curriculum Catalogue",
       "courses": "Courses with scheduled classes",
       "sessions": "Scheduled classes",
       "sessionsRoom": "located to a room",
@@ -249,12 +255,12 @@
     },
     "limitsTitle": "Known limitations",
     "limits": {
-      "timetable": "No class times yet. The University's timetable can no longer be read without signing in: the guest class search has been retired and the official Classes API needs credentials. Until the site's maintainer supplies those, this site shows rooms and buildings but cannot say what is scheduled in them. Nothing here is made up to fill the gap.",
+      "timetable": "No class times yet. The University's timetable can no longer be read without signing in: the guest class search has been retired and the official Classes API needs credentials. Until the site's maintainer supplies those, this site shows rooms and buildings but cannot say what is scheduled in them. Nothing here is made up to fill the gap. Search knows every course in the University's 2026 Curriculum Catalogue by code and title, with the terms and campuses the catalogue lists for it; the catalogue gives no class times or rooms, and its course descriptions are not copied here.",
       "timetableLoaded": "Class times come from a snapshot of the timetable taken on {date}. Rooms and times change during the semester; your own timetable is the authority.",
       "scheduled": "A timetabled class is not the same as an occupied room. Classes are cancelled, moved and recorded online, and rooms are used for things that are not on the timetable.",
       "heights": "Each building is stacked floor by floor from the outlines on the official campus map, so its podiums, towers, setbacks and courtyards are real. Floors whose outlines differ by less than a twentieth of their area are drawn as one block. Its height is not surveyed: every floor is drawn {height} m high. The windows and the rim round each roof are drawn by rule and say nothing about the real walls and roofs. The ground is drawn flat although the campus sits on a ridge.",
       "rooms": "Outlines are simplified from the official campus map. Learning spaces (lecture theatres, teaching rooms, labs, studios, study spaces) are named and can be selected. Every other space on the campus map is drawn as a shape with no code or name, so that a floor reads as a floor plan, and its floor is tinted by the campus map's type for it: offices, other labs, toilets, stairs and lifts, services, and areas the map does not describe. Point at a shape, or tap it, to read that type in the campus map's own words. Stairs, lifts, toilets and showers carry a sign. A room among them is found by its code and marked with a pin, and the shape it stands on is outlined. Walls stand on every outline at a height chosen for the drawing; the campus map has no wall heights and no doors, so none are shown. Floors where people live and childcare centres are left blank, and single parking bays are not drawn. Some floors are blank or nearly blank on the campus map itself, most of them in halls of residence; the floor list marks them and the building bar says so. The furniture drawn in a selected room is decoration laid out by rule; it is not a seating plan and says nothing about capacity.",
-      "campuses": "Only the City, Grafton and Newmarket campuses are modelled in 3D. Buildings on other campuses appear in search and are marked as not on the map.",
+      "campuses": "Every campus on the official campus map is modelled in 3D. The City, Grafton and Newmarket campuses share one stretch of the city; Tai Tokerau, Tai Tonga, Leigh, Waiheke and Ardmore, and one Grafton building on Carrick Place, each stand in their own patch of surroundings, a few hundred metres across, and the map jumps between them. Positions far from the City Campus are drawn on the same flat map, so shapes at Tai Tokerau, 125 km north, are about 1% wider east to west than they are. The sea is not drawn: OpenStreetMap maps the coast as a line, which this map does not turn into water, so Leigh and Waiheke stand on land to the edge of their patch.",
       "context": "Surrounding buildings, streets and trees come from OpenStreetMap. Where it maps a building in parts or gives a roof a shape, those are drawn, the roof in a simplified form. Where a height is not mapped, a default is used. A tree standing alone is where OpenStreetMap maps it; its size and shape are drawn by rule. Trees OpenStreetMap tags as deciduous turn in April and May, stand bare from June to August and come into leaf in September and October; the rest are drawn evergreen. Trees inside woodland areas are scattered for decoration.",
       "calendar": "Semester dates are transcribed by hand from the 2026 University Calendar. Dates for 2027 were not fully published when this was built.",
       "daylight": "The sun stands where it does over the City Campus at the date and time shown, from NOAA's published solar-position equations; below 10° above the horizon it is drawn at 10°, so that shadows stay on the map. Night falls as the sun goes from 6° above the horizon to 8° below. In Now mode the cloud, rain and fog follow Open-Meteo's current weather for the City Campus, and the falling rain is drawn by rule; Preview shows a clear sky, because past and future weather are not known here."
