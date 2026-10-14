@@ -11,6 +11,7 @@ import {
   encodeRing,
   interiorPoint,
   makeProjector,
+  overlap,
   pointInRing,
   ringArea,
   ringCentroid,
@@ -56,6 +57,13 @@ const ORIGIN = { lat: -36.8523, lon: 174.7691 };
 const FLOOR_HEIGHT = 3.6;
 /** A floor outline with less of its area than this over its own building belongs to another one. */
 const MIN_FOOTPRINT_SHARE = 0.2;
+/**
+ * Two floors whose outlines share this much of the area either covers are drawn from outside as
+ * one block. Of the 472 pairs of neighbouring floors in the snapshot of 2026-10-13, 251 share 99%
+ * or more: the same walls, traced again floor by floor. The value keeps a real setback, which
+ * takes away far more than a twentieth of a floor.
+ */
+const STACK_OVERLAP = 0.95;
 /** south, west, north, east of the 3D scene; must match scripts/fetch-osm.ts. */
 const SCENE_BBOX = [-36.8689, 174.7608, -36.8441, 174.7797] as const;
 
@@ -234,6 +242,8 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
     const center = ringCentroid(outline[0]!);
 
     const floors: Floor[] = [];
+    // The outline each floor has in effect: its own, or the one it repeats from the floor below.
+    const shapes: (Ring[][] | undefined)[] = [];
     let prevKey = "";
     const sorted = Object.entries(b.floors)
       .map(([k, f]) => ({ i: Number(k), f }))
@@ -252,8 +262,21 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
       const key = JSON.stringify(polys);
       if (polys.length && key !== prevKey) floor.outline = polys;
       if (polys.length) prevKey = key;
+      shapes.push(floor.outline ? rings : shapes[shapes.length - 1]);
       floors.push(floor);
     }
+    // Storeys that are alike from outside stand as one block: each run of full levels at or above
+    // entry is measured against its lowest floor, so that a slow drift up a tower still shows.
+    const entry = floors.find((f) => f.i >= 0)?.i;
+    let run: { i: number; shape: Ring[][] } | undefined;
+    floors.forEach((floor, k) => {
+      if (entry === undefined || floor.i < 0 || (floor.i - entry) % 10 !== 0) return;
+      const shape = shapes[k] ?? [outline];
+      if (run && shape !== run.shape && overlap(run.shape, shape) >= STACK_OVERLAP) {
+        floor.stackWith = run.i;
+        bump("floors.stackedWithLower");
+      } else if (!run || shape !== run.shape) run = { i: floor.i, shape };
+    });
     const above = floors.filter((f) => f.i >= 0).map((f) => f.i);
     const levels = above.length ? (Math.max(...above) - Math.min(...above)) / 10 + 1 : 0;
     const height = levels > 0 ? round1(levels * FLOOR_HEIGHT) : 1.2;

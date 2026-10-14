@@ -1,8 +1,9 @@
-// The shape of a building seen from outside: its floors stacked, each with its own outline.
-// The outlines are the campus map's; the heights are the display convention of one storey per level.
+// The shape of a building seen from outside: its floors stacked, each with its own outline, and
+// floors that are alike standing as one block. The outlines are the campus map's; the heights are
+// the display convention of one storey per level.
 import type { Building, FlatRing } from "./types.ts";
 
-/** A run of floors that share one outline, as a block between two heights in metres. */
+/** A run of floors drawn with one outline, as a block between two heights in metres. */
 export interface MassingBlock {
   /** Polygons with holes: [polygon][ring] -> FlatRing. */
   outline: FlatRing[][];
@@ -17,11 +18,16 @@ export interface MassingBlock {
  */
 export function massing(b: Building, floorHeight: number): MassingBlock[] {
   const levels: { i: number; outline: FlatRing[][] }[] = [];
-  // A floor without its own outline repeats the one below it, basements included.
+  // A floor without its own outline repeats the one below it, basements included. A floor marked
+  // as alike to a lower one is drawn with that floor's outline.
   let outline: FlatRing[][] | undefined;
+  const drawn = new Map<number, FlatRing[][]>();
   for (const f of b.floors) {
     if (f.outline) outline = f.outline;
-    if (f.i >= 0) levels.push({ i: f.i, outline: outline ?? [b.outline] });
+    if (f.i < 0) continue;
+    const shape = (f.stackWith !== undefined ? drawn.get(f.stackWith) : undefined) ?? outline ?? [b.outline];
+    drawn.set(f.i, shape);
+    levels.push({ i: f.i, outline: shape });
   }
   const base = levels[0]?.i;
   if (base === undefined) return [{ outline: [b.outline], y0: 0, y1: b.height }];

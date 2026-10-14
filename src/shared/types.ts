@@ -41,6 +41,12 @@ export interface Floor {
   outline?: FlatRing[][];
   /** Set when the source's outline for this floor was unusable and the building's footprint stands in. */
   outlineFrom?: "footprint";
+  /**
+   * Level index of a lower floor that this floor matches almost exactly in outline. Seen from
+   * outside the two are drawn as one block with the lower floor's outline; inside the building
+   * each floor keeps its own.
+   */
+  stackWith?: number;
   /** Set when no floor plan is published for this floor: people live on it, or it is a childcare centre. */
   noPlan?: "residential" | "childcare";
 }
