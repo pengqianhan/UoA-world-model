@@ -92,6 +92,7 @@ Data is fetched once, cached as raw snapshots under `data/raw/`, and every later
 npm run data:fetch                         # fetches only what is missing
 npx tsx scripts/fetch-mapsindoors.ts --refresh   # re-download the campus map (4 requests)
 npx tsx scripts/fetch-osm.ts --refresh           # re-download OpenStreetMap context (1 request per area, 7)
+npx tsx scripts/fetch-terrain.ts --refresh       # re-download the elevation tiles (29 at zoom 14)
 npx tsx scripts/fetch-calendar.ts --refresh      # re-download the Calendar pages (3 requests)
 npm run data:build                         # rebuild public/data from the snapshots
 npm test                                   # the data consistency tests must still pass
@@ -212,6 +213,7 @@ windows and roof rims are drawn by rule.
 | [University of Auckland campus maps](https://maps.auckland.ac.nz/) (the public map, served by MapsIndoors) | Buildings, floors, room codes, room types and positions | © University of Auckland. Only derived facts are published here: learning spaces with their names and simplified outlines; other searchable rooms as a code, floor and point; every other space as a simplified outline with the map's type for it and no code or name. Floors with student accommodation, childcare centres and single parking bays are left out, and a room the map marks as not searchable is never named. |
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) via the Overpass API | Surrounding buildings, streets, paths, parks, trees | © OpenStreetMap contributors, [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The snapshot in `data/raw/osm/` and the derived `public/data/context.json` are under the same licence. |
 | [University of Auckland Calendar 2026](https://www.auckland.ac.nz/en/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar.html) | Semester dates, breaks, holidays; list of subject codes | © University of Auckland. Dates and codes are quoted as facts with a link to the source. |
+| [LINZ 8 m Digital Elevation Model (2012)](https://data.linz.govt.nz/layer/51768-nz-8m-digital-elevation-model-2012/), via the [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) | The height of the ground | New Zealand terrain data © Land Information New Zealand and the New Zealand Government, [CC BY 3.0 NZ](https://creativecommons.org/licenses/by/3.0/nz/). The tiles also hold SRTM and GMTED2010 data (U.S. Geological Survey) and ETOPO1 (U.S. NOAA) at the coast. The tiles in `data/raw/terrain/` and the derived `public/data/terrain/` are under the same terms. |
 | [Open-Meteo](https://open-meteo.com/) | Current temperature in Auckland, fetched by the visitor's browser | [CC BY 4.0](https://open-meteo.com/en/licence) |
 
 Snapshot dates are shown in the site's About panel and recorded in `public/data/meta.json`.
@@ -224,8 +226,9 @@ If you represent the University and would like something changed or removed, ple
 
 - No class times until a timetable snapshot is added (see above).
 - A timetabled class is not the same as an occupied room.
-- Heights are estimated, windows are drawn by rule, and the ground is flat, although the City Campus
-  sits on a ridge.
+- Building heights are estimated and windows are drawn by rule. The ground's heights come from the
+  LINZ 8 m elevation model, drawn from contours: smooth, peaks a few metres low. A building stands
+  at the ground under its middle, with a footing of up to 4 m on a slope.
 - Only learning spaces are named and can be selected. The rest of a floor is shapes that show the
   campus map's type and nothing more; where the map's type says nothing ("Non Usable Area",
   "Nonasgn Rentable" and the like) the site says "Other area". Floors where people live and

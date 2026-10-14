@@ -227,9 +227,25 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
 - Seasons: the 21 trees OpenStreetMap tags `leaf_cycle=deciduous` (of 1,819 mapped) are kept apart
   in `context.json` and turn in April and May, stand bare from June to August and come into leaf
   in September and October. No other tree is tagged either way, so the rest stay evergreen.
+- Terrain, since 2026-10-15 (the user asked for every remaining item that has a public source):
+  `scripts/fetch-terrain.ts` takes the zoom-14 tiles of the AWS Open Data "Terrain Tiles" under
+  every area (29 tiles, 2 MB, committed: over New Zealand they hold the LINZ 8 m DEM of 2012, CC BY
+  3.0 NZ). Zoom 15 adds nothing there (within 0.1 m); zoom 16 does not exist. `buildTerrain` in
+  `build-data.ts` samples them on a 10 m grid over each area plus 700 m (central) or 500 m of margin
+  and writes `terrain/<area>.json` (heights in decimetres as base64 Int16; 346 KB central, 90-135 KB
+  each other area), clamping single-pixel pits where land meets sea (-1,421 m in Hobson Bay) to -2 m.
+  The PNGs are decoded with Node's zlib (`scripts/lib/png.ts`), so no dependency is added. In the
+  scene each grid is a mesh with skirts down to a flat plane at -2.5 m; paint on the ground (parks,
+  streets, rails) is split to 10 m and laid over it, lifted 15 cm and pulled forward in depth layer
+  by layer; trees stand on it; every building stands at the ground under its middle, never more
+  than 4 m above its lowest corner, with a footing below that (`Terrain.footing`). Surrounding
+  buildings sink to their footprints where they stand in building view; trees go at half way.
+  Checked against the source: Symonds Street 41 m, Albert Park 41 m, Grafton Gully 19-22 m, lower
+  Queen Street 9 m (the smooth contour model puts a ramp over reclaimed land), Mt Eden 188 m against
+  196 m. The 1 m LiDAR DEM is also open (AWS `nz-elevation`, LINZ, CC BY 4.0) but as LERC-compressed
+  Cloud Optimised GeoTIFFs, which would need a new dependency (a gate).
 - Not done: course-level catalogue (the Curriculum Catalogue's lists are lazy-loaded APEX regions;
-  many requests for little value while there is no timetable). Terrain (AWS open "terrarium" tiles
-  need no key) is a possible bonus.
+  many requests for little value while there is no timetable).
 
 ## Decisions (and why) — do not re-litigate without new information
 
