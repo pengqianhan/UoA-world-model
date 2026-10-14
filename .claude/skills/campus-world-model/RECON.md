@@ -8,7 +8,9 @@ to record what you find.
 Recon ends with one verdict per layer under "Data sources" in `PROGRESS.md`:
 
 - **usable**: public, no login, and the terms allow republishing derived facts. Record the exact
-  requests that return the data, how many there are, and the licence line About will show.
+  requests that return the data, how many there are, the licence line About will show, and what the
+  host's terms say about reuse, in their words. Terms that allow non-commercial reuse make the
+  verdict hold only while the site carries no advertising; write that condition down.
 - **needs the user**: the data exists behind a credential, an approval or a permission. Record what
   the person must obtain and from whom.
 - **not published**: every route listed below for that layer was tried and none has it.
@@ -100,3 +102,8 @@ is republished only with the owner's permission, which the person asks for.
 
 The site shipped with buildings, floors and rooms and no class times, and says so in the room card,
 the status strip, Search and About.
+
+The indoor verdict has a condition. The University's copyright page, read on 2026-10-14, allows its
+material for not-for-profit educational use, unaltered and acknowledged, and puts commercial use
+behind written permission. The site simplifies what it takes, so it stands on being non-commercial,
+crediting the University and offering to remove anything on request, and has no written permission.
