@@ -102,6 +102,14 @@ const ROOM_WALL = 0.22;
 const PLAN_WALL = 1.1;
 const PLAN_FLOOR = 0.03;
 const ROOM_HEIGHT_SELECTED = 3.0;
+/**
+ * In building view the open floor keeps its outer walls, cut at the height of the rooms so that
+ * the lower part of the windows shows; metres high and thick. Drawn by rule, like the windows.
+ */
+const CUT_WALL = 1.5;
+const CUT_WALL_THICKNESS = 0.3;
+/** Share of the screen's width and height the open floor is framed to fill, beside the panels. */
+const FLOOR_FILL = { wide: [0.56, 0.66], narrow: [0.84, 0.48] } as const;
 
 const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
@@ -668,6 +676,31 @@ export class CampusScene {
     }
   }
 
+  private wallColour(b: Building): number {
+    return b.roomCount > 0 ? this.palette.uniTeaching : this.palette.uni;
+  }
+
+  private roofColour(b: Building): number {
+    return b.roomCount > 0 ? this.palette.uniRoofTeaching : this.palette.uniRoof;
+  }
+
+  /** How bright the windows of an open building glow after dark. */
+  private get openGlow(): number {
+    return this.night * 0.55;
+  }
+
+  /** The walls of the open building: the window texture in the building's colour, lit after dark. */
+  private facadeMaterial(b: Building): MeshLambertMaterial {
+    return new MeshLambertMaterial({
+      color: this.wallColour(b),
+      vertexColors: true,
+      map: this.wallTexture,
+      emissive: 0xffc56e,
+      emissiveMap: this.glowTexture,
+      emissiveIntensity: this.openGlow,
+    });
+  }
+
   /**
    * In building view every other building sinks to its footprint, so the open floor is not
    * hidden behind its neighbours but the street layout stays readable.
@@ -765,23 +798,29 @@ export class CampusScene {
     const { b, floor } = cur;
     const p = this.palette;
     const H = this.campus?.floorHeight ?? 3.6;
+    const facade = { storey: H, bay: WINDOW_BAY, roofGroup: true };
 
-    // Solid mass of the floors below the cut.
-    const below = new MeshBuilder();
+    // The floors below the cut keep the building's walls and windows. Their roofs show where a
+    // lower floor reaches out beyond the open one.
+    const below = new MeshBuilder(true, true);
     for (const f of b.floors) {
       if (f.i >= floor.i) break;
       const y = this.floorY(b, f.i);
       const next = b.floors.find((x) => x.i > f.i);
       const top = next ? this.floorY(b, next.i) : y + H;
-      for (const poly of this.floorOutline(b, f.i)) below.extrude(poly, y, top);
+      for (const poly of this.floorOutline(b, f.i)) below.extrude(poly, y, top, ROOF_TINT, WALL_TINT, true, facade);
     }
     if (below.vertexCount) {
-      const mesh = new Mesh(below.build(), new MeshLambertMaterial({ color: p.slabBelow }));
+      const geometry = below.build();
+      const mesh = new Mesh(geometry, [this.facadeMaterial(b), new MeshLambertMaterial({ color: this.roofColour(b) })]);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.role = "below";
       mesh.userData.noPick = true;
-      this.detailGroup.add(mesh);
+      const edges = new LineSegments(new EdgesGeometry(geometry, 35), new LineBasicMaterial({ color: p.uniEdge, transparent: true, opacity: 0.45 }));
+      edges.userData.role = "belowEdges";
+      edges.userData.noPick = true;
+      this.detailGroup.add(mesh, edges);
     }
 
     // The selected floor's slab.
@@ -798,6 +837,37 @@ export class CampusScene {
     slabEdges.userData.role = "slabEdges";
     slabEdges.userData.noPick = true;
     this.detailGroup.add(slabEdges);
+
+    // The open floor's own outer walls, cut at the height of the rooms.
+    const cut = new MeshBuilder(true, true);
+    const sy = y + SLAB;
+    for (const [outer, ...holes] of this.floorOutline(b, floor.i)) {
+      const inner = outer && inset(decodeRing(outer), CUT_WALL_THICKNESS);
+      if (inner) {
+        const ring = inner.flatMap(([x, z]) => [Math.round(x * 10), Math.round(z * 10)]);
+        cut.extrude([outer!, ring], sy, sy + CUT_WALL, ROOF_TINT, WALL_TINT, true, facade);
+      }
+      // An outline that cannot be inset cleanly, and the rim of a courtyard, get walls of no thickness.
+      for (const r of inner ? holes : [outer!, ...holes]) {
+        for (let i = 0; i + 1 < r.length; i += 2) {
+          const j = (i + 2) % r.length;
+          cut.fence(r[i]! / 10, r[i + 1]! / 10, r[j]! / 10, r[j + 1]! / 10, sy, sy + CUT_WALL, WALL_TINT);
+        }
+      }
+    }
+    if (cut.vertexCount) {
+      const walls = this.facadeMaterial(b);
+      // Where a room or a shape meets the outer wall their faces coincide; the outer wall wins.
+      walls.polygonOffset = true;
+      walls.polygonOffsetFactor = -1;
+      walls.polygonOffsetUnits = -1;
+      const mesh = new Mesh(cut.build(), [walls, new MeshLambertMaterial({ color: lerpColour(this.wallColour(b), p.uniEdge, 0.3) })]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.role = "cut";
+      mesh.userData.noPick = true;
+      this.detailGroup.add(mesh);
+    }
     this.rebuildPlan();
 
     // Rooms on the selected floor, walled on their outlines.
@@ -869,9 +939,16 @@ export class CampusScene {
 
   private rebuildDetailColours(): void {
     const p = this.palette;
+    const b = this.currentFloor()?.b;
     for (const child of this.detailGroup.children) {
       const role = child.userData.role as string | undefined;
-      if (role === "below") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.slabBelow);
+      if ((role === "below" || role === "cut") && b) {
+        const [walls, top] = (child as Mesh).material as MeshLambertMaterial[];
+        walls!.color.setHex(this.wallColour(b));
+        walls!.emissiveIntensity = this.openGlow;
+        top!.color.setHex(role === "below" ? this.roofColour(b) : lerpColour(this.wallColour(b), p.uniEdge, 0.3));
+      }
+      if (role === "belowEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.uniEdge);
       if (role === "slab") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.slab);
       if (role === "slabEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.uniEdge);
       if (role === "plan") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.plan);
@@ -1084,28 +1161,64 @@ export class CampusScene {
     return Math.min(byHeight, byWidth);
   }
 
+  /**
+   * Where to look and how far to zoom so that the open floor, as the camera sees it from its
+   * present angle, fills the share of the screen that the panels leave free.
+   */
+  private floorFrame(b: Building, floor: Floor): { centre: Vector3; zoom: number } {
+    const y = this.floorY(b, floor.i);
+    this.camera.updateMatrixWorld();
+    const right = new Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const up = new Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+    const back = new Vector3().setFromMatrixColumn(this.camera.matrixWorld, 2);
+    const across = [Infinity, -Infinity];
+    const down = [Infinity, -Infinity];
+    const v = new Vector3();
+    for (const [outer] of this.floorOutline(b, floor.i)) {
+      for (let i = 0; outer && i + 1 < outer.length; i += 2) {
+        for (const h of [y, y + SLAB + CUT_WALL]) {
+          v.set(outer[i]! / 10, h, -outer[i + 1]! / 10);
+          const a = v.dot(right);
+          const d = v.dot(up);
+          across[0] = Math.min(across[0]!, a);
+          across[1] = Math.max(across[1]!, a);
+          down[0] = Math.min(down[0]!, d);
+          down[1] = Math.max(down[1]!, d);
+        }
+      }
+    }
+    // A very small floor is still shown with some of the street round it.
+    const w = Math.max(across[1]! - across[0]!, 30);
+    const h = Math.max(down[1]! - down[0]!, 22);
+    const [fillW, fillH] = this.width <= 720 ? FLOOR_FILL.narrow : FLOOR_FILL.wide;
+    const zoom = Math.min((VIEW_HEIGHT * fillH) / h, (VIEW_HEIGHT * (this.width / this.height) * fillW) / w);
+    // The middle of the floor on screen, moved along the line of sight to the floor's height.
+    const a = (across[0]! + across[1]!) / 2;
+    const d = (down[0]! + down[1]!) / 2;
+    const centre = right.multiplyScalar(a).add(up.multiplyScalar(d));
+    centre.addScaledVector(back, (y - centre.y) / back.y);
+    return { centre, zoom };
+  }
+
   private frameSelection(animate: boolean): void {
     const cur = this.currentFloor();
     if (!cur) return;
     const { b, floor } = cur;
     const y = this.floorY(b, floor.i);
+    const { centre, zoom: floorZoom } = this.floorFrame(b, floor);
     const room = this.selection.room ? this.roomsByCode.get(this.selection.room) : undefined;
     if (!room && this.pin) {
-      const [bx0, bz0, bx1, bz1] = ringsBounds(this.floorOutline(b, floor.i).flat());
-      this.flyTo(new Vector3(this.pin.at[0], y, -this.pin.at[1]), this.zoomToFit(bx1 - bx0, bz1 - bz0, 0.7) * 1.8, animate);
+      this.flyTo(new Vector3(this.pin.at[0], y, -this.pin.at[1]), floorZoom * 1.4, animate);
       return;
     }
     if (room && room.b === b.id && room.f === floor.i) {
       const [x0, z0, x1, z1] = ringsBounds([room.poly]);
       // Zoom in on the room but keep enough of the floor in view to stay oriented.
-      const [bx0, bz0, bx1, bz1] = ringsBounds(this.floorOutline(b, floor.i).flat());
       const roomZoom = this.zoomToFit(x1 - x0, z1 - z0, 0.42);
-      const floorZoom = this.zoomToFit(bx1 - bx0, bz1 - bz0, 0.7);
-      this.flyTo(new Vector3(room.c[0], y, -room.c[1]), Math.max(floorZoom, Math.min(roomZoom, floorZoom * 5)), animate);
+      this.flyTo(new Vector3(room.c[0], y, -room.c[1]), Math.max(floorZoom, Math.min(roomZoom, floorZoom * 3)), animate);
       return;
     }
-    const [x0, z0, x1, z1] = ringsBounds(this.floorOutline(b, floor.i).flat());
-    this.flyTo(new Vector3((x0 + x1) / 2, y, (z0 + z1) / 2), this.zoomToFit(x1 - x0, z1 - z0, 0.62), animate);
+    this.flyTo(centre, floorZoom, animate);
   }
 
   /** Shows a whole campus. `center` is [east, north] in metres. */
@@ -1255,10 +1368,16 @@ export class CampusScene {
    * What stands on the open floor: wall faces round the unnamed shapes, and how many of the rooms
    * that can be selected are walled rather than drawn as solid blocks. For tests.
    */
-  floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number } {
+  floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number; outerWalls: boolean; windowsBelow: boolean } {
     const walls = this.planObjects.find((o) => o.userData.role === "planWalls") as Mesh | undefined;
     const rooms = [...this.roomMeshes.values()];
+    const textured = (role: string) => {
+      const mesh = this.detailGroup.children.find((o) => o.userData.role === role) as Mesh | undefined;
+      return !!mesh && !!(mesh.material as MeshLambertMaterial[])[0]?.map;
+    };
     return {
+      outerWalls: textured("cut"),
+      windowsBelow: textured("below"),
       planWallFaces: walls ? (walls.geometry.index?.count ?? 0) / 6 : 0,
       rooms: rooms.length,
       // A walled room's floor is in the second group and lies below its walls' top.
@@ -1270,6 +1389,28 @@ export class CampusScene {
         return y < 0.5;
       }).length,
     };
+  }
+
+  /** The box the open floor's outline takes up on the page, in CSS pixels. For tests. */
+  openFloorBox(): { left: number; top: number; right: number; bottom: number } | undefined {
+    const cur = this.currentFloor();
+    if (!cur) return undefined;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const y = this.floorY(cur.b, cur.floor.i) + SLAB;
+    const box = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+    const v = new Vector3();
+    for (const [outer] of this.floorOutline(cur.b, cur.floor.i)) {
+      for (let i = 0; outer && i + 1 < outer.length; i += 2) {
+        v.set(outer[i]! / 10, y, -outer[i + 1]! / 10).project(this.camera);
+        const x = rect.left + (v.x * 0.5 + 0.5) * rect.width;
+        const yy = rect.top + (-v.y * 0.5 + 0.5) * rect.height;
+        box.left = Math.min(box.left, x);
+        box.right = Math.max(box.right, x);
+        box.top = Math.min(box.top, yy);
+        box.bottom = Math.max(box.bottom, yy);
+      }
+    }
+    return box;
   }
 
   /**

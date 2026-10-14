@@ -437,3 +437,21 @@ test("rooms on the open floor stand as walls on their outlines, the named ones r
   expect(params(page).get("room")).toBe("303-G20");
   await shot(page, "15-floor-walls");
 });
+
+test("an open building fills the screen beside the panels, keeps its windows below the cut and its outer walls on the open floor", async ({ page }) => {
+  await open(page, "?building=106&floor=M1&light=day");
+  const walls = await page.evaluate(() => window.__scene!.floorWalls());
+  expect(walls.outerWalls).toBe(true);
+  expect(walls.windowsBelow).toBe(true);
+
+  // The open floor takes up a good part of the width, and none of it is under the floor list.
+  const box = (await page.evaluate(() => window.__scene!.openFloorBox()))!;
+  const view = page.viewportSize()!;
+  expect(box.right - box.left).toBeGreaterThan(view.width * 0.45);
+  expect(box.top).toBeGreaterThan(0);
+  expect(box.bottom).toBeLessThan(view.height);
+  const list = (await page.locator(".floors").boundingBox())!;
+  expect(box.right).toBeLessThan(list.x);
+  await expectRealRender(page);
+  await shot(page, "16-building-facade");
+});

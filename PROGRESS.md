@@ -243,6 +243,10 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   label still rotates the map.
 - **Building view = cut-away:** floors above the selected one are hidden, floors below are a solid
   base, neighbours sink to footprints. The stack is lifted so the lowest floor sits on the ground.
+  Since 2026-10-14 (the user, after comparing floors with the Tsinghua World Model): the base keeps
+  the building's walls and windows, the open floor keeps its outer walls cut at the height of the
+  rooms, rooms stand as walls on their outlines, and the camera frames the open floor to fill the
+  screen beside the panels (`FLOOR_FILL` in `CampusScene.ts`).
 - **Timetable features are tested with a fixture served only inside Playwright**
   (`e2e/helpers.ts`, courses named "TESTFIX … (not a real course)"). Nothing synthetic is ever
   written to `public/data`; `tests/search-classes-data.test.ts` asserts the published schedule is
