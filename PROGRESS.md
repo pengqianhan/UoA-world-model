@@ -4,7 +4,7 @@ Handover notes for whoever (probably a future session of the same agent) picks t
 Read `AGENTS.md` first, then this file, then `git status` / `git log`. `GOAL.md`, the original brief,
 is local only; its rules now live in `AGENTS.md`.
 
-Last updated: 2026-10-13, evening NZDT
+Last updated: 2026-10-15 NZDT
 
 ## Now working on
 
@@ -31,16 +31,18 @@ that a fault in a source can be fixed without a hand edit to `public/data/`.
 `E2E_BASE_URL=https://campusworldmodel.com/uoa/ npm run e2e`, then take up an open issue, pick a bonus
 item below or, if the user has added a timetable snapshot, follow README "Adding the class timetable".
 
-Bonus ideas not done, in rough order of value:
+Every bonus idea listed on 2026-10-13 that has a public source was done on 2026-10-14 and 15, at the
+user's request (see "Data sources" and "Other sources"): types, signs and pinned outlines on the
+floor plans; the real sun, current weather and seasons; every campus in 3D; the course catalogue;
+the ground's heights. Ideas still open, none needing a new source:
 
-1. Terrain from open elevation tiles (large change: everything has to be draped over it).
-2. Course-level catalogue (titles for course codes). Checked 2026-10-13: the 2026 Calendar no longer
-   prints course prescriptions (its "Course codes by faculty" page points to the Curriculum
-   Catalogue), so the only source is the APEX app at `study.auckland.ac.nz`, whose lists are
-   lazy-loaded and whose course pages are about 240 KB each. Not worth thousands of requests while
-   there is no timetable to attach the courses to.
-3. Remote campuses in 3D (building data exists; no OSM context fetched for them).
-4. Seasons and weather effects in the scene.
+1. The sea: OpenStreetMap's coastline is a line, and turning it into water (with the land polygons
+   OpenStreetMap publishes for that, a new source) would put Leigh and Waiheke on their shores.
+2. The 1 m LiDAR DEM in place of the 8 m model (AWS `nz-elevation`, LINZ, CC BY 4.0): a new
+   dependency to read LERC-compressed GeoTIFFs, so a gate.
+3. A course's points, which the catalogue gives only on each course's own page (about 7,000
+   requests of 240 KB).
+4. Chinese or other translations of the interface (the structure is there; one locale file each).
 
 ## Final report (2026-10-13)
 

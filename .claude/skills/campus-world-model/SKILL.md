@@ -54,14 +54,16 @@ resume from `PROGRESS.md`, and delete it after the final report.
    Done when every field has a value.
 
 2. **Recon.** Follow [RECON.md](RECON.md).
-   Done when all five layers have a verdict in `PROGRESS.md`: a usable one names the requests that
+   Done when all six layers have a verdict in `PROGRESS.md`: a usable one names the requests that
    return its data, and any other is backed by every route RECON.md lists for that layer, each
-   recorded with its URL and what came back.
+   recorded with its URL and what came back. List every campus the indoor layer names, with where
+   its buildings stand: each one away from the main campus becomes an area of its own.
 
 3. **Pipeline.** Rebuild everything upstream of the contract along the data seams in
    [SEAMS.md](SEAMS.md): one fetch script per usable source, then `scripts/build-data.ts`.
    Done when `npm run data:fetch && npm run data:build` writes every file of the contract from the
-   new school's snapshots; with a usable timetable, every class meeting in the snapshot is a session
+   new school's snapshots (the central `context.json`, and `context/` and `terrain/` for every
+   area); with a usable timetable, every class meeting in the snapshot is a session
    with a precision or an exclusion with a reason, and the two counts add up to the meetings in the
    snapshot; `npm run typecheck && npm test` pass with every assertion that names an Auckland place
    or count rewritten from the new data (SEAMS.md, "Tests"); and the coverage block of
@@ -86,7 +88,8 @@ resume from `PROGRESS.md`, and delete it after the final report.
    place; re-point those the same way.
    Done when every test passes three ways: on the local build, in CI, and with
    `E2E_BASE_URL=<public URL> npm run e2e`; and you have opened the desktop and phone screenshots
-   taken from the public URL. A green run over a black canvas is a failure. Straight after a deploy
+   taken from the public URL, including a campus away from the centre and a winter and a summer
+   noon. A green run over a black canvas is a failure. Straight after a deploy
    the live run has twice failed a test or two on page-load timeouts and passed when run again; a
    test that fails twice is a failure.
 
