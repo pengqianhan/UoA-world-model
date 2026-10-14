@@ -67,3 +67,45 @@ describe("a parapet", () => {
     }
   });
 });
+
+describe("the ground storey of an extrusion", () => {
+  const wall = [0.96, 0.95, 0.93] as const;
+  const plinth = { top: 3.6, color: [0.86, 0.85, 0.83] as const };
+  /** Colour and height of every wall vertex: those whose normal is level. */
+  const wallVertices = (mb: MeshBuilder) => {
+    const out: { y: number; v: number; red: number }[] = [];
+    for (let i = 0; i < mb.vertexCount; i++) {
+      if (mb.normals[i * 3 + 1] !== 0) continue;
+      out.push({ y: mb.positions[i * 3 + 1]!, v: mb.uvs[i * 2 + 1]!, red: mb.colors[i * 3]! });
+    }
+    return out;
+  };
+
+  it("is tinted apart from the storeys above it, with the storeys still counted from the ground", () => {
+    const mb = new MeshBuilder(true, true);
+    mb.extrude([square], 0, 10.8, undefined, wall, true, { storey: 3.6, bay: 3.2, plinth });
+    const vs = wallVertices(mb);
+    // Four walls, each in two bands of four vertices.
+    expect(vs.length).toBe(4 * 2 * 4);
+    for (const { y, v, red } of vs) {
+      expect(v).toBeCloseTo(y / 3.6, 6);
+      if (y < 3.6 - 1e-6) expect(red).toBeCloseTo(0.86, 6);
+      if (y > 3.6 + 1e-6) expect(red).toBeCloseTo(0.96, 6);
+    }
+    expect(vs.filter((p) => Math.abs(p.y - 3.6) < 1e-6).map((p) => p.red).sort()).toEqual([...Array(8).fill(0.86), ...Array(8).fill(0.96)].map((n) => expect.closeTo(n, 6)));
+  });
+  it("covers a block that is no taller than the ground storey", () => {
+    const mb = new MeshBuilder(true, true);
+    mb.extrude([square], 0, 3.6, undefined, wall, true, { storey: 3.6, plinth });
+    const vs = wallVertices(mb);
+    expect(vs.length).toBe(4 * 4);
+    for (const { red } of vs) expect(red).toBeCloseTo(0.86, 6);
+  });
+  it("leaves a block that starts above it alone", () => {
+    const mb = new MeshBuilder(true, true);
+    mb.extrude([square], 3.6, 7.2, undefined, wall, true, { storey: 3.6, plinth });
+    const vs = wallVertices(mb);
+    expect(vs.length).toBe(4 * 4);
+    for (const { red } of vs) expect(red).toBeCloseTo(0.96, 6);
+  });
+});

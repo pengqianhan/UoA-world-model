@@ -17,7 +17,6 @@ import {
   Matrix4,
   Mesh,
   MeshLambertMaterial,
-  NearestFilter,
   Object3D,
   OrthographicCamera,
   PCFShadowMap,
@@ -88,6 +87,8 @@ const WALL_TINT = [0.96, 0.95, 0.93] as const;
 /** Metres. A parapet round every roof that stands in the open: drawn by rule, like the windows. */
 const RIM_HEIGHT = 0.9;
 const RIM_TINT = [1.03, 1.03, 1.02] as const;
+/** The ground storey is a tone darker than the storeys above it, as a base for the building to stand on. */
+const PLINTH_TINT = [0.86, 0.85, 0.83] as const;
 /** The unnamed shapes of a floor plan stand lower than the rooms that can be selected. */
 const PLAN_HEIGHT = 0.45;
 const ROOM_HEIGHT_SELECTED = 3.0;
@@ -220,7 +221,7 @@ export class CampusScene {
     this.ground.receiveShadow = true;
     this.scene.add(this.ground, this.contextGroup, this.uniGroup, this.detailGroup, this.pinGroup);
 
-    this.wallTexture = this.makeWindowTexture("#ffffff", "#c2bbab");
+    this.wallTexture = this.makeWindowTexture("#ffffff", "#93a3ab", { slab: "#ddd6c8", lintel: "#7d8d96", sill: "#e9e3d6" });
     this.glowTexture = this.makeWindowTexture("#000000", "#ffffff");
     this.applyPalette();
 
@@ -260,7 +261,13 @@ export class CampusScene {
       const mb = new MeshBuilder(true, true);
       const blocks = massing(b, campus.floorHeight);
       for (const block of blocks) {
-        const wall = { storey: campus.floorHeight, bay: WINDOW_BAY, bottom: block.y0 > 0, roofGroup: true };
+        const wall = {
+          storey: campus.floorHeight,
+          bay: WINDOW_BAY,
+          bottom: block.y0 > 0,
+          roofGroup: true,
+          plinth: block.y0 === 0 ? { top: campus.floorHeight, color: PLINTH_TINT } : undefined,
+        };
         for (const poly of block.outline) mb.extrude(poly, block.y0, block.y1, ROOF_TINT, WALL_TINT, true, wall);
       }
       // The creases of the blocks themselves, before the parapets go on: a parapet has no
@@ -417,25 +424,40 @@ export class CampusScene {
   }
 
   /**
-   * One window bay of one storey, repeated over University building walls: `base` with a `pane`
-   * where the window is. Used once for the daytime wall colour and once as the night glow. The
-   * windows are drawn by rule; nothing about a real facade is known.
+   * One window bay of one storey, repeated over University building walls: `base` with a window
+   * of two lights in `pane`. With `trim` the storey also gets the edge of its floor slab along
+   * the top, a shadow under the lintel and a sill; without, only the panes show, which is the
+   * night glow. The tile is smoothed with distance, so that far walls take an even tone where
+   * sharp pixels would shimmer. The windows are drawn by rule; nothing about a real facade is known.
    */
-  private makeWindowTexture(base: string, pane: string): CanvasTexture {
+  private makeWindowTexture(base: string, pane: string, trim?: { slab: string; lintel: string; sill: string }): CanvasTexture {
+    const size = 128;
     const c = document.createElement("canvas");
-    c.width = 32;
-    c.height = 32;
+    c.width = size;
+    c.height = size;
     const g = c.getContext("2d")!;
     g.fillStyle = base;
-    g.fillRect(0, 0, 32, 32);
+    g.fillRect(0, 0, size, size);
+    // The canvas is drawn top down: its first rows are the top of the storey.
+    const [x0, x1, y0, y1] = [18, 110, 30, 84];
     g.fillStyle = pane;
-    g.fillRect(7, 9, 18, 13);
+    g.fillRect(x0, y0, x1 - x0, y1 - y0);
+    if (trim) {
+      g.fillStyle = trim.slab;
+      g.fillRect(0, 0, size, 6);
+      g.fillStyle = trim.lintel;
+      g.fillRect(x0, y0, x1 - x0, 7);
+      g.fillStyle = trim.sill;
+      g.fillRect(x0 - 4, y1, x1 - x0 + 8, 5);
+    }
+    // The mullion between the two lights.
+    g.fillStyle = base;
+    g.fillRect(size / 2 - 3, y0, 6, y1 - y0);
     const tex = new CanvasTexture(c);
     tex.wrapS = RepeatWrapping;
     tex.wrapT = RepeatWrapping;
-    tex.magFilter = NearestFilter;
     tex.colorSpace = SRGBColorSpace;
-    tex.anisotropy = 4;
+    tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     return tex;
   }
 
