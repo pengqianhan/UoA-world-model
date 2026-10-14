@@ -4,7 +4,7 @@ Handover notes for whoever (probably a future session of the same agent) picks t
 Read `AGENTS.md` first, then this file, then `git status` / `git log`. `GOAL.md`, the original brief,
 is local only; its rules now live in `AGENTS.md`.
 
-Last updated: 2026-10-13, evening NZDT
+Last updated: 2026-10-15 NZDT
 
 ## Now working on
 
@@ -31,16 +31,16 @@ that a fault in a source can be fixed without a hand edit to `public/data/`.
 `E2E_BASE_URL=https://campusworldmodel.com/uoa/ npm run e2e`, then take up an open issue, pick a bonus
 item below or, if the user has added a timetable snapshot, follow README "Adding the class timetable".
 
-Bonus ideas not done, in rough order of value:
+Every bonus idea listed on 2026-10-13 that has a public source was done on 2026-10-14 and 15, at the
+user's request (see "Data sources" and "Other sources"): types, signs and pinned outlines on the
+floor plans; the real sun, current weather and seasons; every campus in 3D; the ground's heights.
+The course catalogue was built too and is held back (see "Other sources"). Ideas still open:
 
-1. Terrain from open elevation tiles (large change: everything has to be draped over it).
-2. Course-level catalogue (titles for course codes). Checked 2026-10-13: the 2026 Calendar no longer
-   prints course prescriptions (its "Course codes by faculty" page points to the Curriculum
-   Catalogue), so the only source is the APEX app at `study.auckland.ac.nz`, whose lists are
-   lazy-loaded and whose course pages are about 240 KB each. Not worth thousands of requests while
-   there is no timetable to attach the courses to.
-3. Remote campuses in 3D (building data exists; no OSM context fetched for them).
-4. Seasons and weather effects in the scene.
+1. The sea: OpenStreetMap's coastline is a line, and turning it into water (with the land polygons
+   OpenStreetMap publishes for that, a new source) would put Leigh and Waiheke on their shores.
+2. The 1 m LiDAR DEM in place of the 8 m model (AWS `nz-elevation`, LINZ, CC BY 4.0): a new
+   dependency to read LERC-compressed GeoTIFFs, so a gate.
+3. Chinese or other translations of the interface (the structure is there; one locale file each).
 
 ## Final report (2026-10-13)
 
@@ -244,8 +244,17 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   Queen Street 9 m (the smooth contour model puts a ramp over reclaimed land), Mt Eden 188 m against
   196 m. The 1 m LiDAR DEM is also open (AWS `nz-elevation`, LINZ, CC BY 4.0) but as LERC-compressed
   Cloud Optimised GeoTIFFs, which would need a new dependency (a gate).
-- Not done: course-level catalogue (the Curriculum Catalogue's lists are lazy-loaded APEX regions;
-  many requests for little value while there is no timetable).
+- Course catalogue: built and held back (the user, 2026-10-15). The Curriculum Catalogue
+  (`study.auckland.ac.nz`, Oracle APEX, public, no sign-in) gives all 6,982 courses of 2026 with
+  their terms and campuses in 29 requests inside one session, and no class times or rooms. Pull
+  request #24 holds the fetch script, `courses.json` and its search. The user keeps it out of `main`
+  until the Classes API key arrives, so that what each source supplies is settled once with both
+  in hand: the timetable should bring the courses that have classes in the terms fetched, and the
+  catalogue the rest (other terms, theses, research and online courses). The porting skill's text
+  about it is in commit `0efea52`, on the closed pull request #26.
+  The research for it, by a sub-agent on 2026-10-15, let a headless browser send up to six
+  requests in one second to `study.auckland.ac.nz` and about 22 to third-party analytics before it
+  blocked them. Exploration of a site goes through the same pacing as fetching (RECON.md).
 
 ## Decisions (and why) — do not re-litigate without new information
 
@@ -356,4 +365,5 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
    approved by the owning team. The API document names Student Recruitment
    (`student-recruitment@list.auckland.ac.nz`) as the contact. Ask them, and say that the class
    times will be republished on a public site. With a key, follow the README section "Adding the
-   class timetable" (`UOA_API_KEY`).
+   class timetable" (`UOA_API_KEY`), and take up pull request #24, the course catalogue, at the same
+   time (see "Other sources").

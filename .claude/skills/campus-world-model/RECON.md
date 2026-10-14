@@ -20,15 +20,22 @@ A layer whose verdict is not "usable" ships absent. Every route tried gets a row
 host, read its `robots.txt` and its terms page. Before fetching in bulk, count the requests it will
 take.
 
+Looking at a site counts as fetching from it. A headless browser loads a page's scripts, its
+analytics and its service worker in a burst: on 2026-10-15 one exploration sent six requests in a
+second to the catalogue host and about twenty to third-party analytics before they were blocked.
+Queue the browser's requests through the same one-a-second pacing, allow only the hosts you are
+studying, block service workers, and log every request.
+
 ## Layers
 
 ### 1. Footprints and surroundings
 
-OpenStreetMap through Overpass: `scripts/fetch-osm.ts` with the new bounding box. Usable everywhere
-under ODbL, with attribution in About. The one query also brings building parts and roof shapes,
-which the pipeline draws for the city around the campus. Note what the campus buildings carry
-(`name`, `ref`, `building:levels`, `height`): they are the fallback for building names and heights
-when the indoor layer is thin.
+OpenStreetMap through Overpass: `scripts/fetch-osm.ts` with the areas in `scripts/lib/areas.ts`, one
+query each. Usable everywhere under ODbL, with attribution in About. The query also brings building
+parts, roof shapes and trees, which the pipeline draws for the city around the campus. Note what
+the campus buildings carry (`name`, `ref`, `building:levels`, `height`): they are the fallback for
+building names and heights when the indoor layer is thin. A campus far from the main one gets an
+area of its own: list every campus the indoor layer names and where its buildings stand.
 
 ### 2. Indoor: buildings, floors, rooms
 
@@ -83,6 +90,28 @@ for the current and the next year. Snapshot it, then transcribe it by hand into
 A public list of subject or course codes with names, usually in the calendar or the course catalogue.
 It lets search recognise a course code while the timetable is absent.
 
+1. **Subject codes** from the calendar or a faculty page.
+2. **The course catalogue**: every course's code and title, with the terms and campuses it is offered
+   in. Catalogue apps often load their lists after the page (Oracle APEX, Coursedog, Kuali, Acalog,
+   CourseLeaf): the plain HTML is empty. Watch the page's own requests in a paced browser, then replay
+   them with plain HTTP. One request for the whole list beats one per course: Auckland's APEX app
+   takes the number of rows to return from the request, so one POST inside a session returned all
+   6,982 courses, and a filter on term or campus is a value in the same POST. If a fact such as
+   points is only on each course's own page, count those requests and leave the fact out unless it
+   is worth them. Keep facts (code, title, terms, campuses), not descriptions: those are prose, and
+   a university's terms usually limit its text to private study. A usable timetable names its
+   courses too: where one is coming, compare the two lists before building on the catalogue.
+
+### 6. Ground heights
+
+The AWS Open Data Terrain Tiles cover the world with no key: `scripts/fetch-terrain.ts`. Fetch one
+tile over the campus and read its `x-amz-meta-x-imagery-sources` header: it names the national
+model the tile was built from, and Tilezen's "joerd" attribution document gives that model's
+licence and required credit. Check the tile against two known heights, a hilltop and a waterfront,
+and look for single-pixel pits where land meets sea. A national LiDAR model may be open too, but
+in a format (Cloud Optimised GeoTIFF, LERC) that needs a new dependency: record it as the way up,
+not the first step.
+
 ## When the person offers their own login
 
 This branch opens only at the person's request, with them present. They sign in in their own
@@ -95,11 +124,13 @@ is republished only with the owner's permission, which the person asks for.
 
 | Layer | Verdict | What decided it |
 | --- | --- | --- |
-| Footprints | usable | One Overpass query, 9 MB |
+| Footprints | usable | One Overpass query per area, seven in all: 9 MB for the centre, 0.1-1.4 MB for each campus away from it |
 | Indoor | usable | The campus map is a MapsIndoors app; four anonymous requests return 209 buildings with per-floor outlines and 26,521 rooms with code, floor, type and polygon |
 | Timetable | needs the user | Official API answers 401 and its key needs approval by the owning team; the legacy API of 2018 drops connections; the guest class search is retired; the student system redirects to login |
 | Calendar | usable | Key-dates PDF, transcribed by hand |
-| Subjects | usable | 251 codes from the calendar's "course codes by faculty" page |
+| Subjects and courses | usable | 251 subject codes from the calendar's "course codes by faculty" page. The Curriculum Catalogue (Oracle APEX, robots.txt 404) gives 6,982 courses with terms and campuses in 29 requests inside one session; held back until the timetable's own course list can be compared with it |
+| Ground heights | usable | AWS Terrain Tiles hold the LINZ 8 m DEM (CC BY 3.0 NZ); 29 tiles at zoom 14; the 1 m LiDAR model is open as LERC GeoTIFFs and was left for later |
+| Weather | usable | Open-Meteo, fetched by the visitor's browser, no key |
 
 The site shipped with buildings, floors and rooms and no class times, and says so in the room card,
 the status strip, Search and About.
