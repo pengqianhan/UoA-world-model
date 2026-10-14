@@ -43,6 +43,8 @@ import type {
   RoomKind,
   Schedule,
   SourceInfo,
+  SpaceKind,
+  SpaceType,
   Subject,
 } from "../src/shared/types.ts";
 import { buildSchedule, loadClassSnapshots } from "./lib/classes.ts";
@@ -168,6 +170,44 @@ const PLAN_RESIDENTIAL_TYPES = new Set(["Stud Residential Accom"]);
 const PLAN_CHILDCARE_BUILDINGS = /Early Childhood|K[oō]hanga Reo/i;
 /** Shapes that are not rooms: single parking bays and the source's own test records. */
 const PLAN_SKIPPED_TYPES = new Set(["Parking For Vehicles", "Void 2.0 test"]);
+/**
+ * The group each source type of a floor-plan shape is drawn in. A type not listed here, such as
+ * "Non Usable Area", "Ancillary Area" or "Nonasgn Rentable", is "other": the source does not say
+ * what it holds. A learning type lands here when the source hides the room from its search or
+ * gives it no standard code, so it is not named.
+ */
+const SPACE_KINDS: Record<string, SpaceKind> = {
+  ...Object.fromEntries(Object.keys(LEARNING_TYPES).map((t) => [t, "learning"])),
+  "Office Accommodation": "office",
+  "Lab-Research": "lab",
+  "Lab-Postgrad": "lab",
+  "Lab-Circulation spaces": "lab",
+  "Lab-Music": "lab",
+  "Lab-Media": "lab",
+  Female: "toilet",
+  Male: "toilet",
+  Unisex: "toilet",
+  Accessible: "toilet",
+  "Gender Diverse": "toilet",
+  Squat: "toilet",
+  Shower: "toilet",
+  Stairs: "stairs",
+  Elevator: "stairs",
+  "Cafes and Restaurants": "amenity",
+  Bars: "amenity",
+  Groceries: "amenity",
+  Pharmacy: "amenity",
+  Post: "amenity",
+  Kitchen: "amenity",
+  Gyms: "amenity",
+  "Health and counselling": "amenity",
+  "Disability services": "amenity",
+  "Information Serv": "amenity",
+  "Parent Space": "amenity",
+  "Accommodation Reception": "amenity",
+  Emergency: "amenity",
+  "Bike Store": "amenity",
+};
 /**
  * A floor on which the campus map's shapes, of every kind, cover less of the floor than this is
  * marked as partly drawn. In the snapshot of 2026-10-13 such floors hold stairs, lifts, toilets and
@@ -380,8 +420,9 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
   const roomList = [...rooms.values()].sort((a, z) => a.code.localeCompare(z.code, "en", { numeric: true }));
   for (const r of roomList) byId.get(r.b)!.roomCount++;
 
-  // Floor plans: whatever else the map draws on a floor, as bare shapes. Unlike the rooms above,
-  // these need no code and may be hidden from the source's search, because nothing names them.
+  // Floor plans: whatever else the map draws on a floor, as shapes with the map's type for each.
+  // Unlike the rooms above, these need no code and may be hidden from the source's search,
+  // because nothing names them.
   for (const b of buildings) {
     if (PLAN_CHILDCARE_BUILDINGS.test(b.sourceText)) for (const f of b.floors) f.noPlan = "childcare";
   }
@@ -403,7 +444,7 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
   }
   const namedOn = new Map<string, Pt[]>();
   for (const r of roomList) namedOn.set(`${r.b}|${r.f}`, [...(namedOn.get(`${r.b}|${r.f}`) ?? []), r.c]);
-  const shapes = new Map<string, Map<number, { rings: Ring[]; area: number }[]>>();
+  const shapes = new Map<string, Map<number, { rings: Ring[]; area: number; type: string }[]>>();
   for (const { building, floor, loc } of placed) {
     if (floor.noPlan) {
       bump(`plans.skipped.${floor.noPlan}Floor`);
@@ -429,18 +470,31 @@ function buildCampus(): { data: CampusData; index: RoomIndex; plans: FloorPlans[
     if (!floors) shapes.set(building.id, (floors = new Map()));
     let list = floors.get(floor.i);
     if (!list) floors.set(floor.i, (list = []));
-    list.push({ rings: poly, area: ringArea(poly[0]!) });
+    const type = loc.properties.type.trim();
+    list.push({ rings: poly, area: ringArea(poly[0]!), type });
     if (loc.properties.status !== 3) bump("plans.shapes.hiddenFromSourceSearch");
+    bump(`plans.shapes.kind.${SPACE_KINDS[type] ?? "other"}`);
   }
   const plans: FloorPlans[] = [];
   for (const b of buildings) {
     const floors = shapes.get(b.id);
     if (!floors) continue;
-    const plan: FloorPlans = { version: 1, building: b.id, floors: {} };
+    const plan: FloorPlans = { version: 2, building: b.id, types: [], floors: {}, typeOf: {} };
+    const typeIndex = new Map<string, number>();
+    const typeOf = (text: string): number => {
+      let k = typeIndex.get(text);
+      if (k === undefined) {
+        k = plan.types.push({ text, kind: SPACE_KINDS[text] ?? "other" } satisfies SpaceType) - 1;
+        typeIndex.set(text, k);
+      }
+      return k;
+    };
     b.planShapes = 0;
     for (const [i, list] of [...floors].sort((a, z) => a[0] - z[0])) {
       // Largest first, so a room inside an open area is drawn after the area around it.
-      plan.floors[i] = list.sort((a, z) => z.area - a.area).map((s) => s.rings.map(encodeRing));
+      list.sort((a, z) => z.area - a.area);
+      plan.floors[i] = list.map((s) => s.rings.map(encodeRing));
+      plan.typeOf[i] = list.map((s) => typeOf(s.type));
       b.planShapes += list.length;
       bump("plans.floors");
     }

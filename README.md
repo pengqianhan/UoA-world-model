@@ -31,7 +31,9 @@ It is built to answer two questions a student actually has:
   house gables to the Sky Tower.
 - A cut-away view of every building: pick a floor, see its learning spaces (lecture theatres, teaching
   rooms, labs, studios, study spaces) drawn from the outlines on the official campus map, set in the
-  rest of the floor plan: 14,508 other spaces as plain shapes without names.
+  rest of the floor plan: 14,508 other spaces without names, each tinted by its type on the campus
+  map (office, other lab, toilet, stairs or lift, service) and showing that type when pointed at or
+  tapped.
 - Search over 786 learning spaces, 4,668 further rooms (located as a point), 194 buildings and 251
   subject codes. Māori names match with or without macrons (`Maori` finds `Māori`).
 - "Now" (Auckland time, daylight saving included) and "Preview" (any day and time), with the academic
@@ -190,9 +192,10 @@ e2e/                browser tests (Playwright), numbered after the acceptance cr
 ```
 
 Accuracy is labelled wherever it matters. A room drawn with an outline comes from the campus map. A
-room shown as a pin is known to the campus map by its code; the pin stands on the plain shape that
-the floor plan draws for it. Plain shapes carry no code, name or type. A room that the
-map does not know is placed on a floor inferred from its number and marked as inferred. A building's
+room shown as a pin is known to the campus map by its code; the pin stands on the shape that the
+floor plan draws for it. The shapes carry the campus map's type for each, in its own words, and no
+code or name. A room that the map does not know is placed on a floor inferred from its number and
+marked as inferred. A building's
 shape comes from the campus map's outline of each floor, with floors that are alike within a
 twentieth of their area drawn as one block; its height is an estimate of 3.6 m a floor, and its
 windows and roof rims are drawn by rule.
@@ -201,7 +204,7 @@ windows and roof rims are drawn by rule.
 
 | Source | Used for | Terms |
 | --- | --- | --- |
-| [University of Auckland campus maps](https://maps.auckland.ac.nz/) (the public map, served by MapsIndoors) | Buildings, floors, room codes, room types and positions | © University of Auckland. Only derived facts are published here: learning spaces with their names and simplified outlines; other searchable rooms as a code, floor and point; every other space as a simplified outline with no code, name or type. Floors with student accommodation, childcare centres and single parking bays are left out, and a room the map marks as not searchable is never named. |
+| [University of Auckland campus maps](https://maps.auckland.ac.nz/) (the public map, served by MapsIndoors) | Buildings, floors, room codes, room types and positions | © University of Auckland. Only derived facts are published here: learning spaces with their names and simplified outlines; other searchable rooms as a code, floor and point; every other space as a simplified outline with the map's type for it and no code or name. Floors with student accommodation, childcare centres and single parking bays are left out, and a room the map marks as not searchable is never named. |
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) via the Overpass API | Surrounding buildings, streets, paths, parks, trees | © OpenStreetMap contributors, [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The snapshot in `data/raw/osm/` and the derived `public/data/context.json` are under the same licence. |
 | [University of Auckland Calendar 2026](https://www.auckland.ac.nz/en/about-us/about-the-university/the-university/official-publications/university-calendar/current-calendar.html) | Semester dates, breaks, holidays; list of subject codes | © University of Auckland. Dates and codes are quoted as facts with a link to the source. |
 | [Open-Meteo](https://open-meteo.com/) | Current temperature in Auckland, fetched by the visitor's browser | [CC BY 4.0](https://open-meteo.com/en/licence) |
@@ -218,9 +221,10 @@ If you represent the University and would like something changed or removed, ple
 - A timetabled class is not the same as an occupied room.
 - Heights are estimated, windows are drawn by rule, and the ground is flat, although the City Campus
   sits on a ridge.
-- Only learning spaces are named and can be selected. The rest of a floor is plain shapes, floors
-  where people live and childcare centres are blank, and the furniture in a selected room is
-  illustrative.
+- Only learning spaces are named and can be selected. The rest of a floor is shapes that show the
+  campus map's type and nothing more; where the map's type says nothing ("Non Usable Area",
+  "Nonasgn Rentable" and the like) the site says "Other area". Floors where people live and
+  childcare centres are blank, and the furniture in a selected room is illustrative.
 - The campus map itself draws nothing on 96 floors of the 3D map (most of them in halls of
   residence) and only a few spaces on 34 more. The floor list marks both and the building bar says
   so.

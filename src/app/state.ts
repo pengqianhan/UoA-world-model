@@ -7,7 +7,7 @@ import { nightAmount } from "../shared/daylight.ts";
 import { codeKey, inferFloor, parseRoomCode } from "../shared/roomcode.ts";
 import { sessionsAt } from "../shared/schedule.ts";
 import { aucklandWallTime, formatMinutes, isoWeekday, parseIsoDate, parseTimeOfDay, type WallTime } from "../shared/time.ts";
-import type { Building, Session } from "../shared/types.ts";
+import type { Building, FloorPlans, Session, SpaceType } from "../shared/types.ts";
 import { findIndexedRoom, loadRoomIndex, type AppData } from "./data.ts";
 import { DEFAULT_LANG, lang, languages, setLang } from "./i18n.ts";
 
@@ -33,6 +33,10 @@ export const selBuilding = signal<string | undefined>(undefined);
 export const selFloor = signal<number | undefined>(undefined);
 export const selRoom = signal<string | undefined>(undefined);
 export const marker = signal<Marker | undefined>(undefined);
+/** The floor plans of the buildings opened so far, as they arrive. */
+export const plansLoaded = signal<ReadonlyMap<string, FloorPlans>>(new Map());
+/** An unnamed space on the open floor under the pointer, or tapped, and where on the page. */
+export const spaceTip = signal<{ type: SpaceType; x: number; y: number } | undefined>(undefined);
 /** Bumped to ask the scene to re-frame the current selection or campus. */
 export const frameRequest = signal(0);
 

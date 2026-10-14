@@ -69,6 +69,23 @@ test("6. phone: search for a room and see the building and class information", a
   await shot(page, "06-mobile-about");
 });
 
+test("phone: a tap on an unnamed space says its type on the campus map, inside the screen, and selects nothing", async ({ page }) => {
+  await open(page, "?building=405&floor=8&light=day");
+  const pt = (await page.evaluate(() => window.__scene!.planPoint()))!;
+  const type = (await page.evaluate(({ x, y }) => window.__scene!.spaceAt(x, y), pt))!;
+  await page.touchscreen.tap(pt.x, pt.y);
+  const tip = page.locator("#space-tip");
+  await expect(tip).toContainText(`Campus map type: ${type.text}`);
+  await expect(tip).toBeInViewport({ ratio: 1 });
+  expect(params(page).get("room")).toBeNull();
+  expect(params(page).get("building")).toBe("405");
+  await shot(page, "06-mobile-space");
+  // Another floor takes the tip away with the shapes.
+  await page.locator('.floor[data-floor="7"]').tap();
+  await settle(page);
+  await expect(tip).toHaveCount(0);
+});
+
 test("phone: the top bar holds the site name, the source link, About, Search and the time side by side, down to a 360 px screen", async ({ page }) => {
   for (const width of [390, 360]) {
     await page.setViewportSize({ width, height: 780 });

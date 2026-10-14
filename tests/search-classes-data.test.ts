@@ -163,16 +163,38 @@ describe("published floor plans", () => {
     expect(total).toBe(read<Meta>("meta.json").coverage.planShapes);
     expect(total).toBeGreaterThan(10_000);
   });
-  it("carry shapes and nothing that names them: no code, no name, no type", () => {
+  it("carry shapes with the campus map's type for each, and nothing that names them: no code, no name", () => {
+    const kinds = new Set(["office", "lab", "learning", "toilet", "stairs", "amenity", "other"]);
+    const seen = new Map<string, string>();
     for (const plan of plans) {
-      expect(Object.keys(plan).sort(), plan.building).toEqual(["building", "floors", "version"]);
-      for (const shapes of Object.values(plan.floors)) {
+      expect(Object.keys(plan).sort(), plan.building).toEqual(["building", "floors", "typeOf", "types", "version"]);
+      expect(plan.version).toBe(2);
+      for (const type of plan.types) {
+        expect(Object.keys(type).sort(), plan.building).toEqual(["kind", "text"]);
+        expect(type.text.length, plan.building).toBeGreaterThan(0);
+        expect(kinds.has(type.kind), type.kind).toBe(true);
+        // A type is a type, never a room code, and it means one group everywhere.
+        expect(type.text, plan.building).not.toMatch(/\d{3}[A-Z]?-/);
+        expect(seen.get(type.text) ?? type.kind, type.text).toBe(type.kind);
+        seen.set(type.text, type.kind);
+        // Where people live is never drawn, so it is never a type.
+        expect(type.text, plan.building).not.toBe("Stud Residential Accom");
+      }
+      expect(Object.keys(plan.typeOf).sort(), plan.building).toEqual(Object.keys(plan.floors).sort());
+      for (const [i, shapes] of Object.entries(plan.floors)) {
+        expect(plan.typeOf[i]!.length, `${plan.building} floor ${i}`).toBe(shapes.length);
+        for (const k of plan.typeOf[i]!) expect(plan.types[k], `${plan.building} floor ${i}`).toBeDefined();
         for (const rings of shapes) {
           expect(rings[0]!.length, plan.building).toBeGreaterThanOrEqual(6);
           for (const ring of rings) expect(ring.every(Number.isInteger), plan.building).toBe(true);
         }
       }
     }
+    // The groups that tell a floor apart are all there.
+    for (const k of ["office", "lab", "toilet", "stairs", "amenity", "other"]) expect([...seen.values()], k).toContain(k);
+    expect(seen.get("Office Accommodation")).toBe("office");
+    expect(seen.get("Stairs")).toBe("stairs");
+    expect(seen.get("Female")).toBe("toilet");
   });
   it("leave every floor where people live, and every childcare centre, blank", () => {
     const blank = campus.buildings.flatMap((b) => b.floors.filter((f) => f.noPlan).map((f) => [b.id, f.i, f.noPlan] as const));

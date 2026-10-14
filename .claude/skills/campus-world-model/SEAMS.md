@@ -30,11 +30,14 @@ neighbouring floors share 99% or more. Print the same counts for the new source 
 `src/shared/geo.ts`) and put the value in the gap between walls traced twice and real setbacks. A
 floor outline that misses its own building is replaced by the footprint
 (`MIN_FOOTPRINT_SHARE`): this catches a source's slips and carries over unchanged. Every space that
-is not a named room becomes a bare shape in `public/data/plans/<building>.json`. Which floors stay
-blank is spelled in Auckland's words: `PLAN_RESIDENTIAL_TYPES` holds the room types that mean someone
-lives there, `PLAN_CHILDCARE_BUILDINGS` is a pattern on building names because the source has no
-type for childcare, and `PLAN_SKIPPED_TYPES` holds shapes that are not rooms. List the new source's
-room types with their counts, and its building names, and find its words for each of the three.
+is not a named room becomes a shape in `public/data/plans/<building>.json`, with the source's type
+for it and no code or name. Which floors stay blank is spelled in Auckland's words:
+`PLAN_RESIDENTIAL_TYPES` holds the room types that mean someone lives there,
+`PLAN_CHILDCARE_BUILDINGS` is a pattern on building names because the source has no type for
+childcare, and `PLAN_SKIPPED_TYPES` holds shapes that are not rooms. `SPACE_KINDS` sorts the other
+types into the groups that tint a shape's floor (office, other lab, toilet, stairs or lift, service);
+a type it does not list is "other". List the new source's room types with their counts, and its
+building names, and find its words for each of the four.
 
 **Surroundings.** `buildContext` draws what the OpenStreetMap snapshot holds: building parts with
 their heights, six roof shapes, and a tower at its full height when it is mapped in parts. It

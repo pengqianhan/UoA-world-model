@@ -11,6 +11,7 @@ import {
   openFloor,
   openRoom,
   panel,
+  plansLoaded,
   selBuilding,
   selFloor,
   selRoom,
@@ -19,9 +20,12 @@ import {
 } from "../app/state.ts";
 import { sessionsOnDate } from "../shared/schedule.ts";
 import { formatMinutes } from "../shared/time.ts";
-import type { Building, Floor, Session } from "../shared/types.ts";
+import type { Building, Floor, Session, SpaceKind } from "../shared/types.ts";
 import { buildingTitle, campusName, componentName, sessionTimes } from "./common.tsx";
 import { notTeachingReason } from "./TimePanel.tsx";
+
+/** The groups of unnamed spaces, in the order the legend lists them. */
+const SPACE_KINDS: SpaceKind[] = ["office", "lab", "learning", "amenity", "toilet", "stairs", "other"];
 
 function FloorList({ d, b }: { d: AppData; b: Building }) {
   const rooms = d.roomsByBuilding.get(b.id) ?? [];
@@ -195,6 +199,9 @@ export function BuildingView() {
   const floor = b.floors.find((f) => f.i === selFloor.value);
   const hasPlan = !!b.planShapes && !b.offMap;
   const kinds = [...new Set(rooms.map((r) => r.kind))];
+  const plan = hasPlan ? plansLoaded.value.get(b.id) : undefined;
+  const typeOf = plan && floor ? (plan.typeOf[floor.i] ?? []) : [];
+  const spaceKinds = SPACE_KINDS.filter((k) => typeOf.some((i) => plan!.types[i]?.kind === k));
 
   return (
     <>
@@ -237,7 +244,7 @@ export function BuildingView() {
           ) : (
             <p class="bar-note">{t("building.noRooms")}</p>
           )}
-          {(kinds.length > 0 || hasPlan) && (
+          {kinds.length > 0 && (
             <ul class="legend" aria-label={t("building.legend")}>
               {kinds.map((k) => (
                 <li>
@@ -245,12 +252,17 @@ export function BuildingView() {
                   {t(`room.kind.${k}`)}
                 </li>
               ))}
-              {hasPlan && (
-                <li id="legend-plan">
-                  <span class="kind-dot kind-plan" aria-hidden="true" />
-                  {t("building.legendPlan")}
+            </ul>
+          )}
+          {spaceKinds.length > 0 && (
+            <ul class="legend legend-spaces" id="legend-spaces" aria-label={t("building.legendSpaces")}>
+              <li class="legend-title">{t("building.legendSpaces")}</li>
+              {spaceKinds.map((k) => (
+                <li data-kind={k}>
+                  <span class={`kind-dot space-${k}`} aria-hidden="true" />
+                  {t(`space.kind.${k}`)}
                 </li>
-              )}
+              ))}
             </ul>
           )}
           {rooms.length > 0 && onFloor.length === 0 && !marker.value && <p class="bar-note">{t("building.noRoomsOnFloor")}</p>}

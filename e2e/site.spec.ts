@@ -394,20 +394,42 @@ test("a floor whose outline the campus map puts under another building is drawn 
   await shot(page, "11-floor-outline-footprint");
 });
 
-test("the rest of a floor is drawn as unnamed shapes that cannot be selected, and floors where people live or children are cared for stay blank", async ({ page }) => {
+test("the rest of a floor is drawn as unnamed shapes that carry the campus map's type and cannot be selected, and floors where people live or children are cared for stay blank", async ({ page }) => {
   await open(page, "?building=405&floor=4&light=day");
   expect(await page.evaluate(() => window.__scene!.planShapes)).toBeGreaterThan(30);
-  await expect(page.locator("#legend-plan")).toContainText("not named here");
+  await expect(page.locator("#legend-spaces")).toContainText("by their type on the campus map");
   await expectRealRender(page);
   await shot(page, "12-floor-plan");
 
-  // A click on one of the plain shapes selects nothing and leaves the building open.
+  // A click on one of the shapes selects nothing and leaves the building open; it says what the
+  // campus map calls the space, in the map's own words.
   const pt = (await page.evaluate(() => window.__scene!.planPoint()))!;
+  const type = (await page.evaluate(({ x, y }) => window.__scene!.spaceAt(x, y), pt))!;
+  expect(type.text.length).toBeGreaterThan(0);
   await page.mouse.click(pt.x, pt.y);
   await settle(page);
   expect(params(page).get("room")).toBeNull();
   expect(params(page).get("building")).toBe("405");
   await expect(page.locator("#room-card")).toHaveCount(0);
+  await expect(page.locator("#space-tip")).toContainText(`Campus map type: ${type.text}`);
+
+  // A floor with no learning space at all still reads: offices, labs, toilets, stairs and lifts,
+  // each group with a floor colour of its own and a line in the legend.
+  await open(page, "?building=405&floor=8&light=day");
+  await expect(page.locator("#building-bar")).toContainText("No learning spaces are listed on this floor");
+  const floors = await page.evaluate(() => window.__scene!.spaceFloors());
+  const kinds = floors.map((f) => f.kind);
+  for (const k of ["office", "lab", "toilet", "stairs"]) expect(kinds).toContain(k);
+  expect(new Set(floors.map((f) => f.colour)).size).toBe(floors.length);
+  for (const label of ["Office", "Other lab", "Toilet or shower", "Stairs or lift"]) {
+    await expect(page.locator("#legend-spaces")).toContainText(label);
+  }
+  const at = (await page.evaluate(() => window.__scene!.planPoint()))!;
+  await page.mouse.move(at.x, at.y);
+  await expect(page.locator("#space-tip")).toContainText("Campus map type:");
+  await shot(page, "12-floor-types");
+  await page.mouse.move(5, 300);
+  await expect(page.locator("#space-tip")).toHaveCount(0);
 
   // A hall of residence: the floor is there, its rooms are not, and the page says why.
   await open(page, "?building=440&floor=3&light=day");

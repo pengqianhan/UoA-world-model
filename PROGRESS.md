@@ -40,8 +40,9 @@ Bonus ideas not done, in rough order of value:
    lazy-loaded and whose course pages are about 240 KB each. Not worth thousands of requests while
    there is no timetable to attach the courses to.
 3. Remote campuses in 3D (building data exists; no OSM context fetched for them).
-4. On the floor plans: mark stairs, lifts and toilets, and outline the shape a pinned room stands
-   on. Both give a plain shape a meaning, so both reopen the "Places, not people" rule (a gate).
+4. On the floor plans: icons for stairs, lifts and toilets (their type is shown since 2026-10-14),
+   and an outline round the shape a pinned room stands on. The outline ties a code to a shape, so
+   it reopens the "Places, not people" rule (a gate).
 5. Seasons and weather effects in the scene.
 
 ## Final report (2026-10-13)
@@ -88,7 +89,8 @@ Verified 2026-10-13 against https://pengqianhan.github.io/campus-world-model/ at
   room: **not applicable** (nothing to locate).
 - What is covered instead: 194 buildings (139 on the 3D map); 786 learning spaces with outlines, every
   one tied to a building and a floor from the official campus map; 4,668 further rooms locatable as a
-  point on their floor; 251 subject codes; the 2026 academic calendar.
+  point on their floor; 14,508 other spaces drawn on their floors, each with the campus map's type
+  for it; 251 subject codes; the 2026 academic calendar.
 - What the campus map itself leaves out, of the 722 floors on the 3D map: 96 floors with no shape at
   all (`noPlan: "unmapped"`; 73 of them in halls of residence the source maps as a bare building),
   and 34 where its shapes cover under 30% of the floor (`partialPlan`; plant levels, mezzanines,
@@ -152,13 +154,22 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   `rooms-index.json` as code + floor + one point.
 - Floor plans, since 2026-10-13 (the user chose this after comparing with the Tsinghua map, whose
   floors look complete): every other polygon on a floor of an on-map building is published as a bare
-  shape in `public/data/plans/<building>.json`, with no code, name or type, and cannot be selected.
+  shape in `public/data/plans/<building>.json`, with no code or name, and cannot be selected.
   That includes 2,086 rooms the source hides from its search (`status != 3`, mostly offices):
   drawn, never named. Left out, with `noPlan` on the floor and a note on screen: every floor holding
   student accommodation (139 floors) and the three childcare centres (255, 410, 511; matched by
   name, the source has no room type for them). Also left out: single parking bays, the source's
   "Void 2.0 test" records, shapes under 2 m², and three shapes that lie over a named room. 14,508
-  shapes on 490 floors of 108 buildings, 950 KB in all, loaded one building at a time.
+  shapes on 490 floors of 108 buildings, 1,027 KB in all, loaded one building at a time.
+- Space types on the floor plans, since 2026-10-14 (the user chose this after asking why floors 6 to
+  11 of building 405, all offices and research labs, showed only grey shapes): each shape carries
+  the source's own type text, sorted by `SPACE_KINDS` in `build-data.ts` into seven groups that
+  tint its floor (office 3,332, other lab 790, toilet or shower 1,155, stairs or lift 1,791,
+  service or amenity 262, learning space not listed 7, other area 7,171). Pointing at a shape, or
+  tapping it, shows the group and the type in the source's words; the legend lists the groups on
+  the open floor. Still no code or name, still nothing to select. "Other area" is what the source
+  calls "Non Usable Area", "Ancillary Area", "Nonasgn Rentable", "Unclassified Facilities" and
+  "General Facility": it does not say what those hold, so neither does the site.
 - Room codes are `<building>-<room>`; the true floor comes from the map. Inference from the room
   number (agrees with the map for >85% of rooms, see `tests/roomcode.test.ts`) is only the fallback
   for unknown codes and is labelled "inferred" in the UI.

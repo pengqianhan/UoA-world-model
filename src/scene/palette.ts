@@ -1,6 +1,6 @@
 // Colours of the 3D scene. One palette per lighting mood; the scene blends between them.
 // Deliberately not the University's brand colours: this is an unofficial project.
-import type { AreaClass, RoadClass, RoomKind } from "../shared/types.ts";
+import type { AreaClass, RoadClass, RoomKind, SpaceKind } from "../shared/types.ts";
 
 export interface Palette {
   sky: number;
@@ -24,8 +24,11 @@ export interface Palette {
   hover: number;
   slab: number;
   slabBelow: number;
-  /** Unnamed floor-plan shapes: a floor a step darker than the slab it stands on, inside light walls. */
-  plan: number;
+  /**
+   * Unnamed floor-plan shapes: a floor tinted by the group of its type on the campus map, paler
+   * than the rooms that can be selected, inside light walls. "other" is a step darker than the slab.
+   */
+  space: Record<SpaceKind, number>;
   planWall: number;
   planEdge: number;
   roomEdge: number;
@@ -58,7 +61,15 @@ export const DAY: Palette = {
   hover: 0xf2a65a,
   slab: 0xf5f1e6,
   slabBelow: 0xd9d2c2,
-  plan: 0xe2dccd,
+  space: {
+    office: 0xd9c7a2,
+    lab: 0xc2d6bd,
+    learning: 0xf2d9a4,
+    toilet: 0xbdd3e2,
+    stairs: 0xbab4aa,
+    amenity: 0xebc5cb,
+    other: 0xe2dccd,
+  },
   planWall: 0xfbf8f0,
   planEdge: 0x8b7b62,
   roomEdge: 0x4a4334,
@@ -90,7 +101,15 @@ export const NIGHT: Palette = {
   hover: 0xffd08a,
   slab: 0x3b5270,
   slabBelow: 0x2a3d55,
-  plan: 0x4a6384,
+  space: {
+    office: 0x66688a,
+    lab: 0x4b7570,
+    learning: 0x7a7258,
+    toilet: 0x4a7898,
+    stairs: 0x3c4c62,
+    amenity: 0x7a5f78,
+    other: 0x4a6384,
+  },
   planWall: 0x6d88ad,
   planEdge: 0x9fb4cf,
   roomEdge: 0xdbe6f2,
@@ -158,7 +177,7 @@ export function mixPalette(a: Palette, b: Palette, t: number): Palette {
     hover: c(a.hover, b.hover),
     slab: c(a.slab, b.slab),
     slabBelow: c(a.slabBelow, b.slabBelow),
-    plan: c(a.plan, b.plan),
+    space: lerpRecord(a.space, b.space, t),
     planWall: c(a.planWall, b.planWall),
     planEdge: c(a.planEdge, b.planEdge),
     roomEdge: c(a.roomEdge, b.roomEdge),
