@@ -37,7 +37,7 @@ import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Ro
 import { decodeRing, interiorPoint } from "../shared/geo.ts";
 import { massing, roofRims } from "../shared/massing.ts";
 import { MeshBuilder, ringsBounds } from "./geometry.ts";
-import { WALL_HEIGHT, buildInterior, disposeGroup } from "./interior.ts";
+import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
 
@@ -93,11 +93,35 @@ const RIM_HEIGHT = 0.9;
 const RIM_TINT = [1.03, 1.03, 1.02] as const;
 /** The ground storey is a tone darker than the storeys above it, as a base for the building to stand on. */
 const PLINTH_TINT = [0.86, 0.85, 0.83] as const;
-/** The unnamed shapes of a floor plan stand lower than the rooms that can be selected. */
-const PLAN_HEIGHT = 0.45;
+/** Metres. A room that can be selected is walled on its outline; this is how thick the walls are drawn. */
+const ROOM_WALL = 0.22;
+/**
+ * The unnamed shapes of a floor plan are walled too, lower than the rooms that can be selected and
+ * with walls of no thickness, round a floor a little above the slab. Heights in metres.
+ */
+const PLAN_WALL = 1.1;
+const PLAN_FLOOR = 0.03;
 const ROOM_HEIGHT_SELECTED = 3.0;
 
 const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+
+/**
+ * A room on the open floor, one unit high: walls on its outline round a floor that is in the
+ * mesh's second material group, so that the two can take colours of their own.
+ */
+function roomShell(r: Room): BufferGeometry {
+  const mb = new MeshBuilder();
+  const inner = inset(decodeRing(r.poly), ROOM_WALL);
+  if (inner) {
+    const hole = inner.flatMap(([x, y]) => [Math.round(x * 10), Math.round(y * 10)]);
+    mb.extrude([r.poly, hole], 0, 1);
+    mb.flat(hole, 0.02, undefined, true);
+  } else {
+    // An outline too narrow or too ragged to wall is a solid block with a top in the floor's colour.
+    mb.extrude([r.poly], 0, 1, undefined, undefined, true, { roofGroup: true });
+  }
+  return mb.build();
+}
 
 /** Deterministic pseudo-random generator so decorative scatter is identical on every load. */
 function mulberry32(seed: number): () => number {
@@ -776,12 +800,10 @@ export class CampusScene {
     this.detailGroup.add(slabEdges);
     this.rebuildPlan();
 
-    // Rooms on the selected floor, as low blocks on the slab.
+    // Rooms on the selected floor, walled on their outlines.
     for (const r of this.roomsByBuilding.get(b.id) ?? []) {
       if (r.f !== floor.i) continue;
-      const mb = new MeshBuilder();
-      mb.extrude([r.poly], 0, 1);
-      const mesh = new Mesh(mb.build(), new MeshLambertMaterial({ color: 0xffffff }));
+      const mesh = new Mesh(roomShell(r), [new MeshLambertMaterial({ color: 0xffffff }), new MeshLambertMaterial({ color: 0xffffff })]);
       mesh.position.y = y + SLAB;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -805,31 +827,44 @@ export class CampusScene {
     if (!cur || !shapes?.length) return;
     const p = this.palette;
     const y = this.floorY(cur.b, cur.floor.i);
-    const top = y + SLAB + PLAN_HEIGHT;
-    const mb = new MeshBuilder();
+    const base = y + SLAB + PLAN_FLOOR;
+    const top = y + SLAB + PLAN_WALL;
+    const floors = new MeshBuilder();
+    const walls = new MeshBuilder();
     const lines: number[] = [];
     for (const rings of shapes) {
       // From the underside of the slab, so a shape that overhangs the floor outline has a base.
-      mb.extrude(rings, y, top);
+      floors.extrude(rings, y, base);
+      // Where two shapes share an edge their walls coincide; with one material that cannot show.
       for (const ring of rings) {
         for (let i = 0; i + 1 < ring.length; i += 2) {
           const j = (i + 2) % ring.length;
-          lines.push(ring[i]! / 10, top + 0.02, -ring[i + 1]! / 10, ring[j]! / 10, top + 0.02, -ring[j + 1]! / 10);
+          const ax = ring[i]! / 10;
+          const ay = ring[i + 1]! / 10;
+          const bx = ring[j]! / 10;
+          const by = ring[j + 1]! / 10;
+          walls.fence(ax, ay, bx, by, base, top);
+          lines.push(ax, top + 0.02, -ay, bx, top + 0.02, -by);
         }
       }
     }
-    const mesh = new Mesh(mb.build(), new MeshLambertMaterial({ color: p.plan }));
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.userData.role = "plan";
-    mesh.userData.noPick = true;
+    const floorMesh = new Mesh(floors.build(), new MeshLambertMaterial({ color: p.plan }));
+    floorMesh.castShadow = true;
+    floorMesh.receiveShadow = true;
+    floorMesh.userData.role = "plan";
+    floorMesh.userData.noPick = true;
+    const wallMesh = new Mesh(walls.build(), new MeshLambertMaterial({ color: p.planWall }));
+    wallMesh.castShadow = true;
+    wallMesh.receiveShadow = true;
+    wallMesh.userData.role = "planWalls";
+    wallMesh.userData.noPick = true;
     const g = new BufferGeometry();
     g.setAttribute("position", new Float32BufferAttribute(lines, 3));
     const edges = new LineSegments(g, new LineBasicMaterial({ color: p.planEdge, transparent: true, opacity: 0.6 }));
     edges.userData.role = "planEdges";
     edges.userData.noPick = true;
-    this.planObjects = [mesh, edges];
-    this.detailGroup.add(mesh, edges);
+    this.planObjects = [floorMesh, wallMesh, edges];
+    this.detailGroup.add(floorMesh, wallMesh, edges);
   }
 
   private rebuildDetailColours(): void {
@@ -840,6 +875,7 @@ export class CampusScene {
       if (role === "slab") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.slab);
       if (role === "slabEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.uniEdge);
       if (role === "plan") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.plan);
+      if (role === "planWalls") ((child as Mesh).material as MeshLambertMaterial).color.setHex(p.planWall);
       if (role === "planEdges") ((child as LineSegments).material as LineBasicMaterial).color.setHex(p.planEdge);
     }
   }
@@ -869,7 +905,9 @@ export class CampusScene {
       if (this.busy.size > 0 && !busy) colour = lerpColour(colour, p.slab, 0.55);
       if (hovered) colour = lerpColour(colour, 0xffffff, 0.3);
       if (selected) colour = p.accent;
-      (mesh.material as MeshLambertMaterial).color.setHex(colour);
+      const [walls, floor] = mesh.material as MeshLambertMaterial[];
+      walls!.color.setHex(colour);
+      floor!.color.setHex(lerpColour(colour, p.slab, 0.6));
       mesh.scale.y = selected ? ROOM_HEIGHT_SELECTED : busy ? ROOM_HEIGHT * 1.35 : ROOM_HEIGHT;
       // The selected room opens up: its block is replaced by low walls and illustrative furniture.
       mesh.visible = !selected;
@@ -1214,6 +1252,27 @@ export class CampusScene {
   }
 
   /**
+   * What stands on the open floor: wall faces round the unnamed shapes, and how many of the rooms
+   * that can be selected are walled rather than drawn as solid blocks. For tests.
+   */
+  floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number } {
+    const walls = this.planObjects.find((o) => o.userData.role === "planWalls") as Mesh | undefined;
+    const rooms = [...this.roomMeshes.values()];
+    return {
+      planWallFaces: walls ? (walls.geometry.index?.count ?? 0) / 6 : 0,
+      rooms: rooms.length,
+      // A walled room's floor is in the second group and lies below its walls' top.
+      walledRooms: rooms.filter((m) => {
+        const g = m.geometry;
+        const floor = g.groups[1];
+        if (!floor) return false;
+        const y = g.getAttribute("position").getY(g.index!.getX(floor.start));
+        return y < 0.5;
+      }).length,
+    };
+  }
+
+  /**
    * A point on the page where an unnamed floor-plan shape is drawn with no room, label or other
    * building in front of it. For tests.
    */
@@ -1224,7 +1283,7 @@ export class CampusScene {
     const v = new Vector3();
     for (const rings of shapes) {
       const c = interiorPoint(decodeRing(rings[0]!));
-      v.set(c[0], this.floorY(cur!.b, cur!.floor.i) + SLAB + PLAN_HEIGHT, -c[1]).project(this.camera);
+      v.set(c[0], this.floorY(cur!.b, cur!.floor.i) + SLAB + PLAN_FLOOR, -c[1]).project(this.camera);
       const p = { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
       if (document.elementFromPoint(p.x, p.y) !== this.renderer.domElement) continue;
       if (!this.pickAt(p.x, p.y) && !this.labelAt(p.x, p.y)) return p;

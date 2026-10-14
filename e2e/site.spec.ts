@@ -420,3 +420,20 @@ test("the rest of a floor is drawn as unnamed shapes that cannot be selected, an
   expect(await page.evaluate(() => window.__scene!.planShapes)).toBe(0);
   await expect(page.locator("#floor-no-plan-note")).toContainText("childcare centre");
 });
+
+test("rooms on the open floor stand as walls on their outlines, the named ones round a floor in their colour", async ({ page }) => {
+  await open(page, "?building=303&floor=G&light=day");
+  const walls = await page.evaluate(() => window.__scene!.floorWalls());
+  // Every edge of every unnamed shape is walled, and the learning spaces are open rooms, not blocks.
+  expect(walls.planWallFaces).toBeGreaterThan(300);
+  expect(walls.rooms).toBe(12);
+  expect(walls.walledRooms).toBeGreaterThanOrEqual(10);
+  await expectRealRender(page);
+
+  // A room is still picked by a click inside its walls.
+  const pt = (await page.evaluate(() => window.__scene!.screenPoint("room", "303-G20")))!;
+  await page.mouse.click(pt.x, pt.y);
+  await settle(page);
+  expect(params(page).get("room")).toBe("303-G20");
+  await shot(page, "15-floor-walls");
+});

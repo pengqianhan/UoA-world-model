@@ -10,6 +10,7 @@ interface SceneHandle {
   loading: number;
   planShapes: number;
   planPoint(): { x: number; y: number } | undefined;
+  floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number };
   probe(): { width: number; height: number; distinctColours: number; samples: number };
   cameraState(): { azimuth: number; polar: number; zoom: number; target: [number, number, number] };
   screenPoint(kind: "building" | "room", id: string): { x: number; y: number } | undefined;

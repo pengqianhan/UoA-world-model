@@ -12,7 +12,7 @@ const WALL_THICKNESS = 0.22;
 const MAX_ITEMS = 520;
 
 /** Moves every vertex inwards by `d` along the bisector of its two edges (mitre offset). */
-function inset(ring: Ring, d: number): Ring | undefined {
+export function inset(ring: Ring, d: number): Ring | undefined {
   const ccw = signedArea(ring) > 0;
   const n = ring.length;
   const out: Ring = [];
