@@ -14,6 +14,8 @@ export interface WallOptions {
   bay?: number;
   /** Close the underside, which a block that overhangs the one below needs to cast a whole shadow. */
   bottom?: boolean;
+  /** Put the roof in the mesh's second material group, so that it can take a colour of its own. */
+  roofGroup?: boolean;
 }
 
 /** A turn sharper than this, in radians, ends one face of a building and starts the next. */
@@ -69,6 +71,8 @@ export class MeshBuilder {
   readonly colors: number[] = [];
   readonly uvs: number[] = [];
   readonly indices: number[] = [];
+  /** Triangles of the second material group: the roofs of an extrusion that asked for one. */
+  readonly roofIndices: number[] = [];
   private withColor: boolean;
   private withUV: boolean;
 
@@ -91,13 +95,13 @@ export class MeshBuilder {
   }
 
   /** Pushes a roof triangle wound so that it faces up (counter-clockwise seen from above). */
-  private upFacing(base: number, pts: readonly Vector2[], tri: readonly number[]): void {
+  private upFacing(base: number, pts: readonly Vector2[], tri: readonly number[], into = this.indices): void {
     const a = pts[tri[0]!]!;
     const b = pts[tri[1]!]!;
     const c = pts[tri[2]!]!;
     const ccw = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y) > 0;
-    if (ccw) this.indices.push(base + tri[0]!, base + tri[1]!, base + tri[2]!);
-    else this.indices.push(base + tri[0]!, base + tri[2]!, base + tri[1]!);
+    if (ccw) into.push(base + tri[0]!, base + tri[1]!, base + tri[2]!);
+    else into.push(base + tri[0]!, base + tri[2]!, base + tri[1]!);
   }
 
   /**
@@ -106,7 +110,7 @@ export class MeshBuilder {
    * With UVs enabled, `wall` says how the wall texture repeats; the roof samples its plain part.
    */
   extrude(rings: readonly FlatRing[], y0: number, y1: number, topColor?: RGB, sideColor?: RGB, cap = true, wall: WallOptions = {}): void {
-    const { storey = 0, bay = 0, bottom = false } = wall;
+    const { storey = 0, bay = 0, bottom = false, roofGroup = false } = wall;
     const outer = rings[0];
     if (!outer || outer.length < 6) return;
     const toVec = (flat: FlatRing) => {
@@ -124,7 +128,7 @@ export class MeshBuilder {
       const base = this.vertexCount;
       const all = holes.length ? contour.concat(...holes) : contour;
       for (const p of all) this.vertex(p.x, y1, -p.y, 0, 1, 0, topColor);
-      for (const tri of ShapeUtils.triangulateShape(contour, holes)) this.upFacing(base, all, tri);
+      for (const tri of ShapeUtils.triangulateShape(contour, holes)) this.upFacing(base, all, tri, roofGroup ? this.roofIndices : this.indices);
     }
     if (bottom) {
       const base = this.vertexCount;
@@ -302,7 +306,11 @@ export class MeshBuilder {
     if (this.withColor) g.setAttribute("color", new BufferAttribute(new Float32Array(this.colors), 3));
     if (this.withUV) g.setAttribute("uv", new BufferAttribute(new Float32Array(this.uvs), 2));
     const Index = this.vertexCount > 65535 ? Uint32Array : Uint16Array;
-    g.setIndex(new BufferAttribute(new Index(this.indices), 1));
+    g.setIndex(new BufferAttribute(new Index(this.roofIndices.length ? this.indices.concat(this.roofIndices) : this.indices), 1));
+    if (this.roofIndices.length) {
+      g.addGroup(0, this.indices.length, 0);
+      g.addGroup(this.indices.length, this.roofIndices.length, 1);
+    }
     g.computeBoundingSphere();
     g.computeBoundingBox();
     return g;
