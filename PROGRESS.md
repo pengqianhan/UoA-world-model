@@ -197,7 +197,19 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   shapes (`MeshBuilder.roof`). A tower mapped in parts is drawn at its full height (the Sky Tower,
   328 m); a tower that is one outline is still cut to a 24 m podium. The 45 parts inside University
   footprints are dropped: University buildings take their shape from the campus map.
-- Weather: Open-Meteo, fetched by the visitor's browser in Now mode; optional.
+- Weather: Open-Meteo, fetched by the visitor's browser, on load and each half hour; optional.
+  Since 2026-10-15 the same request also asks for cloud cover, precipitation and wind, and in Now
+  mode (with the light left on automatic) the scene draws them: cloud greys the sky, softens the
+  shadows and dims the sun, rain falls as streaks on a canvas over the map and darkens the ground
+  and streets, fog hazes the distance. Preview draws a clear sky; past and future weather are not
+  fetched.
+- Sun: since 2026-10-15 the sun's direction is computed for the date and time shown
+  (`src/shared/daylight.ts`, NOAA's solar-position equations; `tests/daylight.test.ts` checks it
+  against Auckland's published sunrise and sunset), and night follows the sun's elevation, which
+  replaced a sunrise/sunset approximation. Below 10° the sun is drawn at 10°.
+- Seasons: the 21 trees OpenStreetMap tags `leaf_cycle=deciduous` (of 1,819 mapped) are kept apart
+  in `context.json` and turn in April and May, stand bare from June to August and come into leaf
+  in September and October. No other tree is tagged either way, so the rest stay evergreen.
 - Not done: course-level catalogue (the Curriculum Catalogue's lists are lazy-loaded APEX regions;
   many requests for little value while there is no timetable). Terrain (AWS open "terrarium" tiles
   need no key) is a possible bonus.

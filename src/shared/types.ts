@@ -172,6 +172,8 @@ export interface ContextData {
   rails: FlatRing[];
   /** Flat [x, y, x, y, ...] in decimetres. */
   trees: number[];
+  /** Trees OpenStreetMap tags `leaf_cycle=deciduous`, which are not in `trees`. Flat, in decimetres. */
+  deciduous: number[];
 }
 
 /**
