@@ -16,6 +16,8 @@ export interface WallOptions {
   bottom?: boolean;
   /** Put the roof in the mesh's second material group, so that it can take a colour of its own. */
   roofGroup?: boolean;
+  /** Tint the walls below this height, in metres, differently: the ground storey of a building. */
+  plinth?: { top: number; color: RGB };
 }
 
 /** A turn sharper than this, in radians, ends one face of a building and starts the next. */
@@ -110,7 +112,7 @@ export class MeshBuilder {
    * With UVs enabled, `wall` says how the wall texture repeats; the roof samples its plain part.
    */
   extrude(rings: readonly FlatRing[], y0: number, y1: number, topColor?: RGB, sideColor?: RGB, cap = true, wall: WallOptions = {}): void {
-    const { storey = 0, bay = 0, bottom = false, roofGroup = false } = wall;
+    const { storey = 0, bay = 0, bottom = false, roofGroup = false, plinth } = wall;
     const outer = rings[0];
     if (!outer || outer.length < 6) return;
     const toVec = (flat: FlatRing) => {
@@ -144,8 +146,15 @@ export class MeshBuilder {
       }
     }
 
-    const v0 = storey > 0 ? y0 / storey : 0.05;
-    const v1 = storey > 0 ? y1 / storey : 0.05;
+    // One band of wall from the bottom to the top, or two where a plinth ends part of the way up.
+    const split = plinth && plinth.top > y0 + 1e-6 && plinth.top < y1 - 1e-6 ? plinth.top : undefined;
+    const bands: [number, number, RGB | undefined][] =
+      split !== undefined
+        ? [
+            [y0, split, plinth!.color],
+            [split, y1, sideColor],
+          ]
+        : [[y0, y1, plinth && plinth.top >= y1 - 1e-6 ? plinth.color : sideColor]];
     const walls = (ring: Vector2[]) => {
       const us = bay > 0 ? bayCoords(ring, bay) : undefined;
       for (let i = 0; i < ring.length; i++) {
@@ -160,11 +169,15 @@ export class MeshBuilder {
         const nz = dx / len;
         const ua = us?.[i * 2];
         const ub = us?.[i * 2 + 1];
-        const i0 = this.vertex(a.x, y0, -a.y, nx, 0, nz, sideColor, v0, ua);
-        const i1 = this.vertex(b.x, y0, -b.y, nx, 0, nz, sideColor, v0, ub);
-        const i2 = this.vertex(b.x, y1, -b.y, nx, 0, nz, sideColor, v1, ub);
-        const i3 = this.vertex(a.x, y1, -a.y, nx, 0, nz, sideColor, v1, ua);
-        this.indices.push(i0, i1, i2, i0, i2, i3);
+        for (const [from, to, color] of bands) {
+          const v0 = storey > 0 ? from / storey : 0.05;
+          const v1 = storey > 0 ? to / storey : 0.05;
+          const i0 = this.vertex(a.x, from, -a.y, nx, 0, nz, color, v0, ua);
+          const i1 = this.vertex(b.x, from, -b.y, nx, 0, nz, color, v0, ub);
+          const i2 = this.vertex(b.x, to, -b.y, nx, 0, nz, color, v1, ub);
+          const i3 = this.vertex(a.x, to, -a.y, nx, 0, nz, color, v1, ua);
+          this.indices.push(i0, i1, i2, i0, i2, i3);
+        }
       }
     };
     walls(contour);
