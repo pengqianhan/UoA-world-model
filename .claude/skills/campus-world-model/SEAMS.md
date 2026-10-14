@@ -22,7 +22,22 @@ and 2.8 km tall, gives 612 KB. Budget: the whole deploy under 50 MB, the first l
 `sources` list. Write one fetch script per usable source in their place and chain them in the
 `data:fetch` script of `package.json`. `LEARNING_TYPES` maps the source's room types onto `RoomKind`
 and decides which rooms are named and selectable; `INDEX_EXCLUDED_TYPES` decides which stay out of
-search. The `sources` list is what About shows: name, link, licence line, snapshot date.
+search. The `sources` list is what About shows: name, link, licence line, snapshot date. Every
+request goes through `snapshot()` in `scripts/lib/snapshot.ts`, which paces, names the project and
+times out after 240 s.
+
+**Ground.** `scripts/fetch-terrain.ts` and `scripts/lib/terrain.ts` take the AWS Open Data Terrain
+Tiles (terrarium PNGs, no key) under every area at zoom 14, decoded with Node's zlib
+(`scripts/lib/png.ts`). The tiles are worldwide but their source differs by country: a tile's
+`x-amz-meta-x-imagery-sources` header names it, and the Tilezen "joerd" attribution document gives
+its licence and the credit to show. Auckland's is the LINZ 8 m DEM, CC BY 3.0 NZ, committed under
+`data/raw/terrain/`; check that the new country's licence allows that too. Sample one tile at zoom
+14 and 15 near the campus and keep the zoom at which the finer one adds nothing. `buildTerrain`
+writes a 10 m grid per area (`terrain/<area>.json`) and clamps pits where land meets sea
+(`TERRAIN_FLOOR`); `TERRAIN_MARGIN` is how far past an area the ground reaches. In the scene a
+building stands at the ground under its middle, no more than `FOOTING` (4 m, `src/scene/terrain.ts`)
+above its lowest corner, with a footing below. The credit goes in the `sources` list and in
+`attribution.short` in `en.json`.
 
 **Floors and floor plans.** Three things are built from the indoor source's outlines, and each falls
 back to something plainer when the source is thinner. A building's shape in the campus view is its
@@ -41,13 +56,18 @@ for it and no code or name. Which floors stay blank is spelled in Auckland's wor
 childcare, and `PLAN_SKIPPED_TYPES` holds shapes that are not rooms. `SPACE_KINDS` sorts the other
 types into the groups that tint a shape's floor (office, other lab, toilet, stairs or lift, service);
 a type it does not list is "other". `SPACE_ICONS` puts a sign on stairs, lifts, toilets and showers;
-check what the new source's toilet types are named before mapping them. List the new source's room types with their counts, and its
-building names, and find its words for each of the four.
+check what the new source's toilet types are named before mapping them (Auckland's "Accessible" is
+always an accessible toilet, which only the names show). List the new source's room types with
+their counts, and its building names, and find its words for each of the five.
 
-**Surroundings.** `buildContext` draws what the OpenStreetMap snapshot holds: building parts with
-their heights, six roof shapes, and a tower at its full height when it is mapped in parts. It
-carries over unchanged. A campus building has one source: where the indoor layer gives it a
-footprint, OpenStreetMap's copy and its parts are dropped (`insideUni`).
+**Surroundings.** `buildContext` draws what the OpenStreetMap snapshot of an area holds: building
+parts with their heights, six roof shapes, a tower at its full height when it is mapped in parts,
+and trees, with those tagged `leaf_cycle=deciduous` kept apart for the seasons. It carries over
+unchanged. A campus building has one source: where the indoor layer gives it a footprint,
+OpenStreetMap's copy and its parts are dropped (`insideUni`). The public Overpass instances can
+answer 504 for an hour: `fetch-osm.ts` goes round all of them three times, a minute apart, and a
+snapshot already on disk is never fetched again. The sea is not drawn; OpenStreetMap's coastline is
+a line, and a campus on the shore stands on land to the edge of its area.
 
 **Room codes.** `src/shared/roomcode.ts`, `CODE_RE` in `build-data.ts`, `tests/roomcode.test.ts`.
 Auckland's grammar is `<building>-<room>` with the floor in the room's first character. Derive the new
@@ -62,9 +82,13 @@ offsets, rename the functions, and rewrite the tests around the new zone's own c
 skipped hour, the repeated hour, a class on each side of the change. A zone without daylight saving
 gets one test asserting the constant offset.
 
-**Daylight and weather.** `src/shared/daylight.ts` hard-codes Auckland's day length, its
-southern-hemisphere solstice phase and its solar noon. Recompute the three numbers for the new
-latitude and longitude. `src/ui/weather.ts` carries the coordinates and the zone in its URL.
+**Sun, weather and seasons.** `src/shared/daylight.ts` computes the sun's position from NOAA's
+equations for `LAT` and `LON`, the main campus: change the two constants. `tests/daylight.test.ts`
+checks it against Auckland's own solstice noon heights and published sunrise and sunset times, and
+a daylight-saving date; rewrite each from the new city's published times. `src/ui/weather.ts`
+carries the coordinates and the zone in its URL (Open-Meteo, worldwide, no key). The months in
+`deciduousColour` in `CampusScene.ts` are the southern hemisphere's: autumn in April and May, bare
+from June to August; shift them by six months in the north.
 
 **Timetable model.** A `Session` is a weekly meeting: weekday, start and end in minutes after local
 midnight, an inclusive date range. A timetable in periods and week numbers converts into it: periods
@@ -84,7 +108,7 @@ URL.
 **Names and words.** `package.json` (then `npm install`, which refreshes the lock file),
 `index.html`, `src/i18n/locales/en.json`, `REPO` in `src/app/links.ts`, `USER_AGENT` in
 `scripts/lib/snapshot.ts`. `CAMPUS_SPAN` in `src/ui/SceneHost.tsx` is the camera framing in metres
-for each campus id. The site's name shares the phone's top bar with four buttons, and
+for each central campus id; a campus in an area of its own is framed from its buildings. The site's name shares the phone's top bar with four buttons, and
 `e2e/mobile.spec.ts` measures the fit down to a 360 px screen: a name longer than "UoA World Model"
 needs a shorter form there. In `en.json`, the strings that explain an absent layer state Auckland's
 verdicts:
@@ -105,8 +129,8 @@ and counts the distance from this campus to that one, so each entry carries its 
 coordinates. Keep the Tsinghua World Model, where the idea comes from, and add UoA World Model,
 which this is a port of.
 
-**Auckland's data.** `public/data/*`, `data/raw/osm/`, `data/sources.json` and `docs/*.jpg` are
-regenerated by the pipeline and the screenshots, never edited by hand.
+**Auckland's data.** `public/data/*`, `data/raw/osm/`, `data/raw/terrain/`, `data/sources.json` and
+`docs/*.jpg` are regenerated by the pipeline and the screenshots, never edited by hand.
 
 **Credit.** `LICENSE` keeps its existing copyright line and gains yours. The site is a port of UoA
 World Model, which was inspired by the Tsinghua World Model, and says so with a link to each in
@@ -122,7 +146,9 @@ and record that under Decisions.
 **Unit tests (step 3)**, beyond the room-code and time-zone files named above:
 
 - `tests/search-classes-data.test.ts`: the names that search must find; the scale of buildings,
-  rooms and plan shapes; the floors that must be blank.
+  rooms and plan shapes; the floors that must be blank; the areas away from the centre; and the
+  ground's height at named places (a ridge, a gully, the waterfront) and under one tall building.
+- `tests/daylight.test.ts`: the new city's solstice noon heights and published sunrise and sunset.
 - `tests/massing.test.ts`: two buildings whose floors differ in outline, one of them a tower on a
   podium; and a tower of floors that are alike, drawn as one block.
 - `tests/travel.test.ts`: the distance from this campus to each world, which no grep for a name
@@ -130,11 +156,15 @@ and record that under Decisions.
 - `tests/roofs.test.ts`, "published surroundings": the tallest thing in the scene, and how many
   parts and roofs OpenStreetMap holds there.
 
-**End-to-end tests (step 6)**: `e2e/site.spec.ts`, `e2e/mobile.spec.ts`, `e2e/travel.spec.ts`, the
-fixture in `e2e/helpers.ts`. The travel tests name the city left and the distance the flight counts
-to. Substitute from the new data: a building with several floors, a room on its entry
-floor and one on an upper floor, a second building for the URL test, a second campus if there is
-one, a teaching date and a non-teaching date from the new calendar, a course code. The tests without
-a number need a floor with a floor plan, a floor left blank, and a floor marked `outlineFrom`. The
+**End-to-end tests (step 6)**: `e2e/site.spec.ts`, `e2e/mobile.spec.ts`, `e2e/travel.spec.ts`,
+`e2e/sky.spec.ts`, `e2e/ground.spec.ts`, the fixture in `e2e/helpers.ts`. The travel tests name the
+city left and the distance the flight counts to. Substitute from the new data: a building with
+several floors, a room on its entry floor and one on an upper floor, a second building for the URL
+test, a second campus if there is one and a campus in an area of its own, a teaching date and a
+non-teaching date from the new calendar, a course code. The tests without a number
+need a floor with a floor plan, signs and a room found by its code, a floor left blank, and a floor
+marked `outlineFrom`. `sky.spec.ts` needs the sun's height at the new city's solstice noons;
+`ground.spec.ts` needs the local coordinates of a high and a low place. The Open-Meteo answers in
+`sky.spec.ts` are fixtures, served only inside the test browser. The
 fixture's courses keep the "not a real course" wording and are served only inside Playwright;
 `public/data` receives only what the pipeline builds from snapshots.
