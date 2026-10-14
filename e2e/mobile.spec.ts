@@ -85,7 +85,7 @@ test("phone: the top bar holds the site name, the source link, About, Search and
 });
 
 test("phone: the way to other worlds sits in the status strip, inside the screen, and starts a flight that can be called off", async ({ page }) => {
-  // The other site is never called. Should the flight run its course, the page stays where it is.
+  // The other site is never called. The flight is called off long before it would be.
   await page.route("https://tsinghua-world-model.pages.dev/**", (route) => route.abort());
   for (const width of [390, 360]) {
     await page.setViewportSize({ width, height: 780 });
@@ -106,7 +106,6 @@ test("phone: the way to other worlds sits in the status strip, inside the screen
   const flight = page.getByRole("dialog", { name: "Travelling to Tsinghua World Model" });
   await expect(flight).toBeVisible();
   await expect(flight.locator(".travel-distance")).toHaveText(/^[\d,]+ km$/);
-  await shot(page, "13-mobile-travel");
   await flight.getByRole("button", { name: "Stay in Auckland" }).tap();
   await expect(flight).toHaveCount(0);
   await expect(page.locator("#status-strip")).toBeVisible();

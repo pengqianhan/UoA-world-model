@@ -263,6 +263,16 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   route checks. Not pursued further; the test credential was deleted from the dashboard afterwards.
 - The OAuth route the student project `SOFTENG310-G7/degree-planner` used in 2023-24 for Course
   Catalog Api V3 (`/courses/v3/oauth2/token`) now answers 401 as well.
+- **Blurring the map during the flight to another world (2026-10-14).** A CSS `filter: blur()` on
+  the WebGL canvas, and a radial gradient repainted on the star canvas every frame, were fine on a
+  GPU and on SwiftShader on this machine. On CI's software renderer (2 cores) a flight that had run
+  for about a second left the page producing almost no frames: after it was called off, the next
+  flight got 1 frame in 1.5 s, and with the departure tied to a frame it never left. Now the map is
+  only scaled, the glow is CSS, the star canvas is capped at 1.5 million pixels, and a timer sends
+  the browser on its way. Two things the tests learned the same day: Playwright holds back every
+  locator, `evaluate` and screenshot while the page has a navigation pending, so the page reports
+  what it showed from its own `beforeunload`; and reading a canvas back there (`getImageData`)
+  holds the departure up when the renderer is behind.
 
 ## Needs the user
 

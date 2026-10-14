@@ -73,12 +73,16 @@ const newStar = (z: number): Star => ({
   colour: STAR_COLOURS[Math.floor(Math.random() * STAR_COLOURS.length)]!,
 });
 
+/** Pixels the star canvas is allowed. Streaks do not need more, and a renderer without a GPU cannot keep up with more. */
+const CANVAS_PIXELS = 1_500_000;
+
 /** Stars rushing past, faster and faster; the canvas stays clear where there is no star. */
 function fly(canvas: HTMLCanvasElement, onProgress: (p: number) => void): () => void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return () => {};
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let dpr = 1;
   const fit = () => {
+    dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(CANVAS_PIXELS / Math.max(1, canvas.clientWidth * canvas.clientHeight)));
     canvas.width = Math.round(canvas.clientWidth * dpr);
     canvas.height = Math.round(canvas.clientHeight * dpr);
   };
@@ -108,13 +112,6 @@ function fly(canvas: HTMLCanvasElement, onProgress: (p: number) => void): () => 
     const appear = Math.min(1, p * 5);
 
     ctx.clearRect(0, 0, w, h);
-    // The light at the far end grows as the flight goes on.
-    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, reach * (0.18 + 0.5 * p));
-    glow.addColorStop(0, `rgba(255, 200, 128, ${0.34 * p * p})`);
-    glow.addColorStop(1, "rgba(255, 200, 128, 0)");
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, w, h);
-
     ctx.lineCap = "round";
     for (const s of stars) {
       const from = s.z;
@@ -159,16 +156,23 @@ export function TravelOverlay() {
     const origin = data.value?.campus.origin;
     // To the nearest ten: the two points stand for whole campuses.
     const total = origin ? Math.round(greatCircleKm(origin, world) / 10) * 10 : 0;
+    const show = (km: number) => {
+      if (counter.current && total) counter.current.textContent = t("travel.distance", { km: km.toLocaleString(intlLocale()) });
+    };
+    // The count eases in and out, as a journey does, and stands still once the whole distance is shown.
     const stop = fly(canvas.current, (p) => {
-      // The count eases in and out, as a journey does.
-      const eased = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
-      if (counter.current && total) counter.current.textContent = t("travel.distance", { km: Math.round(total * eased).toLocaleString(intlLocale()) });
-      if (p >= 1 && !departed) {
-        departed = true;
-        window.location.assign(world.url);
-      }
+      if (!departed) show(Math.round(total * (p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2)));
     });
-    return stop;
+    // A timer sends the browser on its way, not a frame: frames stop in a hidden tab and can stall on a slow machine.
+    const timer = window.setTimeout(() => {
+      departed = true;
+      show(total);
+      window.location.assign(world.url);
+    }, FLIGHT * 1000);
+    return () => {
+      window.clearTimeout(timer);
+      stop();
+    };
   }, [world]);
 
   if (!world) return null;

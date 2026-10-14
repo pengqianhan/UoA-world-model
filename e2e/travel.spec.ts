@@ -9,7 +9,7 @@ const HOST = "https://tsinghua-world-model.pages.dev/**";
 /** What the page was showing at the moment the browser set off for somewhere else. */
 interface Departure {
   flight: { role: string | null; name: string | null; from: string; to: string; place: string; distance: string } | null;
-  /** Sampled pixels of the flight's canvas that a star covers. */
+  /** Strokes drawn on the flight's canvas up to then: one for a star in a frame. */
   stars: number;
 }
 
@@ -24,15 +24,16 @@ async function standIn(page: Page, hold = false) {
   const seen = { requests: 0, release, departures: [] as Departure[] };
   await page.exposeFunction("__departing", (d: Departure) => void seen.departures.push(d));
   await page.addInitScript(() => {
+    // Counted as they are drawn. Reading the canvas back on leaving would hold the departure up on a slow renderer.
+    let stars = 0;
+    const stroke = CanvasRenderingContext2D.prototype.stroke as (this: CanvasRenderingContext2D, ...a: unknown[]) => void;
+    (CanvasRenderingContext2D.prototype as unknown as { stroke: typeof stroke }).stroke = function (...a) {
+      if (this.canvas.closest("#travel")) stars++;
+      return stroke.apply(this, a);
+    };
     window.addEventListener("beforeunload", () => {
       const el = document.querySelector("#travel");
       const text = (selector: string) => el?.querySelector(selector)?.textContent ?? "";
-      let stars = 0;
-      const canvas = el?.querySelector("canvas");
-      if (canvas) {
-        const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
-        for (let i = 0; i < pixels.length; i += 4 * 53) if (pixels[i + 3]! > 160) stars++;
-      }
       const flight = el && {
         role: el.getAttribute("role"),
         name: el.getAttribute("aria-label"),
@@ -64,10 +65,8 @@ test("the campus view offers the Tsinghua World Model as another world; followin
   await expect(link).toHaveAttribute("href", TSINGHUA);
   await expect(page.locator("#status-strip")).toContainText("Other worlds");
 
+  // No picture is taken mid-flight: a screenshot that is still being made when the browser sets off never returns.
   await link.click();
-  // A picture from the middle of the flight; only the picture depends on this timing.
-  await page.waitForTimeout(1500);
-  await shot(page, "13-travel");
   await page.waitForURL(TSINGHUA);
   expect(other.requests).toBe(1);
 
@@ -81,7 +80,7 @@ test("the campus view offers the Tsinghua World Model as another world; followin
     place: "Tsinghua University, Beijing",
     distance: expect.stringMatching(/^10,4\d0 km$/),
   });
-  expect(left.stars).toBeGreaterThan(40);
+  expect(left.stars, "strokes on the star canvas").toBeGreaterThan(400);
 
   // Back again: the campus, not a flight frozen in mid-air.
   await page.goBack();
@@ -143,7 +142,7 @@ test("a visitor who asked for less motion gets a plain link, with no flight", as
 });
 
 test("About names the Tsinghua World Model as the inspiration and offers the same way there", async ({ page }) => {
-  // Should the flight run its course before the test calls it off, the page stays where it is.
+  // The other site is never called. The flight is called off long before it would be.
   await page.route(HOST, (route) => route.abort());
   await open(page, "?light=day");
   await page.getByRole("button", { name: "About", exact: true }).click();
