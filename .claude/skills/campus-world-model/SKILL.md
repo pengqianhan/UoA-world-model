@@ -29,7 +29,9 @@ before recon. Two of the rules carry more in a port:
 ## Handover
 
 `PROGRESS.md` is the handover, written for a reader who remembers nothing, because the next session
-will be that reader. Keep its headings and replace Auckland's content. It always shows the piece in
+will be that reader. Keep its headings and replace Auckland's content. Entries about the code and its
+tests are not Auckland's and stay: under Decisions and "Tried and did not work", what the test
+browser needs for WebGL and what stalls CI's renderer, which has no GPU. It always shows the piece in
 progress with its exact next step, what is done with its evidence, decisions with their reasons,
 routes that were tried and failed, and "Needs the user".
 
@@ -66,9 +68,9 @@ resume from `PROGRESS.md`, and delete it after the final report.
    `public/data/meta.json` is copied into `PROGRESS.md`.
 
 4. **Identity.** Make the repo the new school's along the identity seams in [SEAMS.md](SEAMS.md).
-   Done when `git grep -il -e auckland -e uoa -- . ':!.claude'` lists only `README.md`, for its
-   credit line, and a screenshot of the local site, opened and read, shows the new campus in 3D
-   under the new name.
+   Done when `git grep -il -e auckland -e uoa -- . ':!.claude'` lists only the files that carry the
+   credit (SEAMS.md, "Credit") and the tests of them, and a screenshot of the local site, opened and
+   read, shows the new campus in 3D under the new name.
 
 5. **Live.** Create the repository named in the brief (`gh repo create`), turn on Pages with the
    workflow as its source (`gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow`; a fork
@@ -84,7 +86,9 @@ resume from `PROGRESS.md`, and delete it after the final report.
    place; re-point those the same way.
    Done when every test passes three ways: on the local build, in CI, and with
    `E2E_BASE_URL=<public URL> npm run e2e`; and you have opened the desktop and phone screenshots
-   taken from the public URL. A green run over a black canvas is a failure.
+   taken from the public URL. A green run over a black canvas is a failure. Straight after a deploy
+   the live run has twice failed a test or two on page-load timeouts and passed when run again; a
+   test that fails twice is a failure.
 
 7. **Report.** Rewrite `README.md` for the new school (what it is, sources and licences, limitations,
    how to add an absent layer) and retake `docs/*.jpg` from the public URL. Then give the final
