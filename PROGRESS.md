@@ -228,6 +228,15 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   visitor who asked for less motion gets a plain link. The other site is linked to and nothing is
   loaded from it. The list is `WORLDS` in `src/app/links.ts`; a school hosted here under its own
   path is meant to join the same row, which has not been built.
+- **How a University building looks from outside (the user, 2026-10-14).** After comparing with
+  the Tsinghua World Model the user asked for five changes, in this order: roofs in a colour of
+  their own; floors that are alike drawn as one block; a rim and firmer edges on roofs; storeys and
+  windows on the walls; fuller trees and ground. All five draw by rule from the campus-map outlines
+  already in use, and none adds a data source. Floors are alike when their outlines share 95% of
+  the area either covers (`STACK_OVERLAP` in `scripts/build-data.ts`), measured against the lowest
+  floor of the run so that a slow drift up a tower still shows. The pipeline marks them
+  (`Floor.stackWith`); inside a building each floor keeps its own outline. On the snapshot of
+  2026-10-13 this takes the 139 buildings on the map from 471 blocks to 303.
 - **All network fetching goes through `scripts/lib/snapshot.ts`** (cache-first, ≥1.1 s between
   requests, honest User-Agent). Never fetch a URL that already has a snapshot unless `--refresh`.
 - **Labels are HTML, hit-tested by the scene** (`pointer-events: none`) so that a drag starting on a

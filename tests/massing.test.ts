@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decodeRing, ringArea } from "../src/shared/geo.ts";
+import { decodeRing, overlap, ringArea, type Ring } from "../src/shared/geo.ts";
 import { massing, type MassingBlock } from "../src/shared/massing.ts";
 import type { Building, CampusData, FlatRing, Floor } from "../src/shared/types.ts";
 
@@ -56,6 +56,26 @@ describe("building massing from floor outlines", () => {
       { outline: plant, y0: 2 * H, y1: 2.5 * H },
     ]);
   });
+  it("draws floors marked as alike with the outline of the floor they are stacked with", () => {
+    const base = [[square(400)]];
+    const nearly = [[square(398)]];
+    const tower = [[square(100)]];
+    const b = building(
+      [
+        { i: 0, name: "G", outline: base },
+        { i: 10, name: "1", outline: nearly, stackWith: 0 },
+        // Repeats the floor below, which is alike to the ground floor, so it is marked too.
+        { i: 20, name: "2", stackWith: 0 },
+        { i: 30, name: "3", outline: tower },
+        { i: 40, name: "4", outline: [[square(99)]], stackWith: 30 },
+      ],
+      5 * H,
+    );
+    expect(massing(b, H)).toEqual([
+      { outline: base, y0: 0, y1: 3 * H },
+      { outline: tower, y0: 3 * H, y1: 5 * H },
+    ]);
+  });
   it("falls back to the footprint for a building with nothing at or above entry level", () => {
     const b = building([{ i: -10, name: "B", outline: [[square(300)]] }], 1.2);
     expect(massing(b, H)).toEqual([{ outline: [b.outline], y0: 0, y1: 1.2 }]);
@@ -81,6 +101,40 @@ describe("building massing from floor outlines", () => {
     expect(area(science[science.length - 1]!)).toBeLessThan(area(science[0]!) / 2);
     const library = blocks("109");
     expect(area(library[library.length - 1]!)).toBeLessThan(area(library[0]!) / 4);
+  });
+  it("stacks only floors that are alike, and leaves no two alike blocks one on the other", () => {
+    const shape = (outline: FlatRing[][]): Ring[][] => outline.map((poly) => poly.map(decodeRing));
+    let marked = 0;
+    for (const b of campus.buildings) {
+      const entry = b.floors.find((f) => f.i >= 0)?.i;
+      // The outline each floor has in effect: its own, or the one it repeats from the floor below.
+      const effective = new Map<number, FlatRing[][]>();
+      let current: FlatRing[][] | undefined;
+      for (const f of b.floors) {
+        if (f.outline) current = f.outline;
+        effective.set(f.i, current ?? [b.outline]);
+      }
+      for (const f of b.floors) {
+        if (f.stackWith === undefined) continue;
+        marked++;
+        expect(f.stackWith, `${b.id} ${f.name}`).toBeLessThan(f.i);
+        expect(f.stackWith, `${b.id} ${f.name}`).toBeGreaterThanOrEqual(entry!);
+        expect((f.i - entry!) % 10, `${b.id} ${f.name} is a full level`).toBe(0);
+        expect((f.stackWith - entry!) % 10, `${b.id} ${f.name} stacks with a full level`).toBe(0);
+        expect(overlap(shape(effective.get(f.stackWith)!), shape(effective.get(f.i)!)), `${b.id} ${f.name}`).toBeGreaterThanOrEqual(0.95);
+      }
+      const blocks = massing(b, H).filter((block) => block.y1 - block.y0 >= H - 1e-6);
+      for (let k = 1; k < blocks.length; k++) {
+        if (blocks[k]!.outline === blocks[k - 1]!.outline) continue;
+        expect(overlap(shape(blocks[k - 1]!.outline), shape(blocks[k]!.outline)), `${b.id} blocks ${k - 1} and ${k}`).toBeLessThan(0.95);
+      }
+    }
+    expect(marked).toBeGreaterThan(150);
+  });
+  it("draws University Hall's fourteen alike floors as one block", () => {
+    const hall = massing(campus.buildings.find((b) => b.id === "440")!, H);
+    expect(hall.length).toBe(3);
+    expect((hall[2]!.y1 - hall[2]!.y0) / H).toBeCloseTo(14, 6);
   });
   it("finds real shape in about half of the buildings on the map", () => {
     const onMap = campus.buildings.filter((b) => !b.offMap);

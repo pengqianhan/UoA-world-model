@@ -110,6 +110,50 @@ export function shareInside(polys: readonly Ring[][], ring: Ring, n = 24): numbe
  * The smallest rectangle around a ring that lies along one of the ring's edges. `angle` is the
  * direction of its long side, in radians anticlockwise from east.
  */
+/**
+ * How much two shapes are the same shape: the area they share over the area either covers, from
+ * 1 for identical to 0 for apart. Each shape is a list of polygons, each a list of rings with the
+ * outer ring first; both are drawn onto one grid of square cells and the cells are counted.
+ */
+export function overlap(a: readonly Ring[][], b: readonly Ring[][], cell = 0.5): number {
+  const [x0, y0, x1, y1] = bbox([...a, ...b].flatMap((poly) => poly[0] ?? []));
+  const w = Math.ceil((x1 - x0) / cell) + 1;
+  const h = Math.ceil((y1 - y0) / cell) + 1;
+  if (!(w > 0 && h > 0)) return 0;
+  const grid = new Uint8Array(w * h);
+  const draw = (shape: readonly Ring[][], bit: number) => {
+    for (const poly of shape) {
+      for (let row = 0; row < h; row++) {
+        // Where the row's centre line crosses the polygon's rings: inside between each pair.
+        const y = y0 + (row + 0.5) * cell;
+        const xs: number[] = [];
+        for (const ring of poly) {
+          for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const p = ring[i]!;
+            const q = ring[j]!;
+            if (p[1] > y !== q[1] > y) xs.push(p[0] + ((y - p[1]) / (q[1] - p[1])) * (q[0] - p[0]));
+          }
+        }
+        xs.sort((m, n) => m - n);
+        for (let k = 0; k + 1 < xs.length; k += 2) {
+          const from = Math.max(0, Math.ceil((xs[k]! - x0) / cell - 0.5));
+          const to = Math.min(w - 1, Math.floor((xs[k + 1]! - x0) / cell - 0.5));
+          for (let col = from; col <= to; col++) grid[row * w + col]! |= bit;
+        }
+      }
+    }
+  };
+  draw(a, 1);
+  draw(b, 2);
+  let both = 0;
+  let either = 0;
+  for (const v of grid) {
+    if (v) either++;
+    if (v === 3) both++;
+  }
+  return either ? both / either : 0;
+}
+
 export function boundingRectangle(ring: Ring): { centre: Pt; angle: number; length: number; width: number } {
   let best = { centre: [0, 0] as Pt, angle: 0, length: 0, width: 0 };
   let bestArea = Infinity;

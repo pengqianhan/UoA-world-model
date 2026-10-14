@@ -193,8 +193,9 @@ Accuracy is labelled wherever it matters. A room drawn with an outline comes fro
 room shown as a pin is known to the campus map by its code; the pin stands on the plain shape that
 the floor plan draws for it. Plain shapes carry no code, name or type. A room that the
 map does not know is placed on a floor inferred from its number and marked as inferred. A building's
-shape comes from the campus map's outline of each floor; its height is an estimate of 3.6 m a floor,
-and its windows are drawn by rule.
+shape comes from the campus map's outline of each floor, with floors that are alike within a
+twentieth of their area drawn as one block; its height is an estimate of 3.6 m a floor, and its
+windows are drawn by rule.
 
 ## Data sources and licences
 
