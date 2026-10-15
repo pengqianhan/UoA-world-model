@@ -2054,6 +2054,17 @@ select optgroup {
   white-space: normal;
 }
 
+/* A picture of the view for an agent (scripts/walker): the panels step aside, the labels stay. */
+.shot-clean .topbar,
+.shot-clean .walker-panel,
+.shot-clean .status,
+.shot-clean .dock,
+.shot-clean .attribution,
+.shot-clean .space-tip,
+.shot-clean .panel {
+  visibility: hidden;
+}
+
 @media (max-width: 720px) {
   .walker-panel {
     top: calc(var(--top) + 4px);
