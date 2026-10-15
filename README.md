@@ -276,7 +276,8 @@ an estimate of 3.6 m a floor, and its windows and roof rims are drawn by rule.
 
 Snapshot dates are shown in the site's About panel and recorded in `public/data/meta.json`.
 
-The **code** is under the MIT licence (see `LICENSE`). That licence does not cover the data above.
+The **code** is under the MIT licence (see `LICENSE`). That licence does not cover the data above;
+`NOTICE` says so too, beside the licence.
 
 If you represent the University and would like something changed or removed, please open an issue.
 

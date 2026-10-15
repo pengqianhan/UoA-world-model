@@ -1,0 +1,15 @@
+UoA World Model (unofficial). Not affiliated with, endorsed by or maintained by the University of
+Auckland.
+
+The MIT License in LICENSE covers the source code in this repository only. It does not cover the
+data. The files under public/data/ and data/ are derived from third-party sources and remain under
+their terms:
+
+- data/raw/osm/, public/data/context.json and public/data/context/: (c) OpenStreetMap
+  contributors, under the Open Database License 1.0.
+- data/raw/terrain/ and public/data/terrain/: New Zealand terrain data (c) Land Information New
+  Zealand and the New Zealand Government, under CC BY 3.0 NZ.
+- What the site takes from the University of Auckland's public campus map and Calendar
+  (buildings, floors, rooms, room types, key dates) remains the University of Auckland's copyright.
+
+README.md, "Data sources and licences", gives each source with its terms and how it is used.
