@@ -24,9 +24,10 @@ A change to what the site does or shows adds its line here, and the README's
   are not mapped. It goes into a building at street level, takes the nearest stairs or lift, and
   walks to a room keeping to corridors where it can, the building view following it. It can wander
   on its own from building to building. It is seen from above, from behind or through its eyes,
-  says things in a bubble that other walkers near it hear, and wears one of five outfits (Halloween's among them), with an umbrella when Open-Meteo
-  reports rain. Claude Code and other agents steer it with `npm run walker`, an MCP server or the
-  `campus-walker` skill, all on the user's own computer (#40).
+  says things in a bubble that other walkers near it hear, and wears one of five outfits
+  (Halloween's among them), with an umbrella when Open-Meteo reports rain. Claude Code and other
+  agents steer it with `npm run walker`, an MCP server or the `campus-walker` skill, all on the
+  user's own computer (#40).
 
 ## 2026-10-15
 
