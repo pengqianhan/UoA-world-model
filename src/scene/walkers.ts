@@ -323,7 +323,11 @@ export class WalkerWorld {
       const was = { x: w.at[0], y: w.at[1], h: w.heading, m: w.moving };
       let travelled = 0;
       if (w.walk) travelled = this.advance(w, dt);
-      else if (w.drive.forward || w.drive.turn) travelled = this.drive(w, dt);
+      else if (w.drive.forward || w.drive.turn) {
+        // Steered by hand: in steps of a tenth of a second at most, so a slow frame cannot carry
+        // the walker through a wall or a tree in one go.
+        for (let left = dt; left > 1e-6; left -= 0.1) travelled += this.drive(w, Math.min(0.1, left));
+      }
       const target = travelled > 0 ? 1 : 0;
       w.moving += (target - w.moving) * Math.min(1, dt * 6);
       if (Math.abs(w.moving) < 0.01) w.moving = 0;

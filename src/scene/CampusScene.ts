@@ -1937,7 +1937,9 @@ export class CampusScene {
   private frame = (now: number): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
-    const dt = this.lastFrame ? Math.min(0.1, (now - this.lastFrame) / 1000) : 0;
+    // Walkers move by the clock, not by frames: on a slow renderer a frame can take a second, and
+    // a walk must still take as long as it takes. A long gap (a hidden tab) counts as two seconds.
+    const dt = this.lastFrame ? Math.min(2, (now - this.lastFrame) / 1000) : 0;
     this.lastFrame = now;
     if (this.tweens.length) {
       this.tweens = this.tweens.filter((t) => {
