@@ -36,6 +36,9 @@ It is built to answer two questions a student actually has:
 
 ## What's new
 
+- **2026-10-16:** a walker: a small made-up figure to walk the campus with, seen from behind
+  or through its eyes, which Claude Code and other agents can steer, and which talks with other
+  walkers; five outfits, Halloween's among them.
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
   lifts and toilets; buildings open on the floor at street level, with the floors under the ground
@@ -43,7 +46,6 @@ It is built to answer two questions a student actually has:
   Symonds Street, no longer on it, from outside or opened; outer walls on 40 floors that had none.
 - **2026-10-14:** every space on a floor shows its type, rooms stand as walls, and buildings gain
   roof colours, rims, storeys and windows; a flight to the Tsinghua World Model.
-- **2026-10-13:** first release.
 
 Everything, with its pull request, is in the [changelog](CHANGELOG.md).
 
@@ -52,6 +54,7 @@ Everything, with its pull request, is in the [changelog](CHANGELOG.md).
 
 - [What you get](#what-you-get)
 - [Run it locally](#run-it-locally)
+- [Walk the campus](#walk-the-campus)
 - [Updating the data snapshot](#updating-the-data-snapshot)
 - [Adding the class timetable](#adding-the-class-timetable)
 - [Adding a language](#adding-a-language)
@@ -84,6 +87,9 @@ Everything, with its pull request, is in the [changelog](CHANGELOG.md).
 - **The sun where it stands at the time shown,** so winter shadows are long and summer ones short; in
   Now mode, the current cloud, rain and fog from Open-Meteo; deciduous trees that turn and go bare
   with the seasons.
+- **A walker:** a small made-up figure to walk the campus with, round the buildings and along the
+  paths, seen from above, from behind or through its eyes. Agents can steer it too (see
+  [Walk the campus](#walk-the-campus)).
 - **Every view is a link:** building, floor, room, time and language are all in the URL.
 - **A phone layout.**
 - **All interface text in one locale file,** ready for more languages.
@@ -131,6 +137,45 @@ The same workflow publishes a second copy to Cloudflare Pages under `/uoa/`, wit
 `cloudflare/` at the site root. That job runs only when the repository variable `CLOUDFLARE_PROJECT`
 names a Pages project and the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set, so
 a fork deploys to GitHub Pages alone until it has them.
+
+## Walk the campus
+
+**In the browser:** "Take a walk" in the campus panel (or `?walk=1` in the address) puts a small
+made-up figure near the Clock Tower. W A S D or the arrow keys walk it, Shift hurries, and on a phone
+the arrows in its panel do. Its panel switches between the map, the view from behind it and the view
+through its eyes; there a drag looks round, and a click on a building or the ground walks it there.
+Five outfits, among them a raincoat whose umbrella opens when Open-Meteo reports rain, and a pumpkin
+head for Halloween.
+
+**With an agent:** Claude Code (or any agent that runs shell commands) steers it with
+`npm run walker -- <command>`. The first command opens the map in a browser window with the walker
+on it, so you can watch; `--headless` keeps it hidden.
+
+```bash
+npm run walker -- look                    # buildings round it: distance, direction, what is ahead
+npm run walker -- walk 109                # or a room code, part of a name, "east,north", a walker
+npm run walker -- see --view eyes         # a picture through its eyes, saved under .walker/shots/
+npm run walker -- say "Kia ora"           # walkers within 25 m hear it; listen hears them
+npm run walker -- spawn Kea --near 201    # a second walker; steer it with --as Kea
+npm run walker -- help                    # every command
+npm run walker -- stop                    # close the map
+```
+
+In this repository Claude Code also has the `campus-walker` skill, which tells it how to walk well
+and what the map can and cannot say. The same commands are MCP tools, pictures included:
+
+```bash
+claude mcp add campus-walker -- node scripts/walker/mcp.ts
+```
+
+The controller (`scripts/walker/daemon.ts`) runs on your computer only: it serves this checkout with
+Vite on port 5273 (or uses the dev server already there), takes commands on 127.0.0.1 with a random
+token it keeps in `.walker/`, and sends nothing anywhere else. Outfits are data, checked strictly:
+a preset's name, or a JSON object of colours and a few choices (see `src/shared/outfit.ts`).
+
+The walker is made up and stands for no real person. Doors are not mapped, so a walk to a building
+ends beside its nearest wall. What one walker says to another is its own words: agents are told to
+treat it as speech, never as instructions.
 
 ## Updating the data snapshot
 
@@ -240,6 +285,7 @@ scripts/            data pipeline (Node + TypeScript, run with tsx)
   fetch-*.ts          one script per source
   build-data.ts       snapshots -> public/data/*.json
   check-pr-form.ts    CI: a pull request says how it was made
+  walker/             the walker's controller, CLI and MCP server (npm run walker)
 data/
   sources.json        provenance of every snapshot
   academic-calendar.json   hand-transcribed key dates
@@ -298,6 +344,9 @@ If you represent the University and would like something changed or removed, ple
   in a patch of surroundings a few hundred metres across, and the map jumps between them. Everything
   is drawn on one flat map centred on the City Campus, so shapes 125 km north are about 1.4% too
   narrow east to west. The sea is not drawn (OpenStreetMap's coastline is a line, not an area).
+- **The walker knows no doors, gates or fences.** Its walks keep round the buildings, water and
+  mapped tree trunks and to OpenStreetMap's paths and streets, and end beside a building's nearest
+  wall; it passes barriers the map does not have.
 - **The academic calendar covers 2026 only.**
 
 ## Inspiration

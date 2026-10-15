@@ -149,6 +149,7 @@ export function AboutPanel() {
               <li>{t("about.limits.heights", { height: d.campus.floorHeight })}</li>
               <li>{t("about.limits.campuses")}</li>
               <li>{t("about.limits.context")}</li>
+              <li id="walker-limits">{t("about.limits.walker")}</li>
               <li>{t("about.limits.calendar")}</li>
               <li>{t("about.limits.daylight")}</li>
             </ul>

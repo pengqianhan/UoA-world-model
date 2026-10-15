@@ -14,6 +14,19 @@ A change to what the site does or shows adds its line here, and the README's
   the Classes API key arrives, so that what the timetable and the catalogue each supply can be
   settled with both in hand.
 
+## 2026-10-16
+
+### Added
+
+- **A walker on the map.** "Take a walk" puts a small made-up figure near the Clock Tower, to walk
+  with the keyboard or the arrows on a phone. Its walks keep round the buildings, water and tree
+  trunks and to OpenStreetMap's paths and streets, and end beside a building's nearest wall, as doors
+  are not mapped. It is seen from above, from behind or through its eyes, says things in a bubble
+  that other walkers near it hear, and wears one of five outfits (Halloween's among them), with an
+  umbrella when Open-Meteo reports rain. Claude Code and other agents steer it with
+  `npm run walker`, an MCP server or the `campus-walker` skill, all on the user's own computer
+  (#38).
+
 ## 2026-10-15
 
 ### Added

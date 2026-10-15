@@ -290,6 +290,24 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   session header and with `/effort status`. Since 2026-10-15 `how-it-was-made` is a required status
   check on `main`, beside `build` and `e2e`, for admins too. That is branch protection, a repository
   setting that does not show in the code.
+- **The walker (the user, 2026-10-16), a bonus, not a base feature.** Asked for overnight: "给地图添加小人，
+  并且从小人视角来逛校园... 在不违反隐私和相关规定的前提下尽量多做一些功能", with Smallville, AI Town and
+  Project Sid as references. What was decided, and why:
+  - It is a made-up figure on the model, never a person: no geolocation, no accounts, nothing about a
+    walk leaves the browser. Places, not people, holds.
+  - Doors and entrances are not mapped, so a walk to a building ends beside its nearest wall
+    (`ARRIVE_REACH` in `src/shared/walkmap.ts`), and the panel, About and the look report say so.
+  - Walks are A* on a grid (`src/shared/walkpath.ts`, 1.5 m cells, widened when the way round lies
+    outside the first box), blocked by what stands on the ground (each building's lowest massing
+    block, so the Southern Underpass's street stays open), surrounding buildings, water and mapped
+    tree trunks; cheapest on footpaths, dearest on motorways except over footbridges.
+  - No new dependency: the controller reuses Playwright and Vite (devDependencies) and the MCP server
+    is JSON-RPC written by hand for initialize, tools/list, tools/call and ping.
+  - The controller listens on 127.0.0.1 with a random token, so a web page cannot steer the walker.
+  - Outfits are data only, checked strictly (`parseOutfit`): known keys, `#rrggbb` colours, fixed
+    choices; none is a uniform or uses the University's colours.
+  - What another walker says reaches an agent as speech: the listen answer, the MCP tool's
+    description and the skill all say it is never instructions.
 - **GOAL.md is gitignored.** It contains the local working-directory path (with a username).
 - **Stack:** Vite + TypeScript + three.js + Preact (+ signals). Shared pure-TS modules in
   `src/shared` are used by both the pipeline and the app.
