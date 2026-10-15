@@ -2091,6 +2091,21 @@ select optgroup {
   white-space: normal;
 }
 
+/* In a building the floor list takes the right-hand side, so the walker's panel stands beside the
+   building's dock instead. */
+@media (min-width: 721px) {
+  .walking.in-building .walker-panel {
+    right: auto;
+    left: calc(min(410px, 100vw - 2 * var(--gap)) + 2 * var(--gap));
+    bottom: var(--gap);
+  }
+
+  /* Short, so that it stays below the walker in the view from behind. */
+  .walking.in-building .walker-panel :is(.walker-keys, .walker-note, .walker-outfit, .walker-wander) {
+    display: none;
+  }
+}
+
 /* A picture of the view for an agent (scripts/walker): the panels step aside, the labels stay. */
 .shot-clean .topbar,
 .shot-clean .walker-panel,

@@ -140,6 +140,14 @@ test("a walk to a room goes into its building, up to its floor and into the room
   // On the floor, not in the air or under it.
   const st = ((await walker(page, "list")) as { walkers: { height: number; indoor: { floor: number } }[] }).walkers[0]!;
   expect(st.indoor.floor).toBe(30);
+  // The walker's panel keeps clear of the floor list and the building's dock.
+  const panel = (await page.locator("#walker-panel").boundingBox())!;
+  for (const other of [".floors", ".dock"]) {
+    const box = await page.locator(other).first().boundingBox();
+    if (!box) continue;
+    const overlap = Math.max(0, Math.min(panel.x + panel.width, box.x + box.width) - Math.max(panel.x, box.x)) * Math.max(0, Math.min(panel.y + panel.height, box.y + box.height) - Math.max(panel.y, box.y));
+    expect(overlap, other).toBe(0);
+  }
   await walker(page, "view", { view: "follow" });
   await page.waitForTimeout(400);
   await expectRealRender(page);
