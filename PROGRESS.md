@@ -311,8 +311,16 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
 - **Labels are HTML, hit-tested by the scene** (`pointer-events: none`) so that a drag starting on a
   label still rotates the map.
 - **Building view = cut-away:** floors above the selected one are hidden, floors below are a solid
-  base, neighbours sink to footprints. The stack is lifted so the lowest floor sits on the ground.
-  Since 2026-10-14 (the user, after comparing floors with the Tsinghua World Model): the base keeps
+  base, neighbours sink to footprints. Since 2026-10-15 (the user, after the Southern Underpass
+  looked as if it stood on Symonds Street: "每次点开建筑物默认显示是0 层，因为对于人类来说一般首先到达的是0level"),
+  a building opens on the floor at street level (`groundLevel` in `src/shared/massing.ts`: the lowest
+  floor at or above index 0) instead of its lowest floor with learning spaces; that changed the
+  opening floor of 19 buildings. That floor stands on the ground, where the campus view stands it,
+  and the floors under it lie below the ground, drawn only while one of them is open. An open floor
+  below the ground is drawn again over the picture with the ground over it at `GROUND_VEIL` (45%),
+  so it is seen through the ground, and the floor list draws the ground as a dashed line under the
+  street-level floor. Before, the stack was lifted so the lowest floor sat on the ground, and an
+  underpass stood on the street it runs under. Since 2026-10-14 (the user, after comparing floors with the Tsinghua World Model): the base keeps
   the building's walls and windows, the open floor keeps its outer walls cut at the height of the
   rooms, rooms stand as walls on their outlines, and the camera frames the open floor to fill the
   screen beside the panels (`FLOOR_FILL` in `CampusScene.ts`).

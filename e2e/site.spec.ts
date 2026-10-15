@@ -529,3 +529,26 @@ test("an open building fills the screen beside the panels, keeps its windows bel
   await expectRealRender(page);
   await shot(page, "16-building-facade");
 });
+
+test("a building opens on the floor at street level, and the floors under the ground lie below it, seen through the ground", async ({ page }) => {
+  // The HIWA Recreation Centre has two floors under its floor 0; its one learning space is on B2.
+  await open(page, "?building=310&light=day&time=preview&date=2026-03-20&t=12:00");
+  await expect(page.locator(".floor.on")).toHaveAttribute("data-floor", "0");
+  // In the floor list the ground runs under floor 0, over B2 and B1.
+  await expect(page.locator(".floors-ground")).toHaveCount(1);
+  await expect(page.locator(".floors-ground + li .floor")).toHaveAttribute("data-floor", "0");
+  await expect(page.locator('.floor[data-floor="B2"]')).toHaveAttribute("title", /below ground/);
+  await page.waitForFunction(() => window.__scene!.groundState(0, 0).terrain && !window.__scene!.animating);
+  const { base } = await page.evaluate(() => window.__scene!.groundState(0, 0, "310"));
+  // Floor 0 is framed on the ground the building stands on, not lifted by the floors under it.
+  expect((await page.evaluate(() => window.__scene!.cameraState())).target[1]).toBeCloseTo(base!, 1);
+  await expectRealRender(page);
+  await shot(page, "19-street-level");
+
+  await page.locator('.floor[data-floor="B2"]').click();
+  await page.waitForFunction(() => !window.__scene!.animating);
+  expect((await page.evaluate(() => window.__scene!.cameraState())).target[1]).toBeCloseTo(base! - 3.6, 1);
+  await expect(page.locator('[data-label^="room:310-"]').first()).toBeVisible();
+  await expectRealRender(page);
+  await shot(page, "19-below-ground");
+});
