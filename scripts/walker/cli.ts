@@ -153,7 +153,7 @@ export function describe(cmd: string, r: Record<string, unknown>): string {
 
 async function main(): Promise<void> {
   const p = parseArgs(process.argv.slice(2));
-  const opts: StartOptions = { headless: p.flags.headless === true, url: typeof p.flags.url === "string" ? p.flags.url : undefined };
+  const opts: StartOptions = { headless: p.flags.headless === true ? true : undefined, url: typeof p.flags.url === "string" ? p.flags.url : undefined };
   const say = (line: string) => console.error(line);
   if (p.cmd === "help" || p.flags.help) {
     console.log(HELP);

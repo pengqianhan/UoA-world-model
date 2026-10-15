@@ -22,9 +22,9 @@ export interface DaemonState {
 }
 
 export interface StartOptions {
-  /** The site to open; by default a Vite dev server of this checkout. */
+  /** The site to open; by default a Vite dev server of this checkout, or WALKER_URL. */
   url?: string;
-  /** No window: for agents on a machine nobody is watching. */
+  /** No window: for agents on a machine nobody is watching. Default: WALKER_HEADLESS=1. */
   headless?: boolean;
 }
 
@@ -74,12 +74,15 @@ export async function ensureDaemon(opts: StartOptions = {}, log: (line: string) 
     // Not there: nothing to clear.
   }
   const args = [path.join(ROOT, "scripts", "walker", "daemon.ts")];
-  if (opts.url) args.push("--url", opts.url);
-  if (opts.headless) args.push("--headless");
+  // WALKER_HEADLESS=1 keeps the browser hidden for an agent working where nobody watches.
+  const headless = opts.headless ?? process.env.WALKER_HEADLESS === "1";
+  const url = opts.url ?? process.env.WALKER_URL;
+  if (url) args.push("--url", url);
+  if (headless) args.push("--headless");
   const logFile = fs.openSync(path.join(STATE_DIR, "daemon.log"), "a");
   const child = spawn(process.execPath, args, { cwd: ROOT, detached: true, stdio: ["ignore", logFile, logFile], windowsHide: true });
   child.unref();
-  log(`Starting the walker's controller (pid ${child.pid}); it opens ${opts.headless ? "a hidden" : "a"} browser on the campus map…`);
+  log(`Starting the walker's controller (pid ${child.pid}); it opens ${headless ? "a hidden" : "a"} browser on the campus map…`);
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 700));
