@@ -88,10 +88,13 @@ class Walker {
   phase = 0;
   moving = 0;
   outfit: Outfit;
-  speech?: { text: string; until: number };
+  /** What it says, for `ms` from the first frame that shows it (`until` is set then). */
+  speech?: { text: string; ms: number; until?: number };
   heardUpTo = 0;
   /** Steering by hand: metres a second forward, degrees a second of turn. */
   drive = { forward: 0, turn: 0 };
+  /** When the steering by hand was last added up, ms (performance.now). */
+  driveFrom = 0;
   nameLabel: LabelSpec;
   sayLabel: LabelSpec;
 
@@ -170,7 +173,7 @@ export class WalkerWorld {
       indoor: w.indoor ? { ...w.indoor } : undefined,
       walking: !!w.walk,
       outfit: { ...w.outfit },
-      saying: w.speech && w.speech.until > this.now ? w.speech.text : undefined,
+      saying: w.speech && (w.speech.until === undefined || w.speech.until > this.now) ? w.speech.text : undefined,
     };
   }
 
@@ -251,8 +254,23 @@ export class WalkerWorld {
   steer(name: string, forward: number, turn: number): void {
     const w = this.walkers.get(name);
     if (!w) return;
+    // A key held until now counts for all the time it was held, though no frame was drawn meanwhile.
+    this.driveUntil(w, performance.now());
     if (forward || turn) this.cancel(w, "steered by hand");
     w.drive = { forward, turn };
+  }
+
+  /**
+   * Adds up the steering by hand from when it was last added up to `t` (ms), in steps of a tenth
+   * of a second at most, so that a slow frame cannot carry the walker through a wall or a tree.
+   */
+  private driveUntil(w: Walker, t: number): number {
+    const span = w.driveFrom && (w.drive.forward || w.drive.turn) ? Math.min(2, Math.max(0, (t - w.driveFrom) / 1000)) : 0;
+    w.driveFrom = Math.max(w.driveFrom, t);
+    let travelled = 0;
+    for (let left = span; left > 1e-6; left -= 0.1) travelled += this.drive(w, Math.min(0.1, left));
+    if (travelled > 0) this.place(w);
+    return travelled;
   }
 
   /** Moves a walker straight to a point, without walking: into or out of a building. */
@@ -278,7 +296,8 @@ export class WalkerWorld {
     const w = this.walkers.get(name);
     const clean = text.replace(/\s+/g, " ").trim().slice(0, 200);
     if (!w || !clean) return undefined;
-    w.speech = { text: clean, until: this.now + Math.min(15000, 3500 + clean.length * 70) };
+    // Shown for its time from the first frame that draws it, which on a slow screen may be a while.
+    w.speech = { text: clean, ms: Math.min(15000, 3500 + clean.length * 70) };
     w.sayLabel.text = clean;
     const s: Speech = { from: name, text: clean, at: this.now, where: [w.at[0], w.at[1]], indoor: w.indoor ? { ...w.indoor } : undefined };
     this.said.push(s);
@@ -306,7 +325,7 @@ export class WalkerWorld {
     const out: LabelSpec[] = [];
     for (const w of this.walkers.values()) {
       out.push(w.nameLabel);
-      if (w.speech && w.speech.until > this.now) out.push(w.sayLabel);
+      if (w.speech && (w.speech.until === undefined || w.speech.until > this.now)) out.push(w.sayLabel);
     }
     return out;
   }
@@ -323,11 +342,7 @@ export class WalkerWorld {
       const was = { x: w.at[0], y: w.at[1], h: w.heading, m: w.moving };
       let travelled = 0;
       if (w.walk) travelled = this.advance(w, dt);
-      else if (w.drive.forward || w.drive.turn) {
-        // Steered by hand: in steps of a tenth of a second at most, so a slow frame cannot carry
-        // the walker through a wall or a tree in one go.
-        for (let left = dt; left > 1e-6; left -= 0.1) travelled += this.drive(w, Math.min(0.1, left));
-      }
+      else travelled = this.driveUntil(w, now);
       const target = travelled > 0 ? 1 : 0;
       w.moving += (target - w.moving) * Math.min(1, dt * 6);
       if (Math.abs(w.moving) < 0.01) w.moving = 0;
@@ -336,7 +351,8 @@ export class WalkerWorld {
       w.figure.setUmbrella(umbrella);
       if (travelled > 0 || w.moving > 0) this.place(w);
       w.figure.pose(w.phase, w.moving, now / 1000);
-      if (w.speech && w.speech.until <= now) {
+      if (w.speech && w.speech.until === undefined) w.speech.until = now + w.speech.ms;
+      else if (w.speech && w.speech.until! <= now) {
         w.speech = undefined;
         this.labelsVersion++;
       }

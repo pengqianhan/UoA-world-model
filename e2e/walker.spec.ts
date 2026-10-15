@@ -11,6 +11,9 @@ declare global {
 }
 
 const QUERY = "light=day&time=preview&date=2026-03-20&t=15:00";
+// A smaller window than the other desktop tests: CI draws in software, and a walker view is redrawn
+// while anything in it moves.
+test.use({ viewport: { width: 1100, height: 720 } });
 
 async function walker(page: Page, command: string, args: Record<string, unknown> = {}): Promise<Reply> {
   return page.evaluate(([c, a]) => window.__walker!.run(c, a), [command, args] as const);

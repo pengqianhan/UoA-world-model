@@ -1723,9 +1723,17 @@ export class CampusScene {
     this.persp.updateMatrixWorld();
     // The shadows follow the walker round the map.
     if (Math.hypot(this.shadowCentre.x - x, this.shadowCentre.z + y) > 70) this.fitShadow();
-    this.needsRender = true;
-    this.needsLabels = true;
+    // Draw only when the view moved: a walker standing still in a still view costs nothing.
+    const e = this.persp.matrixWorld.elements;
+    const moved = !this.lastView || e.some((v, i) => Math.abs(v - this.lastView![i]!) > 1e-5);
+    if (moved || dt >= 1) {
+      this.lastView = e.slice();
+      this.needsRender = true;
+      this.needsLabels = true;
+    }
   }
+  /** The walker view's camera matrix when last drawn. */
+  private lastView?: number[];
 
   /** Turns the walker view by a drag of the pointer, in pixels. */
   private turnWalkerView(dx: number, dy: number): void {
