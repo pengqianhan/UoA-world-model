@@ -1258,6 +1258,26 @@ select optgroup {
   color: var(--accent);
 }
 
+/* The ground, between the floor a building is entered at and the floors under it. */
+.floors-ground {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 2px;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.floors-ground::before,
+.floors-ground::after {
+  flex: 1;
+  border-top: 1px dashed var(--muted);
+  content: "";
+}
+
 .floor-count {
   min-width: 20px;
   padding: 0 5px;
@@ -1719,6 +1739,22 @@ select optgroup {
     height: 36px;
     justify-content: center;
     gap: 5px;
+  }
+
+  /* In the strip the ground stands upright between two floors, with no word. */
+  .floors-ground {
+    padding: 4px 3px;
+  }
+
+  .floors-ground span,
+  .floors-ground::after {
+    display: none;
+  }
+
+  .floors-ground::before {
+    align-self: stretch;
+    border-top: none;
+    border-left: 1px dashed var(--muted);
   }
 
   .dock {

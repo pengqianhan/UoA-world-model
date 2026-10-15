@@ -18,6 +18,7 @@ import {
   LineSegments,
   Matrix4,
   Mesh,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   Object3D,
   OrthographicCamera,
@@ -37,7 +38,7 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room, SpaceKind, SpaceType } from "../shared/types.ts";
 import { decodeRing, interiorPoint, pointInRing } from "../shared/geo.ts";
-import { massing, roofRims } from "../shared/massing.ts";
+import { groundLevel, massing, roofRims } from "../shared/massing.ts";
 import { MeshBuilder, drape, ringsBounds } from "./geometry.ts";
 import { SEA_PLANE, Terrain } from "./terrain.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
@@ -152,6 +153,8 @@ const CUT_WALL = 1.5;
 const CUT_WALL_THICKNESS = 0.3;
 /** Share of the screen's width and height the open floor is framed to fill, beside the panels. */
 const FLOOR_FILL = { wide: [0.56, 0.66], narrow: [0.84, 0.48] } as const;
+/** How much of the ground shows over an open floor below it: the floor is seen through the ground. */
+const GROUND_VEIL = 0.45;
 
 const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
@@ -976,10 +979,18 @@ export class CampusScene {
   // Building detail: cut-away floor stack
   // -------------------------------------------------------------------------------------------
 
-  /** Height of a floor's slab in building view. The lowest floor sits on the ground. */
+  /**
+   * Height of a floor's slab in building view. The floor the building is entered at sits on the
+   * ground, where the campus view stands it, and the floors below it lie under the ground.
+   */
   private floorY(b: Building, i: number): number {
-    const min = b.floors[0]?.i ?? 0;
-    return this.baseOf(b) + ((i - min) / 10) * (this.campus?.floorHeight ?? 3.6);
+    return this.baseOf(b) + ((i - groundLevel(b)) / 10) * (this.campus?.floorHeight ?? 3.6);
+  }
+
+  /** Whether the open floor lies below the ground, and is to be seen through it. */
+  private get openBelowGround(): boolean {
+    const cur = this.focus > 0 ? this.currentFloor() : undefined;
+    return !!cur && cur.floor.i < groundLevel(cur.b);
   }
 
   /** Height of the ground at a point, metres east and north; 0 until the terrain has come. */
@@ -1070,10 +1081,13 @@ export class CampusScene {
     const facade = { storey: H, bay: WINDOW_BAY, roofGroup: true };
 
     // The floors below the cut keep the building's walls and windows. Their roofs show where a
-    // lower floor reaches out beyond the open one.
+    // lower floor reaches out beyond the open one. Floors under the ground are drawn only when the
+    // open floor is under it too, as in the campus view.
     const below = new MeshBuilder(true, true);
+    const ground = groundLevel(b);
     for (const f of b.floors) {
       if (f.i >= floor.i) break;
+      if (f.i < ground && floor.i >= ground) continue;
       const y = this.floorY(b, f.i);
       const next = b.floors.find((x) => x.i > f.i);
       const top = next ? this.floorY(b, next.i) : y + H;
@@ -1700,13 +1714,35 @@ export class CampusScene {
       this.renderer.shadowMap.needsUpdate = true;
       this.needsShadow = false;
     }
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
     if (this.needsLabels) {
       this.needsLabels = false;
       this.labels.update(this.camera, this.width, this.height);
     }
     this.frames++;
   };
+
+  /** A frame of the scene, with an open floor below the ground drawn through it. */
+  private draw(): void {
+    this.renderer.render(this.scene, this.camera);
+    if (!this.openBelowGround) return;
+    // The open floor again, over the picture, and then the ground over that, see-through.
+    const shown = this.scene.children.map((c) => c.visible);
+    const only = (keep: (o: Object3D) => boolean) => this.scene.children.forEach((c, k) => (c.visible = shown[k]! && (keep(c) || (c as DirectionalLight).isLight === true)));
+    this.renderer.autoClear = false;
+    this.renderer.clearDepth();
+    only((c) => c === this.detailGroup || c === this.pinGroup);
+    this.renderer.render(this.scene, this.camera);
+    only((c) => c === this.ground || this.terrainMeshes.includes(c as Mesh));
+    this.groundVeil.color.setHex(this.palette.ground);
+    this.scene.overrideMaterial = this.groundVeil;
+    this.renderer.render(this.scene, this.camera);
+    this.scene.overrideMaterial = null;
+    this.scene.children.forEach((c, k) => (c.visible = shown[k]!));
+    this.renderer.autoClear = true;
+  }
+  /** The ground as it is drawn over a floor below it. */
+  private groundVeil = new MeshBasicMaterial({ transparent: true, opacity: GROUND_VEIL, depthWrite: false });
 
   /** Number of frames drawn so far; lets tests wait for a real render. */
   frames = 0;
@@ -1857,7 +1893,7 @@ export class CampusScene {
    * (headless browsers can report success while drawing nothing).
    */
   probe(): { width: number; height: number; distinctColours: number; samples: number } {
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
     const gl = this.renderer.getContext();
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;

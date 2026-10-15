@@ -27,8 +27,17 @@ A change to what the site does or shows adds its line here, and the README's
 - **The real sun, the current weather and the seasons.** The sun stands where it does at the date
   and time shown. In Now mode the cloud, rain and fog follow Open-Meteo's current weather. The 21
   trees that OpenStreetMap tags as deciduous turn in autumn and stand bare in winter (#22).
+- **Floors under the ground, seen through it.** In a building, the floors below the one at street
+  level lie under the ground, and the floor list draws the ground as a dashed line between them.
+  Open one and the ground turns see-through over it (#32).
 - **Signs on the floor plan** for stairs, lifts, toilets, accessible toilets and showers. A room
   found by its code outlines the shape it stands on, and its card shows that shape's type (#21).
+
+### Changed
+
+- **A building opens on the floor at street level,** the one a visitor walks in on, and that floor
+  stands on the ground. Before, a building opened on its lowest floor with learning spaces, and the
+  whole building was lifted so that its lowest floor stood on the ground (#32).
 
 ### Fixed
 
