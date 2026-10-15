@@ -621,7 +621,8 @@ export function bindWalkerScene(s: CampusScene | undefined): void {
       floor: inB && st.indoor ? floorNameOf(inB, st.indoor.floor) : undefined,
     };
   }, 400);
-  (window as unknown as { __walker?: unknown }).__walker = { run, commands: Object.keys(COMMANDS), ready: () => !!data.value && !!s.walkingMap() };
+  // Ready once the campus and its surroundings are in, so the first walk goes round everything.
+  (window as unknown as { __walker?: unknown }).__walker = { run, commands: Object.keys(COMMANDS), ready: () => !!data.value && !!s.walkingMap() && s.loading === 0 && s.frames > 2 };
   // The visitor's walker keeps in step with the building view: leaving the building takes it
   // out of doors, and choosing another floor takes it up or down there.
   syncStop?.();

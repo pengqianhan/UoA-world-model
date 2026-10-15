@@ -341,10 +341,20 @@ export class WalkerWorld {
     return changed;
   }
 
-  /** Puts every walker back on the ground, after the ground or the buildings changed. */
+  /**
+   * Puts every walker back on the ground, after the ground or the buildings changed. One that now
+   * stands inside something (the surroundings arrived after it) steps out to the nearest free ground.
+   */
   refresh(): void {
     this.local = undefined;
-    for (const w of this.walkers.values()) this.place(w);
+    const map = this.host.walkMap();
+    for (const w of this.walkers.values()) {
+      if (!w.indoor && !w.walk && map && !this.walkable(w, w.at)) {
+        const free = map.freeNear(w.at, 40);
+        if (free) w.at = free;
+      }
+      this.place(w);
+    }
   }
 
   /** Takes every walker off the map. */
