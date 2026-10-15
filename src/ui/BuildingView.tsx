@@ -18,6 +18,7 @@ import {
   shown,
   timeMode,
 } from "../app/state.ts";
+import { groundLevel } from "../shared/massing.ts";
 import { sessionsOnDate } from "../shared/schedule.ts";
 import { formatMinutes } from "../shared/time.ts";
 import type { Building, Floor, Session, SpaceKind } from "../shared/types.ts";
@@ -39,41 +40,56 @@ function FloorList({ d, b }: { d: AppData; b: Building }) {
     document.querySelector(".floor.on")?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [b.id, current]);
   const marks = new Set(b.offMap ? [] : b.floors.map(floorMark).filter(Boolean));
+  // The ground runs under the floor the building is entered at, over the floors below it: before
+  // that floor in the list, or after the top floor of a building wholly below ground.
+  const ground = groundLevel(b);
+  const above = b.floors.findIndex((f) => f.i >= ground);
+  const groundAt = b.floors[0] && b.floors[0].i < ground ? (above === -1 ? b.floors.length : above) : -1;
+  const groundLine = (
+    <li class="floors-ground" aria-hidden="true">
+      <span>{t("building.ground")}</span>
+    </li>
+  );
   return (
     <nav class="floors" aria-label={t("building.floorList")}>
       <span class="floors-title">{t("building.floorList")}</span>
       <ol>
         {/* Lowest floor first in the document; CSS stacks the list bottom-up on wide screens. */}
-        {b.floors.map((f) => {
+        {b.floors.map((f, k) => {
           const count = counts.get(f.i) ?? 0;
           const on = f.i === selFloor.value;
           const mark = b.offMap ? undefined : floorMark(f);
           const title = [
             t("building.floor", { name: f.name }),
+            f.i < ground ? t("building.belowGround") : "",
             count ? tn("building.floorHasRooms", count) : "",
             mark ? t(`building.floorMark.${mark}`) : "",
           ];
           return (
-            <li>
-              <button
-                type="button"
-                class={`floor ${on ? "on" : ""} ${count ? "has-rooms" : ""} ${mark ? `mark-${mark}` : ""}`}
-                aria-current={on ? "true" : undefined}
-                data-floor={f.name}
-                title={title.filter(Boolean).join(" · ")}
-                onClick={() => openFloor(f.i)}
-              >
-                <span class="floor-name">{f.name}</span>
-                {count > 0 ? (
-                  <span class="floor-count">{count}</span>
-                ) : (
-                  mark && <span class={`floor-mark ${mark}`} aria-hidden="true" />
-                )}
-                {busyOn.has(f.i) && <span class="floor-busy" aria-hidden="true" />}
-              </button>
-            </li>
+            <>
+              {k === groundAt && groundLine}
+              <li>
+                <button
+                  type="button"
+                  class={`floor ${on ? "on" : ""} ${count ? "has-rooms" : ""} ${mark ? `mark-${mark}` : ""}`}
+                  aria-current={on ? "true" : undefined}
+                  data-floor={f.name}
+                  title={title.filter(Boolean).join(" · ")}
+                  onClick={() => openFloor(f.i)}
+                >
+                  <span class="floor-name">{f.name}</span>
+                  {count > 0 ? (
+                    <span class="floor-count">{count}</span>
+                  ) : (
+                    mark && <span class={`floor-mark ${mark}`} aria-hidden="true" />
+                  )}
+                  {busyOn.has(f.i) && <span class="floor-busy" aria-hidden="true" />}
+                </button>
+              </li>
+            </>
           );
         })}
+        {groundAt === b.floors.length && groundLine}
       </ol>
       {marks.size > 0 && (
         <ul class="floors-legend" id="floors-legend">

@@ -233,3 +233,11 @@ export function roofRims(block: MassingBlock, above?: MassingBlock): RimSegment[
   }
   return out;
 }
+
+/**
+ * The level a building is entered at from the street, which stands on the ground: its lowest floor
+ * at or above index 0, or index 0 itself for a building that lies wholly below ground.
+ */
+export function groundLevel(b: Building): number {
+  return b.floors.find((f) => f.i >= 0)?.i ?? 0;
+}

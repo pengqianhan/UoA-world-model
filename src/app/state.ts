@@ -6,6 +6,7 @@ import { nextTeachingDay, representativeTeachingDate, termStatus } from "../shar
 import { nightAmount, sunAt } from "../shared/daylight.ts";
 import type { SceneWeather } from "../scene/CampusScene.ts";
 import { weather, type Weather } from "../ui/weather.ts";
+import { groundLevel } from "../shared/massing.ts";
 import { codeKey, inferFloor, parseRoomCode } from "../shared/roomcode.ts";
 import { sessionsAt } from "../shared/schedule.ts";
 import { aucklandWallTime, formatMinutes, isoWeekday, parseIsoDate, parseTimeOfDay, type WallTime } from "../shared/time.ts";
@@ -125,13 +126,13 @@ export function floorName(b: Building | undefined, index: number | undefined): s
   return b?.floors.find((f) => f.i === index)?.name ?? "";
 }
 
-/** The floor to show when a building is opened without one: the lowest entry-level floor with learning spaces. */
-export function defaultFloor(d: AppData, b: Building): number {
-  const rooms = d.roomsByBuilding.get(b.id) ?? [];
-  const withRooms = new Set(rooms.map((r) => r.f));
-  const candidates = b.floors.filter((f) => withRooms.has(f.i));
-  const pick = candidates.find((f) => f.i >= 0) ?? candidates[0] ?? b.floors.find((f) => f.i >= 0) ?? b.floors[0];
-  return pick?.i ?? 0;
+/**
+ * The floor to show when a building is opened without one: the floor a visitor walks in on from
+ * the street (see groundLevel). A building wholly below ground opens on its top floor.
+ */
+export function defaultFloor(b: Building): number {
+  const ground = groundLevel(b);
+  return (b.floors.find((f) => f.i >= ground) ?? b.floors[b.floors.length - 1])?.i ?? 0;
 }
 
 export function goHome(campus?: string): void {
@@ -152,7 +153,7 @@ export function openBuilding(id: string, floor?: number): void {
   batch(() => {
     selCampus.value = b.campus;
     selBuilding.value = id;
-    selFloor.value = floor !== undefined && b.floors.some((f) => f.i === floor) ? floor : defaultFloor(d, b);
+    selFloor.value = floor !== undefined && b.floors.some((f) => f.i === floor) ? floor : defaultFloor(b);
     selRoom.value = undefined;
     marker.value = undefined;
   });
@@ -195,7 +196,7 @@ export function openMarker(m: Marker): void {
   batch(() => {
     selCampus.value = b.campus;
     selBuilding.value = m.building;
-    selFloor.value = m.floor ?? defaultFloor(d, b);
+    selFloor.value = m.floor ?? defaultFloor(b);
     selRoom.value = m.code;
     marker.value = m;
   });
