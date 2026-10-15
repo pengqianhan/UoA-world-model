@@ -385,9 +385,10 @@ export class CampusScene {
         };
         for (const poly of block.outline) mb.extrude(poly, block.y0, block.y1, ROOF_TINT, WALL_TINT, true, wall);
       }
-      // On a slope, a footing from the ground floor down to the lowest corner.
+      // On a slope, a footing from the ground floor down to the lowest corner. It goes under the
+      // ground storey, not the whole footprint, which takes in what lies below ground.
       const { base, low } = this.footingOf(b);
-      if (base - low > 0.05) mb.extrude(b.outline, low - base, 0, ROOF_TINT, PLINTH_TINT, false);
+      if (base - low > 0.05) for (const poly of blocks[0]!.outline) mb.extrude(poly, low - base, 0, ROOF_TINT, PLINTH_TINT, false);
       // The creases of the blocks themselves, before the parapets go on: a parapet has no
       // thickness, and its two faces would read as creases everywhere.
       const creases = new EdgesGeometry(mb.build(), 35);
@@ -1844,6 +1845,18 @@ export class CampusScene {
       ground: this.groundAt(x, y),
       ...(b ? { ...this.footingOf(b), meshY: this.buildingMeshes.get(b.id)?.position.y } : {}),
     };
+  }
+
+  /**
+   * The University buildings that a level line meets on its way from one point to another, metres
+   * east and north, at a height in metres. For tests.
+   */
+  buildingsAcross(ax: number, ay: number, bx: number, by: number, height: number): string[] {
+    const from = new Vector3(ax, height, -ay);
+    const along = new Vector3(bx, height, -by).sub(from);
+    const ray = new Raycaster(from, along.clone().normalize(), 0, along.length());
+    const hits = ray.intersectObjects([...this.buildingMeshes.values()], false);
+    return [...new Set(hits.map((h) => (h.object.userData.pick as { id: string }).id))];
   }
 
   /**
