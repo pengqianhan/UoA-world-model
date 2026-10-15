@@ -230,8 +230,7 @@ Code and run `/campus-world-model <university, campus>`.
 
 Reports and fixes are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). The rules every change keeps
 and the checks it passes are written for people and for coding agents alike, in
-[AGENTS.md](AGENTS.md) and [docs/standards.md](docs/standards.md). `CLAUDE.md` imports `AGENTS.md`,
-so Claude Code reads it even where it would not pick up `AGENTS.md` by itself.
+[AGENTS.md](AGENTS.md) and [docs/standards.md](docs/standards.md).
 
 ## How it is put together
 

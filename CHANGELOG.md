@@ -64,8 +64,8 @@ A change to what the site does or shows adds its line here, and the README's
   (#30).
 - Every pull request says how it was made: the model, the harness with its version and the
   thinking effort. The form asks for them and CI checks they are given (#34).
-- Ready for other contributors and their agents: `CLAUDE.md` imports `AGENTS.md`; only the
-  maintainer rebuilds `public/data/`, and a fresh clone is told why; `PROGRESS.md` says who "the
+- Ready for other contributors and their agents: only the maintainer rebuilds `public/data/`, and
+  a fresh clone is told why; `PROGRESS.md` says who "the
   user" is; the end-to-end tests suit macOS and Linux; the research browser keeps to one request a
   second and the hosts being studied (#37).
 
