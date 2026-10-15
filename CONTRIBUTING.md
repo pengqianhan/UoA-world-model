@@ -16,7 +16,13 @@ were in the room, there is a sign on the door, or a page on the university's web
 Open a pull request against `main`. Its form asks how the change was checked; the checks are in
 [docs/standards.md](docs/standards.md). The maintainer merges, and a merge goes live within minutes.
 A change to what the site does or shows also adds a line to [CHANGELOG.md](CHANGELOG.md) and to
-"What's new" in the README.
+"What's new" in the README. The line carries the pull request's number, so open the pull request
+first and add the line after.
+
+The data the site shows is rebuilt by the maintainer, who holds the snapshots of the campus map; a
+fresh clone cannot rebuild it. If your change needs `public/data/` rebuilt, change the pipeline's
+code, leave `public/data/` as it is, and say on the first line of the pull request that it needs a
+rebuild.
 
 Every change keeps the rules in [AGENTS.md](AGENTS.md). The two that surprise people most: the site
 only publishes data that anyone can open without signing in, and it never publishes staff names.

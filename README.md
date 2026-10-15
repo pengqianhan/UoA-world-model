@@ -90,7 +90,8 @@ Everything, with its pull request, is in the [changelog](CHANGELOG.md).
 
 ## Run it locally
 
-Requires Node 22.12 or newer (developed and built in CI on Node 24).
+Requires Node 22.18 or newer, which runs TypeScript files directly (developed and built in CI on
+Node 24).
 
 ```bash
 npm ci
@@ -105,15 +106,22 @@ Other commands:
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve `dist/` at http://localhost:4273/campus-world-model/ |
-| `npm run e2e` | Playwright tests against the preview build (run `npx playwright install chromium` once) |
-| `npm run data:fetch` | Download any data snapshot that is not cached yet |
-| `npm run data:build` | Rebuild `public/data/*.json` from the cached snapshots |
+| `npm run e2e` | Playwright tests against the preview build: run `npm run build` first, and `npx playwright install chromium` once (on Linux, `npx playwright install --with-deps chromium`) |
+| `npm run data:fetch` | Download any data snapshot that is not cached yet (maintainer; see below) |
+| `npm run data:build` | Rebuild `public/data/*.json` from the cached snapshots (maintainer; see below) |
+
+The end-to-end tests draw with WebGL. On Windows they use the real GPU; on macOS and Linux they use
+the SwiftShader software renderer, as CI does, with CI's longer timeouts and two workers. That is
+slower but sees what CI sees; `E2E_GL=swiftshader` does the same on Windows.
 
 To test a deployed copy instead of a local build:
 
 ```bash
 E2E_BASE_URL=https://pengqianhan.github.io/campus-world-model/ npm run e2e
 ```
+
+In Windows PowerShell, set the variable first: `$env:E2E_BASE_URL = "https://…"; npm run e2e`. The
+same goes for every `NAME=value command` line in this README.
 
 The site is static. A merge into `main` runs `.github/workflows/deploy.yml`, which type-checks, runs
 the unit and end-to-end tests, builds, and publishes to GitHub Pages only if all of that passed. The
@@ -129,6 +137,12 @@ a fork deploys to GitHub Pages alone until it has them.
 Data is fetched once, cached as raw snapshots under `data/raw/`, and every later build reads the cache.
 `data/sources.json` records the URL, fetch time, size and SHA-256 of each snapshot.
 
+The campus map's snapshots are not in the repository (see below), so a fresh clone cannot run
+`npm run data:build`, and a contributor does not fetch new ones: that would ask the University's map
+for data the project already holds, and give a `public/data/` that differs from the published one.
+The maintainer rebuilds the data. A pull request that needs a rebuild changes the pipeline's code and
+says so in its first line (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 ```bash
 npm run data:fetch                               # fetches only what is missing
 npx tsx scripts/fetch-mapsindoors.ts --refresh   # re-download the campus map (4 requests)
@@ -139,12 +153,14 @@ npm run data:build                               # rebuild public/data from the 
 npm test                                         # the data consistency tests must still pass
 ```
 
-Then commit `public/data/`, `data/sources.json` and (if refreshed) `data/raw/osm/`.
+Then commit `public/data/`, `data/sources.json` and, if refreshed, `data/raw/osm/` and
+`data/raw/terrain/`.
 
 Rules the fetch scripts follow, and that any new one should too (`scripts/lib/snapshot.ts` enforces
 them): only public pages that need no login; at most one request per second; each URL fetched once and
 cached; an honest User-Agent that links to this repository. Raw snapshots of University data stay out
-of the repository (`data/raw/` is gitignored); OpenStreetMap data is openly licensed and is committed.
+of the repository (`data/raw/` is gitignored); OpenStreetMap data and the LINZ elevation tiles are
+openly licensed and are committed.
 
 When a new academic year starts, `data/academic-calendar.json` has to be re-transcribed by hand from
 the University Calendar's key-dates page (the source URL is in the file).
@@ -214,7 +230,8 @@ Code and run `/campus-world-model <university, campus>`.
 
 Reports and fixes are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). The rules every change keeps
 and the checks it passes are written for people and for coding agents alike, in
-[AGENTS.md](AGENTS.md) and [docs/standards.md](docs/standards.md).
+[AGENTS.md](AGENTS.md) and [docs/standards.md](docs/standards.md). `CLAUDE.md` imports `AGENTS.md`,
+so Claude Code reads it even where it would not pick up `AGENTS.md` by itself.
 
 ## How it is put together
 
@@ -227,7 +244,7 @@ scripts/            data pipeline (Node + TypeScript, run with tsx)
 data/
   sources.json        provenance of every snapshot
   academic-calendar.json   hand-transcribed key dates
-  raw/                snapshots (gitignored except OpenStreetMap)
+  raw/                snapshots (gitignored except OpenStreetMap and the elevation tiles)
 public/data/        published data: campus, context, rooms-index, subjects, calendar, schedule, meta,
                     and plans/ with one floor-plan file per building
 src/shared/         pure logic shared by pipeline and app: geometry, room codes, Auckland time,

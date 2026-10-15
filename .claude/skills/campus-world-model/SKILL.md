@@ -36,8 +36,9 @@ progress with its exact next step, what is done with its evidence, decisions wit
 routes that were tried and failed, and "Needs the user".
 
 Write the plan for a piece before starting it and the result after. Commit and push each verified
-piece straight to `main`: an interrupted session keeps only what was pushed, and a port has no
-reviewer to wait for, so "How a change lands" in AGENTS.md starts to apply once the port is live.
+piece straight to `main` of the port's own repository, never of this one: an interrupted session
+keeps only what was pushed, and a port has no reviewer to wait for, so "How a change lands" in
+AGENTS.md starts to apply to the port once it is live.
 
 A choice that comes up mid-port is yours. Take the option that keeps the site real and live, record
 it under Decisions, continue.

@@ -19,7 +19,7 @@
 - Reproduced at:
 - Red check:
 - Siblings:
-- Data (`coverage` in meta.json, before → after):
+- Data (`coverage` in meta.json, before → after; or "needs a rebuild by the maintainer"):
 - Real use (screenshots opened):
 - typecheck / unit tests / e2e:
 
