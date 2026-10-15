@@ -10,7 +10,7 @@
 
 - Model: <!-- the full name the tool shows, e.g. claude-opus-5-5 -->
 - Harness: <!-- the tool that ran the model, with its version, e.g. Claude Code 2.1.300 -->
-- Thinking effort: <!-- as set in that tool, e.g. xhigh; "default" if it was never set -->
+- Thinking effort: <!-- the level in effect, e.g. xhigh. Claude Code shows it in the session header and with /effort status. A default is a level too: write which. -->
 
 ## How it was checked
 
