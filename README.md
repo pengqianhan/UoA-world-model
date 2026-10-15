@@ -61,6 +61,7 @@ Everything, with its pull request, is in the [changelog](CHANGELOG.md).
 - [Data sources and licences](#data-sources-and-licences)
 - [Known limitations](#known-limitations)
 - [Inspiration](#inspiration)
+- [Star history](#star-history)
 
 </details>
 
@@ -307,3 +308,13 @@ This project was inspired by the
 independent student project that lets you walk through Tsinghua University's campus and find
 courses and classrooms in it. The idea of a campus you can step into comes from there. The code,
 models and data here were made separately; nothing is copied from that site.
+
+## Star history
+
+<a href="https://www.star-history.com/#pengqianhan/campus-world-model&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=pengqianhan/campus-world-model&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=pengqianhan/campus-world-model&type=Date" />
+    <img alt="A chart of this repository's GitHub stars over time" src="https://api.star-history.com/svg?repos=pengqianhan/campus-world-model&type=Date" />
+  </picture>
+</a>
