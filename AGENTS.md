@@ -39,6 +39,10 @@ These bind every change, whoever or whatever wrote it.
 Work on a branch and open a pull request against `main`; `main` takes changes no other way. The
 maintainer merges.
 
+The pull request says how it was made: your model as your tool names it, the harness with its
+version, and the thinking effort you were started with. Give what you can see of yourself. If you
+cannot see your effort, leave it for the person who started you and say so; never guess it.
+
 A **gate** is a kind of change the maintainer decides, whatever the checks say. A pull request that
 touches one says so in its first line, with the decision it needs:
 

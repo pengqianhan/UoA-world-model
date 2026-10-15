@@ -34,7 +34,14 @@ The report is answered when the reporter's own link shows the right thing on the
    day's date in New Zealand time and with its pull-request number, and says it in a few words in
    the README's "What's new", which keeps the three latest days. A change only to documents, tests
    or the pipeline's insides may add a line but need not.
-7. **Not run.** A check that was not run is listed as not run, with the reason.
+7. **How it was made.** The pull request names what wrote the change: the model, as the tool names
+   it; the harness that ran it, with its version; and the thinking effort it was set to, in that
+   tool's words. Where one changed during the work, or a helper ran on another model, each gets a
+   line saying what it did. A change written by hand says `none`. Whoever started the work fills
+   these in: an agent often cannot see its own effort, and it leaves that to them rather than guess.
+   What cannot be known is written `not known`, with the reason. CI checks that the three are given
+   (`scripts/check-pr-form.ts`); it cannot check that they are true.
+8. **Not run.** A check that was not run is listed as not run, with the reason.
 
 The numbered tests in `e2e/` are the product's acceptance criteria. Each keeps its number and what
 it proves; behaviour that is new gets a test of its own.

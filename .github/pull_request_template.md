@@ -2,6 +2,16 @@
 
 ## What changed and why
 
+## How it was made
+
+<!-- What wrote the change, in the words the tool uses (docs/standards.md). CI checks that all three are given.
+     Written by hand: "none" for each. Something the tool does not show: "not known: <why>"; never a guess.
+     If one changed during the work, or a helper ran on another model, add a line for each, saying what it did. -->
+
+- Model: <!-- the full name the tool shows, e.g. claude-opus-5-5 -->
+- Harness: <!-- the tool that ran the model, with its version, e.g. Claude Code 2.1.300 -->
+- Thinking effort: <!-- as set in that tool, e.g. xhigh; "default" if it was never set -->
+
 ## How it was checked
 
 <!-- The checks are in docs/standards.md. Give each result and the commit it was run on. -->

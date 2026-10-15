@@ -223,6 +223,7 @@ scripts/            data pipeline (Node + TypeScript, run with tsx)
   lib/snapshot.ts     polite, cache-first fetcher
   fetch-*.ts          one script per source
   build-data.ts       snapshots -> public/data/*.json
+  check-pr-form.ts    CI: a pull request says how it was made
 data/
   sources.json        provenance of every snapshot
   academic-calendar.json   hand-transcribed key dates

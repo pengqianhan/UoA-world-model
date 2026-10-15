@@ -1,0 +1,24 @@
+name: Pull request form
+
+# Every pull request says how it was made: the model, the harness and the thinking effort
+# (docs/standards.md). Editing the description runs the check again.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  how-it-was-made:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # The description goes in through the environment, never into the text of a script.
+      - run: node scripts/check-pr-form.ts
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
