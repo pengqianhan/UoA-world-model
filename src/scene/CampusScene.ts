@@ -497,6 +497,8 @@ export class CampusScene {
   setContext(ctx: ContextData): void {
     this.lastContext = ctx;
     this.walkMapCache = undefined;
+    // A walker steered by hand keeps a grid of the ground round it: rebuild it with the surroundings.
+    this.walkers.refresh();
     this.contextGroup.clear();
     this.contextMaterials = [];
     const terrain = this.terrain;

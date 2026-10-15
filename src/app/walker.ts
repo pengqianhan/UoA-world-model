@@ -21,6 +21,8 @@ import { data, defaultFloor, floorByName, goHome, night, openBuilding, openRoom,
 export const MY_WALKER = "Walker";
 /** Metres a second for a walk an agent asks for without a speed: brisk, time a little sped up. */
 export const AGENT_SPEED = 4;
+/** Metres: a walk further than this goes to another part of the map, where a walker is started instead. */
+const MAX_WALK = 4000;
 /** Metres a second for a walk a visitor starts with a click. */
 export const CLICK_SPEED = 3;
 /** Where a walker starts on each campus, metres east and north: on the City Campus, the Clock Tower lawn. */
@@ -218,7 +220,7 @@ export async function lookFrom(name?: string): Promise<Reply> {
 }
 
 /** Where a walk should go: a building, a room's building, a point, another walker, or a campus. */
-function resolveTarget(target: string, from: Pt): { building?: Building; at?: Pt; room?: string; label: string } {
+function resolveTarget(target: string, from: Pt): { building?: Building; at?: Pt; room?: string; campus?: string; label: string } {
   const d = data.value!;
   const t = target.trim();
   const xy = /^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/.exec(t);
@@ -237,7 +239,7 @@ function resolveTarget(target: string, from: Pt): { building?: Building; at?: Pt
     return { at: p.at, label: `${other}, another walker` };
   }
   const campus = d.campus.campuses.find((c) => c.onMap && (c.id === t.toLowerCase() || pick(c.name).toLowerCase() === t.toLowerCase()));
-  if (campus) return { at: START[campus.id] ?? campus.center, label: pick(campus.name) };
+  if (campus) return { at: START[campus.id] ?? campus.center, campus: campus.id, label: pick(campus.name) };
   const q = t.toLowerCase();
   const named = d.campus.buildings
     .filter((b) => !b.offMap && buildingName(b).toLowerCase().includes(q))
@@ -252,18 +254,20 @@ function speedOf(speed: unknown, fallback: number): number {
 }
 
 /** Where a new walker starts, and which way it faces: a point, near a building, or on the campus shown. */
-function startPoint(near: unknown): { at: Pt; heading: number } {
+function startPoint(near: unknown): { at: Pt; heading: number; campus?: string } {
   const d = data.value!;
   const map = need().walkingMap();
   let p: Pt | undefined;
+  let campusId: string | undefined;
   if (Array.isArray(near) && near.length === 2) p = [Number(near[0]), Number(near[1])];
   else if (typeof near === "string" && near.trim()) {
     const target = resolveTarget(near, START[selCampus.value] ?? [0, 0]);
     p = target.at ?? (target.building ? [target.building.center[0], target.building.center[1] - 40] : undefined);
+    campusId = target.campus ?? target.building?.campus;
   }
   const campus = d.campusById.get(selCampus.value);
   p ??= START[selCampus.value] ?? campus?.center ?? [0, 0];
-  return map?.openNear(p, 60) ?? { at: p, heading: 0 };
+  return { ...(map?.openNear(p, 60) ?? { at: p, heading: 0 }), campus: campusId };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -310,6 +314,8 @@ export function spawn(args: { name?: unknown; near?: unknown; outfit?: unknown; 
   const start = startPoint(args.near);
   const heading = args.heading !== undefined && Number.isFinite(Number(args.heading)) ? Number(args.heading) : start.heading;
   const state = s.walkers.spawn(name, start.at, heading, outfit);
+  // A walker started on another campus brings the map there, with that campus's surroundings.
+  if (start.campus && start.campus !== selCampus.value && shownWalker(name)) goHome(start.campus);
   return { spawned: state };
 }
 
@@ -321,6 +327,11 @@ export async function walk(args: { name?: unknown; to?: unknown; speed?: unknown
   const speed = speedOf(args.speed, AGENT_SPEED);
   let st = s.walkers.state(name)!;
   const target = resolveTarget(args.to, st.at);
+  const goal = target.at ?? target.building!.center;
+  const far = Math.hypot(goal[0] - st.at[0], goal[1] - st.at[1]);
+  if (far > MAX_WALK) {
+    throw new Error(`${target.label} is ${(far / 1000).toFixed(1)} km away, too far to walk on this map. Start a walker there instead: spawn with near "${target.campus ?? target.building?.id ?? args.to}".`);
+  }
 
   // A room: its building, then its floor, then the room, keeping to corridors where it can.
   if (target.room && target.building) {
