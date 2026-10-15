@@ -30,6 +30,7 @@ npm run walker -- say "Kia ora"           # walkers within 25 m hear it
 npm run walker -- listen                  # what other walkers said nearby
 npm run walker -- outfit halloween        # student, raincoat, explorer, halloween, witch, or a JSON file
 npm run walker -- spawn Kea --near 201    # a second walker; steer it with --as Kea
+npm run walker -- wander                  # stroll on its own until stop-walker or another command
 npm run walker -- stop                    # close the map when done
 ```
 

@@ -87,6 +87,16 @@ export const TOOLS = [
     },
   },
   {
+    name: "walker_wander",
+    description: "Let the walker stroll on its own from building to building near it, pausing at each, until walker_stop or another command.",
+    inputSchema: { type: "object", properties: { name: NAME } },
+  },
+  {
+    name: "walker_stop",
+    description: "Stop the walker where it is: a walk, or wandering.",
+    inputSchema: { type: "object", properties: { name: NAME } },
+  },
+  {
     name: "walker_spawn",
     description: "Put another walker on the map with a name of its own, near a place, in an outfit.",
     inputSchema: { type: "object", properties: { name: { type: "string" }, near: { type: "string" }, outfit: {} }, required: ["name"] },
@@ -119,6 +129,8 @@ const COMMAND_OF: Record<string, string> = {
   walker_say: "say",
   walker_listen: "listen",
   walker_outfit: "outfit",
+  walker_wander: "wander",
+  walker_stop: "stop",
   walker_spawn: "spawn",
   walker_list: "list",
   walker_remove: "remove",

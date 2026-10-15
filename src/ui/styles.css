@@ -1983,6 +1983,23 @@ select optgroup {
   background: var(--panel-solid);
 }
 
+.walker-wander {
+  height: 30px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.walker-wander:hover,
+.walker-wander.on {
+  border-style: solid;
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
 .walker-keys,
 .walker-note {
   color: var(--muted);

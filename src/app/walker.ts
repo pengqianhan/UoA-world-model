@@ -529,8 +529,44 @@ export function setView(args: { view?: unknown; name?: unknown; yaw?: unknown; p
 
 export function stopWalker(args: { name?: unknown }): Reply {
   const name = walkerNamed(args.name as string | undefined);
+  wandering.delete(name);
   need().walkers.stop(name);
   return { walker: name, stopped: true };
+}
+
+/** Walkers strolling on their own, by name. */
+const wandering = new Set<string>();
+export const wanderingNow = signal<ReadonlySet<string>>(new Set());
+
+/**
+ * Lets a walker stroll on its own, from building to building near it, pausing at each, until it
+ * is stopped or given another command. Out of doors only.
+ */
+export function wander(args: { name?: unknown; speed?: unknown }): Reply {
+  const s = need();
+  const name = walkerNamed(args.name as string | undefined);
+  if (s.walkers.state(name)!.indoor) leaveBuilding(name);
+  if (wandering.has(name)) return { walker: name, wandering: true };
+  wandering.add(name);
+  wanderingNow.value = new Set(wandering);
+  const speed = speedOf(args.speed, WALK_SPEED * 1.2);
+  void (async () => {
+    let last: string | undefined;
+    while (wandering.has(name) && s.walkers.has(name)) {
+      const st = s.walkers.state(name)!;
+      const choices = buildingsNear(st.at, 220).filter(({ b, distance }) => distance > 25 && b.id !== last);
+      const next = choices[Math.floor(Math.random() * Math.min(choices.length, 8))];
+      if (!next) break;
+      const r = await s.walkers.walkToBuilding(name, next.b.id, speed);
+      // Another command, or steering by hand, ends the stroll.
+      if (!r.arrived && r.reason !== "there is no way there on foot") break;
+      last = next.b.id;
+      await new Promise((done) => setTimeout(done, 1500 + Math.random() * 2500));
+    }
+    wandering.delete(name);
+    wanderingNow.value = new Set(wandering);
+  })();
+  return { walker: name, wandering: true, note: "It strolls from building to building near it until stopped or given another command." };
 }
 
 export function removeWalker(args: { name?: unknown }): Reply {
@@ -573,6 +609,7 @@ export const COMMANDS: Record<string, (args: Record<string, unknown>) => Reply |
   outfit: (a) => dress(a),
   view: (a) => setView(a),
   stop: (a) => stopWalker(a),
+  wander: (a) => wander(a),
   remove: (a) => removeWalker(a),
   list: () => listWalkers(),
   outfits: () => ({ presets: OUTFITS }),

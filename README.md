@@ -144,8 +144,8 @@ a fork deploys to GitHub Pages alone until it has them.
 made-up figure near the Clock Tower. W A S D or the arrow keys walk it, Shift hurries, and on a phone
 the arrows in its panel do. Its panel switches between the map, the view from behind it and the view
 through its eyes; there a drag looks round, and a click on a building or the ground walks it there.
-Five outfits, among them a raincoat whose umbrella opens when Open-Meteo reports rain, and a pumpkin
-head for Halloween.
+"Let it wander" sends it strolling on its own from building to building. Five outfits, among them a
+raincoat whose umbrella opens when Open-Meteo reports rain, and a pumpkin head for Halloween.
 
 **With an agent:** Claude Code (or any agent that runs shell commands) steers it with
 `npm run walker -- <command>`. The first command opens the map in a browser window with the walker
@@ -159,6 +159,7 @@ npm run walker -- enter | floor up | exit # in at street level, stairs or lift, 
 npm run walker -- see --view eyes         # a picture through its eyes, saved under .walker/shots/
 npm run walker -- say "Kia ora"           # walkers within 25 m hear it; listen hears them
 npm run walker -- spawn Kea --near 201    # a second walker; steer it with --as Kea
+npm run walker -- wander                  # stroll on its own from building to building
 npm run walker -- help                    # every command
 npm run walker -- stop                    # close the map
 ```

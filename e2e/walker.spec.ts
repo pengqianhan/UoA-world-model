@@ -104,6 +104,19 @@ test("walkers meet and hear each other; outfits are data only; the keyboard walk
   const to = ((await walker(page, "list")) as { walkers: { name: string; at: [number, number] }[] }).walkers.find((w) => w.name === "Walker")!.at;
   expect(Math.hypot(to[0] - from[0], to[1] - from[1])).toBeGreaterThan(0.3);
 
+  // Let it wander: it strolls off on its own, and Stop wandering stops it.
+  await page.locator("#walker-wander").click();
+  await expect(page.locator("#walker-wander")).toHaveAttribute("aria-pressed", "true");
+  const before = ((await walker(page, "list")) as { walkers: { name: string; at: [number, number] }[] }).walkers.find((w) => w.name === "Walker")!.at;
+  await expect
+    .poll(async () => {
+      const now = ((await walker(page, "list")) as { walkers: { name: string; at: [number, number] }[] }).walkers.find((w) => w.name === "Walker")!.at;
+      return Math.hypot(now[0] - before[0], now[1] - before[1]);
+    })
+    .toBeGreaterThan(1);
+  await page.locator("#walker-wander").click();
+  await expect(page.locator("#walker-wander")).toHaveAttribute("aria-pressed", "false");
+
   // Stopping the walk takes every walker away.
   await page.locator("#walker-close").click();
   await expect(page.locator("#walker-panel")).toHaveCount(0);

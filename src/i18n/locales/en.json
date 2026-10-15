@@ -350,6 +350,8 @@
     "enter": "Go into {place}",
     "exit": "Go out",
     "up": "Upstairs",
-    "down": "Downstairs"
+    "down": "Downstairs",
+    "wander": "Let it wander",
+    "wanderStop": "Stop wandering"
   }
 }

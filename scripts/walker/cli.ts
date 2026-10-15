@@ -26,7 +26,8 @@ export const HELP = `Walk the campus map as a made-up figure.
   view <map | follow | eyes>          how the browser shows it: the map, from behind, through its eyes
   see [--view follow|eyes] [--yaw d]  save a picture of the view and print where it is
   spawn <name> [--near <place>]       another walker, with a name of its own
-  list | remove <name> | stop-walker  the walkers; take one away; stop one walking
+  wander                              stroll on its own from building to building until stopped
+  list | remove <name> | stop-walker  the walkers; take one away; stop one walking (or wandering)
   stop                                close the browser and stop the controller
 
   --as <name>   which walker (default: Walker)    --json   print the raw answer
@@ -103,6 +104,8 @@ export function toCommand(p: Parsed): { name: string; args: Record<string, unkno
       return { name: "remove", args: { name: rest || name } };
     case "stop-walker":
       return { name: "stop", args: { name } };
+    case "wander":
+      return { name: "wander", args: { name, speed } };
     default:
       return undefined;
   }

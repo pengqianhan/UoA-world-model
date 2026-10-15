@@ -2,7 +2,7 @@
 // touch screens. The walker is made up; the panel says so, and that doors are not mapped.
 import { useRef, useState } from "preact/hooks";
 import { t } from "../app/i18n.ts";
-import { ENTER_REACH, MY_WALKER, run, setView, stopWalking, walkerOn, walkerStatus, walkerView } from "../app/walker.ts";
+import { ENTER_REACH, MY_WALKER, run, setView, stopWalking, walkerOn, walkerStatus, walkerView, wanderingNow } from "../app/walker.ts";
 import { OUTFITS } from "../shared/outfit.ts";
 import { Icon } from "./common.tsx";
 import { isLite } from "./SceneHost.tsx";
@@ -146,6 +146,15 @@ export function WalkerPanel() {
           {outfit === "custom" && <option value="custom">{status?.outfit}</option>}
         </select>
       </label>
+      <button
+        type="button"
+        class={`walker-wander ${wanderingNow.value.has(MY_WALKER) ? "on" : ""}`}
+        id="walker-wander"
+        aria-pressed={wanderingNow.value.has(MY_WALKER)}
+        onClick={() => void run(wanderingNow.value.has(MY_WALKER) ? "stop" : "wander", { name: MY_WALKER })}
+      >
+        {wanderingNow.value.has(MY_WALKER) ? t("walker.wanderStop") : t("walker.wander")}
+      </button>
       <p class="walker-keys">{touch ? t("walker.keysTouch") : t("walker.keys")}</p>
       <p class="walker-note">{t("walker.note")}</p>
     </section>
