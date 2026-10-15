@@ -313,5 +313,36 @@
         "place": "Tsinghua University, Beijing"
       }
     }
+  },
+  "walker": {
+    "start": "Take a walk",
+    "startHint": "Walk the campus as a small made-up figure, and see it from its eyes",
+    "heading": "Walker",
+    "close": "Stop walking",
+    "view": {
+      "label": "View",
+      "map": "Map",
+      "follow": "Behind",
+      "eyes": "Eyes"
+    },
+    "goTo": "Walk to",
+    "goToPlaceholder": "Building, room or name",
+    "go": "Go",
+    "walking": "Walking…",
+    "standing": "Standing",
+    "near": "Near {place}",
+    "arrived": "Arrived: {place}",
+    "stopped": "Stopped before getting there",
+    "outfit": "Outfit",
+    "arrows": "Walk",
+    "arrow": {
+      "up": "Walk forward",
+      "down": "Walk back",
+      "left": "Turn left",
+      "right": "Turn right"
+    },
+    "keys": "W A S D or the arrow keys to walk, Shift to hurry. Drag to look round; click a building or the ground to walk there.",
+    "keysTouch": "Hold the arrows to walk. Drag to look round; tap a building or the ground to walk there.",
+    "note": "A made-up figure: it stands for no real person, and where it goes stays in your browser. Doors are not mapped, so it walks to the nearest side of a building."
   }
 }

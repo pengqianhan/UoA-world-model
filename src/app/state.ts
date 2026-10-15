@@ -42,6 +42,8 @@ export const plansLoaded = signal<ReadonlyMap<string, FloorPlans>>(new Map());
 export const spaceTip = signal<{ type: SpaceType; x: number; y: number } | undefined>(undefined);
 /** Bumped to ask the scene to re-frame the current selection or campus. */
 export const frameRequest = signal(0);
+/** More of the query string, kept by features that live in modules of their own (the walker). */
+export const urlExtras = signal<Record<string, string>>({});
 
 export const panel = signal<PanelId>("none");
 export const timeMode = signal<"now" | "preview">("now");
@@ -318,6 +320,7 @@ export function currentUrl(): string {
   if (lightMode.value !== "auto") q.set("light", lightMode.value);
   if (panel.value === "about") q.set("panel", "about");
   if (lang.value !== DEFAULT_LANG || languages.length > 1) q.set("lang", lang.value);
+  for (const [k, v] of Object.entries(urlExtras.value)) q.set(k, v);
   const qs = q.toString().replace(/%3A/g, ":");
   return `${location.pathname}${qs ? `?${qs}` : ""}`;
 }

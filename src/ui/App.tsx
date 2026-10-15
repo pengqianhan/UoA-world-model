@@ -1,6 +1,7 @@
 // Page layout and the pieces that are always present.
 import { useEffect } from "preact/hooks";
 import { pick, t, tn } from "../app/i18n.ts";
+import { Icon } from "./common.tsx";
 import { busyBuildings, data, goHome, loadError, marker, night, panel, selBuilding, selCampus, selRoom, sessionsNow, webglFailed } from "../app/state.ts";
 import { AboutPanel } from "./AboutPanel.tsx";
 import { BuildingView } from "./BuildingView.tsx";
@@ -9,11 +10,13 @@ import { SearchPanel } from "./SearchPanel.tsx";
 import { TimePanel, notTeachingReason, previewTeachingDay } from "./TimePanel.tsx";
 import { TopBar, statusLine } from "./TopBar.tsx";
 import { TravelOverlay, Worlds, cancelTravel, travel } from "./Travel.tsx";
+import { WalkerPanel } from "./WalkerPanel.tsx";
+import { MY_WALKER, setView, startWalkerKeys, startWalking, walkerOn, walkerView } from "../app/walker.ts";
 
 /** Campus-level summary: where we are in the academic year and what is timetabled right now. */
 function StatusStrip() {
   const d = data.value;
-  if (!d || selBuilding.value) return null;
+  if (!d || selBuilding.value || walkerOn.value) return null;
   const reason = notTeachingReason();
   const count = sessionsNow.value.length;
   // Campuses in areas of their own, away from the centre.
@@ -70,6 +73,10 @@ function StatusStrip() {
           </label>
         )}
       </div>
+      <button type="button" class="walk-start" id="walk-start" onClick={() => startWalking()} title={t("walker.startHint")}>
+        <Icon name="walk" />
+        <span>{t("walker.start")}</span>
+      </button>
       <Worlds />
     </section>
   );
@@ -90,6 +97,7 @@ export function App() {
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA");
       if (e.key === "Escape") {
         if (travel.value) cancelTravel();
+        else if (walkerView.value !== "map") setView({ view: "map", name: MY_WALKER });
         else if (panel.value !== "none") panel.value = "none";
         else if (selRoom.value) {
           selRoom.value = undefined;
@@ -106,7 +114,9 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("pageshow", onShow);
+    const stopKeys = startWalkerKeys();
     return () => {
+      stopKeys();
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pageshow", onShow);
     };
@@ -114,7 +124,9 @@ export function App() {
 
   const loaded = !!data.value;
   return (
-    <div class={`app ${selBuilding.value ? "in-building" : "in-campus"} ${night.value > 0.5 ? "is-night" : "is-day"} panel-${panel.value} ${travel.value ? "travelling" : ""}`}>
+    <div
+      class={`app ${selBuilding.value ? "in-building" : "in-campus"} ${night.value > 0.5 ? "is-night" : "is-day"} panel-${panel.value} ${travel.value ? "travelling" : ""} ${walkerOn.value ? `walking walker-${walkerView.value}` : ""}`}
+    >
       <SceneHost />
       <TopBar />
       {!loaded && (
@@ -132,6 +144,7 @@ export function App() {
       {panel.value === "search" && <SearchPanel />}
       {panel.value === "time" && <TimePanel />}
       {panel.value === "about" && <AboutPanel />}
+      <WalkerPanel />
       <Attribution />
       <TravelOverlay />
     </div>

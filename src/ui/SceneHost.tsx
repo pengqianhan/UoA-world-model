@@ -23,6 +23,7 @@ import {
   sun,
   webglFailed,
 } from "../app/state.ts";
+import { bindWalkerScene } from "../app/walker.ts";
 import { CampusScene } from "../scene/CampusScene.ts";
 import { Terrain } from "../scene/terrain.ts";
 import type { Building, ContextData, TerrainData } from "../shared/types.ts";
@@ -77,6 +78,7 @@ export function SceneHost() {
       return;
     }
     (window as unknown as { __scene?: CampusScene }).__scene = scene;
+    bindWalkerScene(scene);
 
     scene.onPick = (p) => {
       if (p?.type === "building") openBuilding(p.id);
@@ -195,6 +197,7 @@ export function SceneHost() {
     return () => {
       ro.disconnect();
       stops.forEach((stop) => stop());
+      bindWalkerScene(undefined);
       scene.dispose();
     };
   }, []);
