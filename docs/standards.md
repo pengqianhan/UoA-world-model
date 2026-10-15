@@ -38,9 +38,10 @@ The report is answered when the reporter's own link shows the right thing on the
    it; the harness that ran it, with its version; and the thinking effort it was set to, in that
    tool's words. Where one changed during the work, or a helper ran on another model, each gets a
    line saying what it did. A change written by hand says `none`. Whoever started the work fills
-   these in: an agent often cannot see its own effort, and it leaves that to them rather than guess.
-   What cannot be known is written `not known`, with the reason. CI checks that the three are given
-   (`scripts/check-pr-form.ts`); it cannot check that they are true.
+   these in. An agent cannot always see its own effort (a level given at launch is saved nowhere),
+   and it leaves that to them rather than guess. What cannot be known is written `not known`, with
+   the reason. CI checks that the three are given (`scripts/check-pr-form.ts`), and `main` takes no
+   pull request without that check passing. It cannot check that they are true.
 8. **Not run.** A check that was not run is listed as not run, with the reason.
 
 The numbered tests in `e2e/` are the product's acceptance criteria. Each keeps its number and what

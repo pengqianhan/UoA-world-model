@@ -269,9 +269,14 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   `docs/standards.md`, check 7). Why: to compare later which models and settings make good changes,
   to know how closely to review one, and so that anyone reading the code can see how it was made.
   The fields are as the contributor gives them and cannot be verified. `not known` with its reason
-  is accepted; a guess is not. An agent often cannot see its own effort (the settings on the
-  maintainer's machine hold four different `effortLevel`s), so the person who started it fills that
-  in.
+  is accepted; a guess is not. An agent cannot always see its own effort. Claude Code saves a level
+  per model under `modelSettings` in the user settings. A top-level `effortLevel` there no longer
+  applies to Opus 5.5 and later, which default to `medium` without a saved level
+  (<https://code.claude.com/docs/en/model-config>). A level given with `--effort` at launch is saved
+  nowhere. So the person who started the agent confirms the effort: Claude Code shows it in the
+  session header and with `/effort status`. Since 2026-10-15 `how-it-was-made` is a required status
+  check on `main`, beside `build` and `e2e`, for admins too. That is branch protection, a repository
+  setting that does not show in the code.
 - **GOAL.md is gitignored.** It contains the local working-directory path (with a username).
 - **Stack:** Vite + TypeScript + three.js + Preact (+ signals). Shared pure-TS modules in
   `src/shared` are used by both the pipeline and the app.
