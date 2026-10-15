@@ -62,6 +62,8 @@ A change to what the site does or shows adds its line here, and the README's
 - The README's pictures retaken from the live site, on the ground's heights and with every campus,
   and its counts brought up to date: 14,862 other spaces, 98 bare floors and 35 partly drawn
   (#30).
+- Every pull request says how it was made: the model, the harness with its version and the
+  thinking effort. The form asks for them and CI checks they are given (#34).
 
 ## 2026-10-14
 

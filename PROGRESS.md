@@ -263,6 +263,15 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   and maps the Clock Tower in 13 parts with a dome and pinnacles: the two sources disagree on
   height (building 405 is tagged 50 m and stands 32 m here from its floors), and mixing them would
   leave some buildings surveyed and their neighbours estimated. Reopen only if the user asks.
+- **A pull request says how it was made (the user, 2026-10-15).** The model as the tool names it,
+  the harness with its version and the thinking effort, in "How it was made" on the pull-request
+  form, which CI checks is filled in (`scripts/check-pr-form.ts`, `.github/workflows/pr-form.yml`;
+  `docs/standards.md`, check 7). Why: to compare later which models and settings make good changes,
+  to know how closely to review one, and so that anyone reading the code can see how it was made.
+  The fields are as the contributor gives them and cannot be verified. `not known` with its reason
+  is accepted; a guess is not. An agent often cannot see its own effort (the settings on the
+  maintainer's machine hold four different `effortLevel`s), so the person who started it fills that
+  in.
 - **GOAL.md is gitignored.** It contains the local working-directory path (with a username).
 - **Stack:** Vite + TypeScript + three.js + Preact (+ signals). Shared pure-TS modules in
   `src/shared` are used by both the pipeline and the app.

@@ -26,6 +26,8 @@ source, anything about deployment or secrets, a new dependency, and the rules th
 the top of the pull request if yours is one of them.
 
 Working with a coding agent is fine. `AGENTS.md` is written for it, and the same checks apply.
+Every pull request says how it was made: the model, the harness with its version and the thinking
+effort, or `none` for a change written by hand. The form asks for them and CI checks they are there.
 
 ## Another university
 
