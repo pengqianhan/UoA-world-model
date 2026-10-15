@@ -25,7 +25,7 @@ A change to what the site does or shows adds its line here, and the README's
   that other walkers near it hear, and wears one of five outfits (Halloween's among them), with an
   umbrella when Open-Meteo reports rain. Claude Code and other agents steer it with
   `npm run walker`, an MCP server or the `campus-walker` skill, all on the user's own computer
-  (#38).
+  (#40).
 
 ## 2026-10-15
 
