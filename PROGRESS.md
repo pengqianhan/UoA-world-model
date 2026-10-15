@@ -2,7 +2,14 @@
 
 Handover notes for whoever (probably a future session of the same agent) picks this up next.
 Read `AGENTS.md` first, then this file, then `git status` / `git log`. `GOAL.md`, the original brief,
-is local only; its rules now live in `AGENTS.md`.
+is local only; its rules now live in `AGENTS.md`, and where this file cites a section of it ("GOAL
+§2") it says what that section asked.
+
+**If you are a contributor's agent:** "the user" here is the maintainer, who owns the repository,
+not the person you work for. "Now working on" and "Needs the user" are the maintainer's lists; take
+up an open issue instead. "Decisions" and "Tried and did not work" bind you too. Sections headed
+with a date are records of that day: what was true then, not now; `CHANGELOG.md` has what came
+after. Notes on "this machine" are about the maintainer's Windows computer.
 
 Last updated: 2026-10-15 NZDT
 
@@ -17,7 +24,7 @@ The project is moving to being maintained by coding agents, in three stages agre
 1. **Rules without automation (this stage).** `AGENTS.md`, `docs/standards.md`, `CONTRIBUTING.md`,
    issue and pull-request forms; end-to-end tests gate the deploy; `main` is protected and takes
    changes only through pull requests that the user merges.
-2. **Agents write and review, the user merges.** From here a `LESSONS.md` records what had to be
+2. **Agents write and review, the user merges.** From here a `LESSONS.md` (not started yet) records what had to be
    fixed twice, what should not have merged and what was verified too thinly; a lesson seen on three
    separate days moves into `docs/standards.md`. How the agents are triggered and paid for is not
    decided.
@@ -27,7 +34,7 @@ The project is moving to being maintained by coding agents, in three stages agre
 Not built yet, and wanted by stage 2: a place for sourced corrections that the pipeline applies, so
 that a fault in a source can be fixed without a hand edit to `public/data/`.
 
-**If you are a new session:** check `gh run list --limit 3` is green, run
+**If you are the maintainer's next session:** check `gh run list --limit 3` is green, run
 `E2E_BASE_URL=https://campusworldmodel.com/uoa/ npm run e2e`, then take up an open issue, pick a bonus
 item below or, if the user has added a timetable snapshot, follow README "Adding the class timetable".
 
@@ -95,12 +102,17 @@ Verified 2026-10-13 against https://pengqianhan.github.io/campus-world-model/ at
 
 ## Done (with evidence)
 
+As recorded on 2026-10-13. The counts below are of that day; today's are in the README and in
+`public/data/meta.json`, and what was done since is in `CHANGELOG.md`.
+
 - Local toolchain: Vite 8 + TypeScript 7 + Preact 11 + three 0.186 + Vitest 5 + Playwright 1.64.
 - GitHub repo `pengqianhan/campus-world-model` (public), Pages enabled with `build_type=workflow`,
   workflow `.github/workflows/deploy.yml` (typecheck, unit tests, build, deploy; separate e2e job).
 - Cron job `17 */5 * * *` was created at the start of session 1 (id 233af833) and deleted at the end
   of it, after the final report. It was session-only. A new session that has real work to continue
-  (for example after the user supplies API credentials) should create a fresh one as GOAL §10 says.
+  (for example after the user supplies API credentials) should create a fresh one as GOAL §10 says:
+  a session-only `CronCreate` job every 5 hours that resumes from this file, checked with `CronList`
+  on each wake, remade before its 7-day expiry, and deleted when the work is done.
 - Data feasibility research finished (see "Data sources").
 - Data pipeline (`npm run data:fetch`, `npm run data:build`) writes `public/data/*.json`:
   194 buildings (139 on the 3D map), 786 learning spaces with outlines, 4,668 further rooms in a lazy
@@ -156,8 +168,9 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   drawn, never named. Left out, with `noPlan` on the floor and a note on screen: every floor holding
   student accommodation (139 floors) and the three childcare centres (255, 410, 511; matched by
   name, the source has no room type for them). Also left out: single parking bays, the source's
-  "Void 2.0 test" records, shapes under 2 m², and three shapes that lie over a named room. 14,508
-  shapes on 490 floors of 108 buildings, 1,027 KB in all, loaded one building at a time.
+  "Void 2.0 test" records, shapes under 2 m², and three shapes that lie over a named room. On
+  2026-10-13, 14,508 shapes on 490 floors of 108 buildings, 1,027 KB in all, loaded one building at
+  a time; 14,862 since every campus was added (README).
 - Space types on the floor plans, since 2026-10-14 (the user chose this after asking why floors 6 to
   11 of building 405, all offices and research labs, showed only grey shapes): each shape carries
   the source's own type text, sorted by `SPACE_KINDS` in `build-data.ts` into seven groups that
@@ -344,9 +357,11 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   empty unless a real snapshot produced it.
 - **Playwright on this Windows machine:** Chromium flags `--use-angle=d3d11 --enable-gpu
   --ignore-gpu-blocklist` give the real GPU; CI uses SwiftShader. `E2E_GL=swiftshader` reproduces CI.
-- **Shell quirks here:** Git Bash heredocs break on non-ASCII text, so write source files with the
-  Write tool; use `python -I -X utf8` for ad-hoc scripts; Python `\b` in a non-raw string is a
-  backspace (it corrupted a regex once).
+  Since 2026-10-15 every non-Windows machine renders with SwiftShader and gets CI's timeouts and two
+  workers (`playwright.config.ts`).
+- **Shell quirks on the maintainer's Windows machine:** Git Bash heredocs break on non-ASCII text,
+  so write source files with the Write tool; use `python -I -X utf8` for ad-hoc scripts; Python
+  `\b` in a non-raw string is a backspace (it corrupted a regex once).
 
 ## Tried and did not work
 

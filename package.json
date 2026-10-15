@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
-    "data:fetch": "tsx scripts/fetch-mapsindoors.ts && tsx scripts/fetch-osm.ts && tsx scripts/fetch-calendar.ts",
+    "data:fetch": "tsx scripts/fetch-mapsindoors.ts && tsx scripts/fetch-osm.ts && tsx scripts/fetch-terrain.ts && tsx scripts/fetch-calendar.ts",
     "data:build": "tsx scripts/build-data.ts",
     "data:classes": "tsx scripts/fetch-classes.ts"
   },
@@ -32,6 +32,6 @@
     "vitest": "^5.0.4"
   },
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.18"
   }
 }

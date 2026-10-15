@@ -1033,7 +1033,11 @@ function buildTerrain(area: SceneArea): { data?: TerrainData; stats: Record<stri
   const tiles = new Map<string, Image>();
   for (const [x, y] of tilesFor(box, TERRAIN_ZOOM)) {
     const file = terrainFile(TERRAIN_ZOOM, x, y);
-    if (!hasSnapshot(file)) return { stats };
+    if (!hasSnapshot(file)) {
+      // The area is published without ground and drawn flat; say so rather than let it pass unseen.
+      console.warn(`terrain: no snapshot ${file} for ${area.id}; its ground stays flat. Run \`npm run data:fetch\`.`);
+      return { stats };
+    }
     tiles.set(`${x}/${y}`, decodePng(readSnapshot(file)));
   }
   const pixel = (px: number, py: number): number => {

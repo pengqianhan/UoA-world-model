@@ -24,7 +24,8 @@ Looking at a site counts as fetching from it. A headless browser loads a page's 
 analytics and its service worker in a burst: on 2026-10-15 one exploration sent six requests in a
 second to the catalogue host and about twenty to third-party analytics before they were blocked.
 Queue the browser's requests through the same one-a-second pacing, allow only the hosts you are
-studying, block service workers, and log every request.
+studying, block service workers, and log every request. `scripts/research/polite.mjs` does all four
+for the research tools here (`sniff.mjs`, `open-once.mjs`); a browser of your own goes through it too.
 
 ## Layers
 
@@ -41,7 +42,9 @@ area of its own: list every campus the indoor layer names and where its building
 
 1. **The campus map's own requests.** The school's public campus map has to download buildings and
    rooms to draw them, which makes it the richest source. `node scripts/research/sniff.mjs <map URL>
-   <out prefix>` opens the page headless and lists every request. Look for JSON, GeoJSON or vector
+   <out prefix> --allow=<vendor host>` opens the page headless, one request a second, and lists every
+   request, including those it blocked: a blocked host that carries the data is the one to allow
+   on the next run. Look for JSON, GeoJSON or vector
    tiles from an indoor-mapping vendor (MapsIndoors, MazeMap, Concept3D, Mappedin, ArcGIS Indoors,
    Pointr) or from the school's own endpoint. Requests the page makes anonymously are the source.
 2. **A room or teaching-space directory**: pages listing rooms with building, floor, capacity, type.

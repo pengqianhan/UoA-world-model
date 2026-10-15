@@ -15,8 +15,10 @@ These bind every change, whoever or whatever wrote it.
 - **Snapshot once.** Every fetch goes through `scripts/lib/snapshot.ts`, which caches, paces to one
   request a second, names the project in its User-Agent, and logs URL, date and hash to
   `data/sources.json`. Raw snapshots stay in gitignored `data/raw/`; openly licensed raw data
-  (OpenStreetMap) is the exception and is committed. `public/data/` is written only by
-  `npm run data:build`.
+  (OpenStreetMap and the LINZ elevation tiles) is the exception and is committed. `public/data/` is
+  written only by `npm run data:build`. Looking at a site is fetching from it: a browser opened for
+  research goes through `scripts/research/polite.mjs`, which keeps the same pace and only the hosts
+  being studied.
 - **Closed is a verdict.** A 401, a 403, a login redirect or a dropped connection is recorded once
   and left alone.
 - **Places, not people.** Publish codes, titles, times and rooms. Drop staff names and enrolment
@@ -38,6 +40,16 @@ These bind every change, whoever or whatever wrote it.
 
 Work on a branch and open a pull request against `main`; `main` takes changes no other way. The
 maintainer merges.
+
+The campus map's snapshots stay with the maintainer, so a fresh clone cannot run
+`npm run data:build`, and a contributor does not fetch new snapshots to get round that. A change
+that needs the data rebuilt changes the pipeline's code, says in its first line that it needs a
+rebuild, and leaves `public/data/` alone; the maintainer rebuilds it and gives the `coverage`
+before and after.
+
+`PROGRESS.md` is the maintainer's handover file. In it, "the user" is the maintainer, and its
+"Now working on" and "Needs the user" are the maintainer's lists, not tasks for you. Its
+"Decisions" and "Tried and did not work" bind everyone.
 
 The pull request says how it was made: your model as your tool names it, the harness with its
 version, and the thinking effort you were started with. Give what you can see of yourself. If you
