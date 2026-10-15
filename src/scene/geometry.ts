@@ -341,10 +341,10 @@ export class MeshBuilder {
     if (this.withUV) g.setAttribute("uv", new BufferAttribute(new Float32Array(this.uvs), 2));
     const Index = this.vertexCount > 65535 ? Uint32Array : Uint16Array;
     g.setIndex(new BufferAttribute(new Index(this.roofIndices.length ? this.indices.concat(this.roofIndices) : this.indices), 1));
-    if (this.roofIndices.length) {
-      g.addGroup(0, this.indices.length, 0);
-      g.addGroup(this.indices.length, this.roofIndices.length, 1);
-    }
+    // A mesh given a material for walls and one for roofs draws only its groups, so the walls are
+    // a group even when there is no roof: fences of no thickness on their own were not drawn.
+    g.addGroup(0, this.indices.length, 0);
+    if (this.roofIndices.length) g.addGroup(this.indices.length, this.roofIndices.length, 1);
     g.computeBoundingSphere();
     g.computeBoundingBox();
     return g;

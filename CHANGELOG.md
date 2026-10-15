@@ -37,6 +37,10 @@ A change to what the site does or shows adds its line here, and the README's
   that strip stood across the road as a storey with windows, over a footing as long as the passage.
   A strip of floor no thicker than a wall is no longer drawn as a storey (13 buildings, under 5 m²
   from any one floor), and a footing goes only under what stands on the ground (#31).
+- **Opened, the Southern Underpass's ground floor still had its strip.** In building view the
+  strip ran down Symonds Street as a slab, and the floor had no outer walls, not even round its
+  stairways. Building view now leaves such strips out too: the same 15 floors in 13 buildings,
+  which also get their outer walls back (#33).
 - **About had the far campuses' error the wrong way round.** Shapes at Tai Tokerau are drawn about
   1.4% narrower east to west than they are, not 1% wider (#30).
 

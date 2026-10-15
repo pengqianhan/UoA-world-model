@@ -36,8 +36,16 @@ describe("an extrusion's roof", () => {
     const mb = new MeshBuilder();
     mb.extrude([square], 0, 3.6);
     const g = mb.build();
-    expect(g.groups).toEqual([]);
+    expect(g.groups).toEqual([{ start: 0, count: 4 * 6 + 6, materialIndex: 0 }]);
     expect(g.getIndex()!.count).toBe(4 * 6 + 6);
+  });
+
+  it("leaves walls with no roof in a group of their own, which a mesh with a wall and a roof material draws", () => {
+    // The open floor's outer walls fall back to fences of no thickness where its outline cannot be inset.
+    const mb = new MeshBuilder(true, true);
+    mb.fence(0, 0, 10, 0, 0, 1.5);
+    const g = mb.build();
+    expect(g.groups).toEqual([{ start: 0, count: 2 * 6, materialIndex: 0 }]);
   });
 });
 
@@ -47,7 +55,7 @@ describe("a parapet", () => {
     mb.fence(0, 0, 10, 0, 3.6, 4.5);
     const g = mb.build();
     expect(g.getIndex()!.count).toBe(12);
-    expect(g.groups).toEqual([]);
+    expect(g.groups.map((group) => group.materialIndex)).toEqual([0]);
     const normal = g.getAttribute("normal");
     const position = g.getAttribute("position");
     // Heading east with the roof on the left, which is north: one face looks south (+z), the other north.
