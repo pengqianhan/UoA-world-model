@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decodeRing, overlap, ringArea, type Ring } from "../src/shared/geo.ts";
-import { massing, roofRims, type MassingBlock, type RimSegment } from "../src/shared/massing.ts";
+import { decodeRing, overlap, pointInRing, ringArea, type Ring } from "../src/shared/geo.ts";
+import { massing, roofRims, withoutStrips, type MassingBlock, type RimSegment } from "../src/shared/massing.ts";
 import type { Building, CampusData, FlatRing, Floor } from "../src/shared/types.ts";
 
 const campus = JSON.parse(fs.readFileSync("public/data/campus.json", "utf8")) as CampusData;
@@ -144,6 +144,58 @@ describe("building massing from floor outlines", () => {
     const onMap = campus.buildings.filter((b) => !b.offMap);
     const stepped = onMap.filter((b) => massing(b, H).length > 1);
     expect(stepped.length / onMap.length).toBeGreaterThan(0.4);
+  });
+});
+
+describe("strips of floor no thicker than a wall", () => {
+  const areaOf = (outline: FlatRing[][]) => outline.reduce((sum, poly) => sum + ringArea(decodeRing(poly[0]!)), 0);
+  // Two 5 m rooms 20 m apart, joined along their south edge by a strip 0.1 m wide. Decimetres.
+  const joined: FlatRing = [0, 0, 250, 0, 250, 50, 200, 50, 200, 1, 50, 1, 50, 50, 0, 50];
+
+  it("are taken out, leaving the floor at either end", () => {
+    const pieces = withoutStrips([[joined]]);
+    expect(pieces.length).toBe(2);
+    // Each room closes on a new side from the strip's corner to its own, a sliver short of 25 m².
+    expect(areaOf(pieces)).toBeGreaterThan(49);
+    expect(areaOf(pieces)).toBeLessThanOrEqual(50);
+    expect(pieces.some((p) => pointInRing([12.5, 0.05], decodeRing(p[0]!)))).toBe(false);
+  });
+  it("are found whichever way the ring was drawn, and a courtyard stays with its floor", () => {
+    const backwards: FlatRing = [];
+    for (let i = joined.length - 2; i >= 0; i -= 2) backwards.push(joined[i]!, joined[i + 1]!);
+    const courtyard = rect(1, 1, 2, 2);
+    const pieces = withoutStrips([[backwards, courtyard]]);
+    expect(pieces.length).toBe(2);
+    const withCourtyard = pieces.filter((p) => p.length === 2);
+    expect(withCourtyard.length).toBe(1);
+    expect(withCourtyard[0]![1]).toBe(courtyard);
+  });
+  it("leave a slit cut into a floor, a ledge wider than a wall and a plain outline as they are", () => {
+    // A slot 0.1 m wide cut 15 m into a 20 m floor: the gap is outside, so nothing is a strip.
+    const slit: FlatRing = [0, 0, 200, 0, 200, 200, 101, 200, 101, 50, 100, 50, 100, 200, 0, 200];
+    const ledge: FlatRing = [0, 0, 250, 0, 250, 50, 200, 50, 200, 5, 50, 5, 50, 50, 0, 50];
+    for (const outline of [[[slit]], [[ledge]], [[square(400)]]]) expect(withoutStrips(outline)).toBe(outline);
+  });
+  it("leave the Southern Underpass's two stairways on Symonds Street, and nothing between them", () => {
+    const underpass = campus.buildings.find((b) => b.id === "331")!;
+    const blocks = massing(underpass, H);
+    expect(blocks.length).toBe(1);
+    expect(blocks[0]!.outline.length).toBe(2);
+    // The middle of the passage, under the street.
+    expect(blocks[0]!.outline.some((p) => pointInRing([38, -45], decodeRing(p[0]!)))).toBe(false);
+    expect(areaOf(blocks[0]!.outline)).toBeGreaterThan(50);
+  });
+  it("take next to no floor from any published building", () => {
+    let cut = 0;
+    for (const b of campus.buildings) {
+      for (const f of b.floors) {
+        if (!f.outline) continue;
+        const kept = withoutStrips(f.outline);
+        if (kept !== f.outline) cut += areaOf(f.outline) - areaOf(kept);
+      }
+    }
+    expect(cut).toBeGreaterThan(0);
+    expect(cut).toBeLessThan(30);
   });
 });
 
