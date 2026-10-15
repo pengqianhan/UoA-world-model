@@ -38,7 +38,8 @@ It is built to answer two questions a student actually has:
 
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
-  lifts and toilets; About's note on the far campuses put right.
+  lifts and toilets; About's note on the far campuses put right; the Southern Underpass under
+  Symonds Street, no longer on it.
 - **2026-10-14:** every space on a floor shows its type, rooms stand as walls, and buildings gain
   roof colours, rims, storeys and windows; a flight to the Tsinghua World Model.
 - **2026-10-13:** first release.

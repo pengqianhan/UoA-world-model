@@ -32,6 +32,11 @@ A change to what the site does or shows adds its line here, and the README's
 
 ### Fixed
 
+- **The Southern Underpass stood on Symonds Street.** Building 331 runs under the street, but the
+  campus map draws its ground floor as its two stairways joined by a strip about 0.1 m wide, and
+  that strip stood across the road as a storey with windows, over a footing as long as the passage.
+  A strip of floor no thicker than a wall is no longer drawn as a storey (13 buildings lose under
+  5 m² each), and a footing goes only under what stands on the ground (#31).
 - **About had the far campuses' error the wrong way round.** Shapes at Tai Tokerau are drawn about
   1.4% narrower east to west than they are, not 1% wider (#30).
 
