@@ -14,6 +14,7 @@ interface SceneHandle {
   spaceFloors(): { kind: string; colour: number }[];
   groundState(x: number, y: number, building?: string): { terrain: boolean; ground: number; base?: number; low?: number; meshY?: number };
   buildingsAcross(ax: number, ay: number, bx: number, by: number, height: number): string[];
+  openFloorAcross(ax: number, ay: number, bx: number, by: number, above: number): string[];
   showCampus(center: [number, number], span: number, animate?: boolean): void;
   pinOutline(): { text: string; kind: string; icon?: string } | undefined;
   lightState(): {

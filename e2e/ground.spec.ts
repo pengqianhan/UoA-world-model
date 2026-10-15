@@ -51,6 +51,19 @@ test("an underpass lies under its street: of the Southern Underpass only the two
   await shot(page, "18-ground-underpass");
 });
 
+test("opened, the Southern Underpass's ground floor is its two stairways, with no wall down Symonds Street", async ({ page }) => {
+  await open(page, "?building=331&floor=0&light=day&time=preview&date=2026-03-20&t=15:00");
+  const across = (line: readonly number[], above: number) =>
+    page.evaluate(([ax, ay, bx, by, h]) => window.__scene!.openFloorAcross(ax!, ay!, bx!, by!, h!), [...line, above]);
+  // Through the slab, and through the cut walls a metre over it.
+  expect(await across(ACROSS_THE_PASSAGE, 0.2)).not.toContain("slab");
+  expect(await across(ACROSS_THE_PASSAGE, 1.2)).not.toContain("cut");
+  expect(await across(ACROSS_THE_STAIRWAY, 0.2)).toContain("slab");
+  expect(await across(ACROSS_THE_STAIRWAY, 1.2)).toContain("cut");
+  await expectRealRender(page);
+  await shot(page, "18-ground-underpass-open");
+});
+
 test("a campus away from the centre stands on its own ground", async ({ page }) => {
   await open(page, "?campus=leigh&light=day&time=preview&date=2026-03-20&t=15:00");
   await page.waitForFunction(() => window.__scene!.groundState(2610, 64695).terrain);

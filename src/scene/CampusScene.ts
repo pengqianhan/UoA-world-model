@@ -38,7 +38,7 @@ import {
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room, SpaceKind, SpaceType } from "../shared/types.ts";
 import { decodeRing, interiorPoint, pointInRing } from "../shared/geo.ts";
-import { groundLevel, massing, roofRims } from "../shared/massing.ts";
+import { groundLevel, massing, roofRims, withoutStrips } from "../shared/massing.ts";
 import { MeshBuilder, drape, ringsBounds } from "./geometry.ts";
 import { SEA_PLANE, Terrain } from "./terrain.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
@@ -238,6 +238,8 @@ export class CampusScene {
   private terrainMeshes: Mesh[] = [];
   /** Where each University building stands on the ground, by id. */
   private bases = new Map<string, { base: number; low: number }>();
+  /** Floor outlines without their strips (see withoutStrips), by the outline they were made from. */
+  private cleanOutlines = new WeakMap<object, FlatRing[][]>();
   private lastContext?: ContextData;
   /**
    * Heights of the surrounding buildings' vertices as built, and of the ground under each, so
@@ -1042,13 +1044,18 @@ export class CampusScene {
   }
 
   private floorOutline(b: Building, index: number): FlatRing[][] {
-    // A floor without its own outline repeats the one below it.
+    // A floor without its own outline repeats the one below it. A strip of floor no thicker than a
+    // wall is left out, as it is from outside: the Southern Underpass's ground floor would otherwise
+    // put a wall 40 m long down Symonds Street.
     let outline: FlatRing[][] | undefined;
     for (const f of b.floors) {
       if (f.outline) outline = f.outline;
       if (f.i === index) break;
     }
-    return outline ?? [b.outline];
+    const key = outline ?? b.outline;
+    let clean = this.cleanOutlines.get(key);
+    if (!clean) this.cleanOutlines.set(key, (clean = withoutStrips(outline ?? [b.outline])));
+    return clean;
   }
 
   private currentFloor(): { b: Building; floor: Floor } | undefined {
@@ -1857,6 +1864,27 @@ export class CampusScene {
     const ray = new Raycaster(from, along.clone().normalize(), 0, along.length());
     const hits = ray.intersectObjects([...this.buildingMeshes.values()], false);
     return [...new Set(hits.map((h) => (h.object.userData.pick as { id: string }).id))];
+  }
+
+  /**
+   * What of the open floor in building view a level line meets on its way from one point to
+   * another, metres east and north, at a height in metres over the floor's slab: the roles of the
+   * meshes it passes through ("slab", "cut", "plan", ...). It looks both ways, as a wall of no
+   * thickness has one face. For tests.
+   */
+  openFloorAcross(ax: number, ay: number, bx: number, by: number, above: number): string[] {
+    const cur = this.currentFloor();
+    if (!cur) return [];
+    const height = this.floorY(cur.b, cur.floor.i) + above;
+    const a = new Vector3(ax, height, -ay);
+    const b = new Vector3(bx, height, -by);
+    const meshes = this.detailGroup.children.filter((o): o is Mesh => o instanceof Mesh);
+    const roles = [a, b].flatMap((from, k) => {
+      const along = (k ? a : b).clone().sub(from);
+      const ray = new Raycaster(from, along.clone().normalize(), 0, along.length());
+      return ray.intersectObjects(meshes, false).map((h) => String(h.object.userData.role));
+    });
+    return [...new Set(roles)];
   }
 
   /**
