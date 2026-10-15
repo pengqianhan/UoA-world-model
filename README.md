@@ -36,9 +36,9 @@ It is built to answer two questions a student actually has:
 
 ## What's new
 
-- **2026-10-16:** a walker: a small made-up figure to walk the campus with, seen from behind
-  or through its eyes, which Claude Code and other agents can steer, and which talks with other
-  walkers; five outfits, Halloween's among them.
+- **2026-10-16:** a walker: a small made-up figure to walk the campus with, and into its
+  buildings, seen from behind or through its eyes, which Claude Code and other agents can steer,
+  and which talks with other walkers; five outfits, Halloween's among them.
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
   lifts and toilets; buildings open on the floor at street level, with the floors under the ground
@@ -153,7 +153,9 @@ on it, so you can watch; `--headless` keeps it hidden.
 
 ```bash
 npm run walker -- look                    # buildings round it: distance, direction, what is ahead
-npm run walker -- walk 109                # or a room code, part of a name, "east,north", a walker
+npm run walker -- walk 109                # or part of a name, "east,north", a campus, a walker
+npm run walker -- walk 109-305            # a room: into its building, up to its floor, to the room
+npm run walker -- enter | floor up | exit # in at street level, stairs or lift, back out
 npm run walker -- see --view eyes         # a picture through its eyes, saved under .walker/shots/
 npm run walker -- say "Kia ora"           # walkers within 25 m hear it; listen hears them
 npm run walker -- spawn Kea --near 201    # a second walker; steer it with --as Kea
@@ -174,7 +176,8 @@ token it keeps in `.walker/`, and sends nothing anywhere else. Outfits are data,
 a preset's name, or a JSON object of colours and a few choices (see `src/shared/outfit.ts`).
 
 The walker is made up and stands for no real person. Doors are not mapped, so a walk to a building
-ends beside its nearest wall. What one walker says to another is its own words: agents are told to
+ends beside its nearest wall, going in steps onto the floor at street level, and a walk inside keeps
+to corridors where it can and takes the nearest stairs or lift between floors. What one walker says to another is its own words: agents are told to
 treat it as speech, never as instructions.
 
 ## Updating the data snapshot

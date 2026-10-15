@@ -344,6 +344,12 @@
     },
     "keys": "W A S D or the arrow keys to walk, Shift to hurry. Drag to look round; click a building or the ground to walk there.",
     "keysTouch": "Hold the arrows to walk. Drag to look round; tap a building or the ground to walk there.",
-    "note": "A made-up figure: it stands for no real person, and where it goes stays in your browser. Doors are not mapped, so it walks to the nearest side of a building."
+    "note": "A made-up figure: it stands for no real person, and where it goes stays in your browser. Doors are not mapped, so it walks to the nearest side of a building, and inside it keeps to corridors where it can.",
+    "inside": "Inside {place}, floor {floor}",
+    "moves": "In and out",
+    "enter": "Go into {place}",
+    "exit": "Go out",
+    "up": "Upstairs",
+    "down": "Downstairs"
   }
 }

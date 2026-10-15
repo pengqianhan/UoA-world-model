@@ -110,3 +110,37 @@ test("walkers meet and hear each other; outfits are data only; the keyboard walk
   await expect(page.locator("#status-strip")).toBeVisible();
   expect(new URL(page.url()).searchParams.get("walk")).toBeNull();
 });
+
+test("a walk to a room goes into its building, up to its floor and into the room; the building view follows it, and back out", async ({ page }) => {
+  await open(page, `?walk=1&${QUERY}`);
+  await ready(page);
+  const walked = (await walker(page, "walk", { to: "109-305", speed: 30 })) as Reply & { arrived: boolean; to: string; look: { summary: string; indoor: { building: string; floor: string; in: { room: string } } } };
+  expect(walked.error).toBeUndefined();
+  expect(walked.arrived).toBe(true);
+  expect(walked.look.indoor).toMatchObject({ building: "109", floor: "3", in: { room: "109-305" } });
+  expect(walked.look.summary).toMatch(/inside 109 General Library, on floor 3, in 109-305/);
+  // The building view opened with it, on its floor, with the room's card.
+  await expect.poll(() => new URL(page.url()).searchParams.get("building")).toBe("109");
+  expect(new URL(page.url()).searchParams.get("floor")).toBe("3");
+  expect(new URL(page.url()).searchParams.get("room")).toBe("109-305");
+  await expect(page.locator("#walker-where")).toContainText("Inside 109");
+  // On the floor, not in the air or under it.
+  const st = ((await walker(page, "list")) as { walkers: { height: number; indoor: { floor: number } }[] }).walkers[0]!;
+  expect(st.indoor.floor).toBe(30);
+  await walker(page, "view", { view: "follow" });
+  await page.waitForTimeout(400);
+  await expectRealRender(page);
+  await shot(page, "20-walker-inside");
+
+  // Down by the stairs or lift, then out of doors: the map goes back to the campus.
+  const down = (await walker(page, "floor", { to: "down" })) as { floor: string; via: string };
+  expect(down.floor).toBe("2");
+  expect(down.via).toMatch(/stairs|lift/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("floor")).toBe("2");
+  await page.locator("#walker-exit").click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("building")).toBeNull();
+  const out = (await walker(page, "look")) as { indoor?: unknown; nearby: { id: string; distance: number }[] };
+  expect(out.indoor).toBeUndefined();
+  expect(out.nearby[0]).toMatchObject({ id: "109" });
+  expect(out.nearby[0]!.distance).toBeLessThan(3);
+});

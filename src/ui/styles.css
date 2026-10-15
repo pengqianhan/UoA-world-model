@@ -1915,6 +1915,26 @@ select optgroup {
   color: var(--accent);
 }
 
+.walker-moves {
+  display: flex;
+  gap: 4px;
+}
+
+.walker-moves button {
+  flex: 1;
+  height: 30px;
+  border: 1px solid rgba(110, 211, 200, 0.45);
+  border-radius: 8px;
+  background: rgba(110, 211, 200, 0.1);
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.walker-moves button:hover {
+  background: rgba(110, 211, 200, 0.2);
+}
+
 .walker-go {
   display: flex;
   gap: 6px;

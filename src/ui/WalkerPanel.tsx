@@ -2,7 +2,7 @@
 // touch screens. The walker is made up; the panel says so, and that doors are not mapped.
 import { useRef, useState } from "preact/hooks";
 import { t } from "../app/i18n.ts";
-import { MY_WALKER, run, setView, stopWalking, walkerOn, walkerStatus, walkerView } from "../app/walker.ts";
+import { ENTER_REACH, MY_WALKER, run, setView, stopWalking, walkerOn, walkerStatus, walkerView } from "../app/walker.ts";
 import { OUTFITS } from "../shared/outfit.ts";
 import { Icon } from "./common.tsx";
 import { isLite } from "./SceneHost.tsx";
@@ -48,6 +48,11 @@ export function WalkerPanel() {
   const outfit = Object.keys(OUTFITS).find((k) => OUTFITS[k]!.name === status?.outfit) ?? (status?.outfit ? "custom" : "student");
   const touch = isLite();
 
+  const act = async (command: string, args: Record<string, unknown>) => {
+    const r = await run(command, { name: MY_WALKER, ...args });
+    setMessage(r.error ? String(r.error) : undefined);
+  };
+
   const go = async (e: Event) => {
     e.preventDefault();
     const where = to.trim();
@@ -63,7 +68,13 @@ export function WalkerPanel() {
       <div class="walker-head">
         <h2>{t("walker.heading")}</h2>
         <span class="walker-where" id="walker-where" aria-live="polite">
-          {status?.walking ? t("walker.walking") : status?.near ? t("walker.near", { place: status.near }) : t("walker.standing")}
+          {status?.walking
+            ? t("walker.walking")
+            : status?.indoor
+              ? t("walker.inside", { place: status.indoor, floor: status.floor ?? "" })
+              : status?.near
+                ? t("walker.near", { place: status.near })
+                : t("walker.standing")}
         </span>
         <button type="button" class="btn ghost" id="walker-close" aria-label={t("walker.close")} title={t("walker.close")} onClick={stopWalking}>
           <Icon name="close" />
@@ -76,6 +87,27 @@ export function WalkerPanel() {
           </button>
         ))}
       </div>
+      {(status?.indoor || (status?.nearId && (status.nearMetres ?? Infinity) <= ENTER_REACH)) && (
+        <div class="walker-moves" role="group" aria-label={t("walker.moves")}>
+          {status.indoor ? (
+            <>
+              <button type="button" id="walker-up" onClick={() => act("floor", { to: "up" })}>
+                {t("walker.up")}
+              </button>
+              <button type="button" id="walker-down" onClick={() => act("floor", { to: "down" })}>
+                {t("walker.down")}
+              </button>
+              <button type="button" id="walker-exit" onClick={() => act("exit", {})}>
+                {t("walker.exit")}
+              </button>
+            </>
+          ) : (
+            <button type="button" id="walker-enter" onClick={() => act("enter", {})}>
+              {t("walker.enter", { place: status.nearId ?? "" })}
+            </button>
+          )}
+        </div>
+      )}
       {touch && (
         <div class="walker-pad" role="group" aria-label={t("walker.arrows")}>
           <Arrow dir="up" forward={WALK_SPEED * 1.6} turn={0} />

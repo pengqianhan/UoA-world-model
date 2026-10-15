@@ -20,6 +20,10 @@ npm run walker -- walk 109                # a building number, a room code (303-
                                           # ("library"), "east,north" in metres, a campus, a walker
 npm run walker -- turn north-east         # or: turn 90 (right), turn -45 (left), turn 109 (face it)
 npm run walker -- step 20                 # straight on, round anything in the way
+npm run walker -- walk 109-305            # a room: into its building, up to its floor, to the room
+npm run walker -- enter                   # into the building beside it, at street level
+npm run walker -- floor up                # the nearest stairs or lift: up, down, or a floor's name
+npm run walker -- exit                    # back out of doors
 npm run walker -- see --view eyes         # a picture through its eyes; prints the file to Read
 npm run walker -- see --view follow       # from behind; --view map for the campus from above
 npm run walker -- say "Kia ora"           # walkers within 25 m hear it
@@ -38,7 +42,8 @@ words what is near; use it to choose where to go, and `see` when the person asks
 ## How to walk well
 
 1. `look` first, to know where the walker stands and which way it faces.
-2. Walk to named places: a building number is surest. A room code walks to its building.
+2. Walk to named places: a building number is surest. A room code walks into its building, up or
+   down to its floor and to the room.
 3. After a walk, the answer includes a look from the new place: read it before the next step.
 4. Tell the person what the walker passes and where it ends up, in plain words.
 
@@ -46,8 +51,9 @@ words what is near; use it to choose where to go, and `see` when the person asks
 
 - The walker is **made up**. It stands for no real person, and nothing it does is about anyone.
   Never say a real person is somewhere because a walker is.
-- **Doors and entrances are not mapped.** A walk to a building ends beside its nearest wall; say
-  so if the person wants the way in.
+- **Doors and entrances are not mapped.** A walk to a building ends beside its nearest wall, and
+  going in steps onto the floor at the nearest point. Inside, a walk keeps to corridors where it
+  can, as the campus map has no doors; say so if the person wants the real way in.
 - Building **heights are estimated** from floor counts, and the surroundings come from
   OpenStreetMap. Say what the map shows, not what the real campus must look like.
 - The time and weather are Auckland's (Open-Meteo) when the map shows "now".

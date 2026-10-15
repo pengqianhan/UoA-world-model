@@ -16,6 +16,9 @@ export const HELP = `Walk the campus map as a made-up figure.
   walk <place> [--speed <m/s>]        walk to a building (109), a room (303-G23), a building's name,
                                       "east,north" in metres, a campus, or another walker
   step <metres>                       walk straight on (negative: back), round anything in the way
+  enter [building]                    go into the building beside it (or walk to one and go in)
+  floor <up | down | name>            take the nearest stairs or lift to another floor
+  exit                                go out of the building, onto the ground beside it
   turn <degrees | north | 109>        turn by degrees (+ is right), or to face a compass point or place
   say <words>                         say something; walkers within 25 m hear it
   listen                              what other walkers said nearby since last time
@@ -69,6 +72,13 @@ export function toCommand(p: Parsed): { name: string; args: Record<string, unkno
       return { name: "walk", args: { name, to: rest, speed } };
     case "step":
       return { name: "step", args: { name, metres: Number(rest), speed } };
+    case "enter":
+      return { name: "enter", args: { name, building: rest || undefined, speed } };
+    case "exit":
+    case "out":
+      return { name: "exit", args: { name } };
+    case "floor":
+      return { name: "floor", args: { name, to: rest, speed } };
     case "turn":
     case "face":
       return /^[-+]?\d+(\.\d+)?$/.test(rest) && p.cmd === "turn" ? { name: "turn", args: { name, by: Number(rest) } } : { name: "turn", args: { name, face: rest } };
@@ -116,6 +126,15 @@ export function describe(cmd: string, r: Record<string, unknown>): string {
         .join("\n");
     case "step":
       return r.arrived ? `Walked ${String(r.metres)} m.` : `Stopped: ${String(r.reason ?? "")}.`;
+    case "enter":
+      return r.entered ? `Went into ${String(r.entered)}, floor ${String(r.floor)}. ${String(r.note ?? "")}
+${look?.summary ?? ""}`.trim() : `Did not go in: ${String(r.reason ?? r.note ?? "")}.`;
+    case "exit":
+    case "out":
+      return look?.summary ?? String(r.note ?? "Out of doors.");
+    case "floor":
+      return `On floor ${String(r.floor)}${r.via ? `, by ${String(r.via)}` : ""}.
+${look?.summary ?? ""}`.trim();
     case "turn":
     case "face": {
       const f = r.facing as { compass: string; bearing: number };

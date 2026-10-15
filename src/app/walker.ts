@@ -10,10 +10,12 @@ import { OUTFITS, DEFAULT_OUTFIT, parseOutfit, type Outfit } from "../shared/out
 import { parseRoomCode } from "../shared/roomcode.ts";
 import { formatMinutes } from "../shared/time.ts";
 import { bearing, compass, describeBuilding, look, relative, type Look } from "../shared/walkerLook.ts";
+import { IndoorMap, floorRings, floorSpaces, spaceAt } from "../shared/indoor.ts";
 import type { Building } from "../shared/types.ts";
 import { weather } from "../ui/weather.ts";
+import { loadPlans } from "./data.ts";
 import { pick } from "./i18n.ts";
-import { data, goHome, night, selBuilding, selCampus, shown, timeMode, urlExtras } from "./state.ts";
+import { data, defaultFloor, floorByName, goHome, night, openBuilding, openRoom, resolveRoom, selBuilding, selCampus, selFloor, shown, timeMode, urlExtras } from "./state.ts";
 
 /** The visitor's own walker. Agents name theirs. */
 export const MY_WALKER = "Walker";
@@ -27,7 +29,11 @@ const START: Record<string, Pt> = { city: [28, 205] };
 export const walkerOn = signal(false);
 export const walkerView = signal<WalkerView>("map");
 /** What the panel shows about the visitor's walker, refreshed a few times a second. */
-export const walkerStatus = signal<{ near?: string; walking: boolean; outfit: string; indoor?: string } | undefined>(undefined);
+export const walkerStatus = signal<
+  { near?: string; nearId?: string; nearMetres?: number; walking: boolean; outfit: string; indoor?: string; floor?: string } | undefined
+>(undefined);
+/** Metres from a building's wall within which a walker can go in. */
+export const ENTER_REACH = 8;
 
 let scene: CampusScene | undefined;
 let statusTimer = 0;
@@ -82,8 +88,32 @@ function buildingAhead(at: Pt, heading: number, range = 220): { id: string; dist
   return undefined;
 }
 
+const indoorMaps = new Map<string, Promise<IndoorMap>>();
+
+/** The way about one floor of a building: its outline, its rooms and the shapes of its floor plan. */
+function indoorMap(b: Building, floor: number): Promise<IndoorMap> {
+  const key = `${b.id}:${floor}`;
+  let m = indoorMaps.get(key);
+  if (!m) {
+    m = (b.planShapes ? loadPlans(b.id).catch(() => undefined) : Promise.resolve(undefined)).then(
+      (plans) => new IndoorMap(floorRings(b, floor), floorSpaces(data.value?.roomsByBuilding.get(b.id) ?? [], plans, floor)),
+    );
+    indoorMaps.set(key, m);
+  }
+  return m;
+}
+
+function floorNameOf(b: Building, floor: number): string {
+  return b.floors.find((f) => f.i === floor)?.name ?? String(floor);
+}
+
+/** Whether the visitor sees this walker: their own, or the one a walker view follows. */
+function shownWalker(name: string): boolean {
+  return name === MY_WALKER || scene?.viewedWalker === name;
+}
+
 /** What a walker sees, as data and in a few sentences. */
-export function lookFrom(name?: string): Reply {
+export async function lookFrom(name?: string): Promise<Reply> {
   const s = need();
   const n = walkerNamed(name);
   const st = s.walkers.state(n)!;
@@ -103,7 +133,43 @@ export function lookFrom(name?: string): Reply {
     ahead: buildingAhead(st.at, st.heading),
   });
   const indoorB = st.indoor ? d.buildingById.get(st.indoor.building) : undefined;
-  const indoor = st.indoor && indoorB ? { building: indoorB.id, name: buildingName(indoorB), floor: indoorB.floors.find((f) => f.i === st.indoor!.floor)?.name ?? "" } : undefined;
+  let indoor: Reply | undefined;
+  const inLines: string[] = [];
+  if (st.indoor && indoorB) {
+    const map = await indoorMap(indoorB, st.indoor.floor);
+    const here = spaceAt(map.spaces, st.at);
+    const room = here?.code ? d.roomByCode.get(here.code) : undefined;
+    const rooms = map.spaces
+      .filter((x) => x.kind === "room" && x !== here)
+      .map((x) => {
+        const deg = bearing(st.at, x.at);
+        const r = d.roomByCode.get(x.code!);
+        return { code: x.code!, name: r ? pick(r.name) : x.name, distance: Math.round(Math.hypot(x.at[0] - st.at[0], x.at[1] - st.at[1])), side: relative(st.heading, deg) };
+      })
+      .filter((x) => x.distance <= 35)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 6);
+    const signs = (["stairs", "lift", "toilet", "accessible"] as const)
+      .map((icon) => {
+        const x = map.nearestSign(st.at, [icon]);
+        if (!x) return undefined;
+        return { sign: icon, distance: Math.round(Math.hypot(x.at[0] - st.at[0], x.at[1] - st.at[1])), side: relative(st.heading, bearing(st.at, x.at)) };
+      })
+      .filter((x) => !!x);
+    const floorName = floorNameOf(indoorB, st.indoor.floor);
+    indoor = {
+      building: indoorB.id,
+      name: buildingName(indoorB),
+      floor: floorName,
+      in: room ? { room: room.code, name: pick(room.name), kind: room.kind } : here ? { space: here.type ?? here.kind } : undefined,
+      roomsNearby: rooms,
+      signs,
+    };
+    const where = room ? `in ${room.code} ${pick(room.name)}` : here?.type ? `in a space the campus map calls "${here.type}"` : "on the open floor";
+    inLines.push(`${n} is inside ${indoorB.id} ${buildingName(indoorB)}, on floor ${floorName}, ${where}, facing ${seen.facing.compass}.`);
+    if (rooms.length) inLines.push(`Rooms near: ${rooms.map((r) => `${r.code} ${r.name}, ${r.distance} m ${r.side}`).join("; ")}.`);
+    if (signs.length) inLines.push(`Signs: ${signs.map((x) => `${x!.sign} ${x!.distance} m ${x!.side}`).join("; ")}.`);
+  }
   const w = weather.value;
   const now = timeMode.value === "now";
   const others = s.walkers
@@ -119,10 +185,13 @@ export function lookFrom(name?: string): Reply {
     .sort((a, b) => a.distance - b.distance);
 
   const lines: string[] = [];
-  lines.push(indoor ? `${n} is inside ${indoor.building} ${indoor.name}, on floor ${indoor.floor}, facing ${seen.facing.compass}.` : `${n} is out of doors, facing ${seen.facing.compass} (${seen.facing.bearing}°).`);
-  if (seen.ahead) lines.push(`Straight ahead: ${seen.ahead.id}${seen.ahead.name && !/^Building /.test(seen.ahead.name) ? ` ${seen.ahead.name}` : ""}, ${seen.ahead.distance} m.`);
-  if (seen.nearby.length) lines.push(`Nearby: ${seen.nearby.map(describeBuilding).join("; ")}.`);
-  else lines.push("No University building within 400 m.");
+  if (indoor) lines.push(...inLines);
+  else {
+    lines.push(`${n} is out of doors, facing ${seen.facing.compass} (${seen.facing.bearing}°).`);
+    if (seen.ahead) lines.push(`Straight ahead: ${seen.ahead.id}${seen.ahead.name && !/^Building /.test(seen.ahead.name) ? ` ${seen.ahead.name}` : ""}, ${seen.ahead.distance} m.`);
+    if (seen.nearby.length) lines.push(`Nearby: ${seen.nearby.map(describeBuilding).join("; ")}.`);
+    else lines.push("No University building within 400 m.");
+  }
   if (others.length) lines.push(`Other walkers: ${others.map((o) => `${o.name}, ${o.distance} m ${o.side}`).join("; ")}.`);
   lines.push(
     `It is ${shown.value.date} ${formatMinutes(shown.value.minutes)} in Auckland (${now ? "now" : "preview"}), ${night.value > 0.5 ? "night" : "day"}` +
@@ -134,14 +203,14 @@ export function lookFrom(name?: string): Reply {
     heightAboveSea: st.height,
     facing: seen.facing,
     indoor,
-    ahead: seen.ahead,
-    nearby: seen.nearby,
+    ahead: indoor ? undefined : seen.ahead,
+    nearby: indoor ? [] : seen.nearby,
     otherWalkers: others,
     time: { date: shown.value.date, time: formatMinutes(shown.value.minutes), mode: timeMode.value, light: night.value > 0.5 ? "night" : "day" },
     weather: now && w ? { kind: w.kind, temperatureC: Math.round(w.temperature), source: "Open-Meteo" } : undefined,
     notes: [
       "The walker is a made-up figure on a model of the campus; it stands for no real person.",
-      "Doors and entrances are not mapped: a walk to a building ends beside its nearest wall.",
+      "Doors and entrances are not mapped: a walk to a building ends beside its nearest wall, and inside it keeps to corridors where it can.",
       "Building heights are estimated from the number of floors, not surveyed.",
     ],
     summary: lines.join(" "),
@@ -246,17 +315,130 @@ export function spawn(args: { name?: unknown; near?: unknown; outfit?: unknown; 
 
 export async function walk(args: { name?: unknown; to?: unknown; speed?: unknown }): Promise<Reply> {
   const s = need();
+  const d = data.value!;
   const name = walkerNamed(args.name as string | undefined);
   if (typeof args.to !== "string" || !args.to.trim()) throw new Error('Say where to: "to" is a building, a room code, a name or "east,north".');
-  const st = s.walkers.state(name)!;
-  if (st.indoor) leaveBuilding(name);
-  const target = resolveTarget(args.to, st.at);
   const speed = speedOf(args.speed, AGENT_SPEED);
+  let st = s.walkers.state(name)!;
+  const target = resolveTarget(args.to, st.at);
+
+  // A room: its building, then its floor, then the room, keeping to corridors where it can.
+  if (target.room && target.building) {
+    const found = await resolveRoom(target.room);
+    const room = found?.room ? d.roomByCode.get(found.room) : undefined;
+    const point = room?.c ?? found?.marker?.at;
+    const floor = room?.f ?? found?.marker?.floor;
+    if (point && floor !== undefined) {
+      const b = target.building;
+      if (st.indoor?.building !== b.id) {
+        const entered = await enter({ name, building: b.id, speed });
+        if (entered.error || !s.walkers.state(name)!.indoor) return { walker: name, to: target.label, arrived: false, reason: String(entered.reason ?? entered.error ?? "could not go in") };
+      }
+      st = s.walkers.state(name)!;
+      if (st.indoor!.floor !== floor) await changeFloor({ name, to: floorNameOf(b, floor), speed });
+      const map = await indoorMap(b, floor);
+      const at = s.walkers.state(name)!.at;
+      const plan = map.planTo(at, point);
+      if (!plan) return { walker: name, to: target.label, arrived: false, reason: "no way across the floor to it" };
+      const result = await s.walkers.follow(name, plan, Math.min(speed, 6));
+      if (result.arrived && room && shownWalker(name)) openRoom(room.code);
+      return {
+        walker: name,
+        to: `${room?.code ?? target.room}${room ? ` ${pick(room.name)}` : ""}, on floor ${floorNameOf(b, floor)} of ${b.id}`,
+        ...result,
+        note: "Doors are not mapped: inside, the walk keeps to corridors where it can and goes through a wall where it must.",
+        look: result.arrived ? await lookFrom(name) : undefined,
+      };
+    }
+  }
+
+  if (st.indoor) leaveBuilding(name);
+  st = s.walkers.state(name)!;
   const result: WalkResult = target.building ? await s.walkers.walkToBuilding(name, target.building.id, speed) : await s.walkers.walkTo(name, target.at!, speed);
   const out: Reply = { walker: name, to: target.label, ...result };
-  if (target.room) out.note = `${target.room} is inside ${target.building!.id}. Doors are not mapped, so the walker stops beside the building.`;
-  if (result.arrived) out.look = lookFrom(name);
+  if (target.room) out.note = `${target.room} is inside ${target.building!.id}, and where in it is not known. Doors are not mapped, so the walker stops beside the building.`;
+  if (result.arrived) out.look = await lookFrom(name);
   return out;
+}
+
+/** Goes into a building the walker stands beside, or walks to a named one first, onto its street-level floor. */
+export async function enter(args: { name?: unknown; building?: unknown; speed?: unknown }): Promise<Reply> {
+  const s = need();
+  const d = data.value!;
+  const name = walkerNamed(args.name as string | undefined);
+  let st = s.walkers.state(name)!;
+  let b: Building | undefined;
+  if (typeof args.building === "string" && args.building.trim()) {
+    const t = resolveTarget(args.building, st.at);
+    b = t.building;
+    if (!b) throw new Error(`"${args.building}" is not a building.`);
+  } else {
+    const near = buildingsNear(st.at, ENTER_REACH)[0];
+    if (!near) throw new Error(`${name} is not beside a building. Walk to one first, or say which building to go into.`);
+    b = near.b;
+  }
+  if (st.indoor?.building === b.id) return { walker: name, entered: b.id, floor: floorNameOf(b, st.indoor.floor), note: "Already inside." };
+  if (st.indoor) leaveBuilding(name);
+  st = s.walkers.state(name)!;
+  if (s.walkingMap()!.distanceTo(st.at, b.id) > ENTER_REACH) {
+    const r = await s.walkers.walkToBuilding(name, b.id, speedOf(args.speed, AGENT_SPEED));
+    if (!r.arrived) return { walker: name, entered: undefined, arrived: false, reason: r.reason };
+    st = s.walkers.state(name)!;
+  }
+  const floor = defaultFloor(b);
+  const map = await indoorMap(b, floor);
+  const at = map.nearestOn(st.at);
+  if (!at) throw new Error(`The campus map draws no floor for ${b.id} to stand on.`);
+  if (shownWalker(name)) openBuilding(b.id, floor);
+  s.walkers.teleport(name, at, { building: b.id, floor });
+  s.walkers.turn(name, bearing(st.at, at), true);
+  return {
+    walker: name,
+    entered: `${b.id} ${buildingName(b)}`,
+    floor: floorNameOf(b, floor),
+    note: "Doors are not mapped: the walker steps in at the nearest point of the floor, on the floor at street level.",
+    look: await lookFrom(name),
+    roomsOnFloor: (d.roomsByBuilding.get(b.id) ?? []).filter((r) => r.f === floor).length,
+  };
+}
+
+/** Goes out of the building the walker is in, onto the ground beside it. */
+export async function exit(args: { name?: unknown }): Promise<Reply> {
+  const s = need();
+  const name = walkerNamed(args.name as string | undefined);
+  const st = s.walkers.state(name)!;
+  if (!st.indoor) return { walker: name, note: "Already out of doors." };
+  leaveBuilding(name);
+  return { walker: name, left: st.indoor.building, look: await lookFrom(name) };
+}
+
+/** Takes the nearest stairs or lift to another floor: up, down, or a floor's name. */
+export async function changeFloor(args: { name?: unknown; to?: unknown; speed?: unknown }): Promise<Reply> {
+  const s = need();
+  const d = data.value!;
+  const name = walkerNamed(args.name as string | undefined);
+  const st = s.walkers.state(name)!;
+  if (!st.indoor) throw new Error(`${name} is out of doors: go into a building first.`);
+  const b = d.buildingById.get(st.indoor.building)!;
+  const floors = b.floors.map((f) => f.i).sort((x, y) => x - y);
+  const here = floors.indexOf(st.indoor.floor);
+  const want = String(args.to ?? "").trim().toLowerCase();
+  const next = want === "up" ? floors[here + 1] : want === "down" ? floors[here - 1] : floorByName(b, want);
+  if (next === undefined) throw new Error(want === "up" || want === "down" ? `There is no floor ${want} from ${floorNameOf(b, st.indoor.floor)}.` : `${b.id} has no floor "${String(args.to)}". Floors: ${b.floors.map((f) => f.name).join(", ")}.`);
+  if (next === st.indoor.floor) return { walker: name, floor: floorNameOf(b, next), note: "Already on that floor." };
+  const map = await indoorMap(b, st.indoor.floor);
+  const sign = map.nearestSign(st.at, ["stairs", "lift"]);
+  let via = "no stairs or lift on the campus map; the walker changes floor where it stands";
+  if (sign) {
+    const plan = map.planTo(st.at, sign.at);
+    if (plan) await s.walkers.follow(name, plan, Math.min(speedOf(args.speed, AGENT_SPEED), 6));
+    via = sign.icon === "lift" ? "the lift" : "the stairs";
+  }
+  const nextMap = await indoorMap(b, next);
+  const at = nextMap.nearestOn(s.walkers.state(name)!.at) ?? s.walkers.state(name)!.at;
+  s.walkers.teleport(name, at, { building: b.id, floor: next });
+  if (shownWalker(name) && selBuilding.value === b.id) selFloor.value = next;
+  return { walker: name, floor: floorNameOf(b, next), via, look: await lookFrom(name) };
 }
 
 export async function step(args: { name?: unknown; metres?: unknown; speed?: unknown }): Promise<Reply> {
@@ -361,7 +543,7 @@ function leaveBuilding(name: string): void {
   if (!st.indoor) return;
   const out = s.walkingMap()?.freeNear(st.at, 80) ?? st.at;
   s.walkers.teleport(name, out);
-  if (selBuilding.value === st.indoor.building) goHome();
+  if (shownWalker(name) && selBuilding.value === st.indoor.building) goHome();
 }
 
 /** Every command an agent can send, by name. */
@@ -371,6 +553,9 @@ export const COMMANDS: Record<string, (args: Record<string, unknown>) => Reply |
   look: (a) => lookFrom(a.name as string | undefined),
   walk: (a) => walk(a),
   step: (a) => step(a),
+  enter: (a) => enter(a),
+  exit: (a) => exit(a),
+  floor: (a) => changeFloor(a),
   turn: (a) => turn(a),
   say: (a) => say(a),
   listen: (a) => listen(a),
@@ -413,16 +598,43 @@ export function bindWalkerScene(s: CampusScene | undefined): void {
       walkerStatus.value = undefined;
       return;
     }
-    const near = buildingsNear(st.at, 150)[0];
+    const near = st.indoor ? undefined : buildingsNear(st.at, 150)[0];
+    const inB = st.indoor ? data.value?.buildingById.get(st.indoor.building) : undefined;
     walkerStatus.value = {
       near: near ? `${near.b.id}${buildingName(near.b) && !/^Building /.test(buildingName(near.b)) ? ` ${buildingName(near.b)}` : ""} · ${Math.round(near.distance)} m` : undefined,
+      nearId: near?.b.id,
+      nearMetres: near ? Math.round(near.distance) : undefined,
       walking: st.walking,
       outfit: st.outfit.name,
-      indoor: st.indoor?.building,
+      indoor: inB ? `${inB.id}${buildingName(inB) && !/^Building /.test(buildingName(inB)) ? ` ${buildingName(inB)}` : ""}` : undefined,
+      floor: inB && st.indoor ? floorNameOf(inB, st.indoor.floor) : undefined,
     };
   }, 400);
   (window as unknown as { __walker?: unknown }).__walker = { run, commands: Object.keys(COMMANDS), ready: () => !!data.value && !!s.walkingMap() };
+  // The visitor's walker keeps in step with the building view: leaving the building takes it
+  // out of doors, and choosing another floor takes it up or down there.
+  syncStop?.();
+  syncStop = effect(() => {
+    const b = selBuilding.value;
+    const f = selFloor.value;
+    const st = s.walkers.state(MY_WALKER);
+    if (!st?.indoor) return;
+    if (b !== st.indoor.building) {
+      leaveBuilding(MY_WALKER);
+      return;
+    }
+    if (f !== undefined && f !== st.indoor.floor) {
+      const building = data.value?.buildingById.get(b);
+      if (!building) return;
+      void indoorMap(building, f).then((map) => {
+        const now = s.walkers.state(MY_WALKER);
+        if (!now?.indoor || now.indoor.building !== b || selFloor.peek() !== f) return;
+        s.walkers.teleport(MY_WALKER, map.nearestOn(now.at) ?? now.at, { building: b, floor: f });
+      });
+    }
+  });
 }
+let syncStop: (() => void) | undefined;
 
 /**
  * Starts walking when the address asks: `walk=1` (or `walk=<building or place>` to start there),

@@ -47,6 +47,7 @@ import { LabelLayer, type LabelSpec } from "./labels.ts";
 import { EYE_HEIGHT } from "./figure.ts";
 import { WalkerWorld } from "./walkers.ts";
 import { WalkMap } from "../shared/walkmap.ts";
+import { floorRings } from "../shared/indoor.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
 
 export interface Selection {
@@ -288,6 +289,8 @@ export class CampusScene {
 
   /** The walkers on the map (walkers.ts). */
   readonly walkers: WalkerWorld;
+  /** Floor outlines in metres, by building and floor, for walkers steered by hand indoors. */
+  private floorRingCache = new Map<string, [number, number][][][]>();
   private walkMapCache?: WalkMap;
   /** The camera of the walker views: behind a walker, or at its eyes. */
   private persp = new PerspectiveCamera(55, 1, 0.3, 6000);
@@ -366,6 +369,14 @@ export class CampusScene {
       floorTop: (id, i) => {
         const b = this.buildings.get(id);
         return b ? this.floorY(b, i) + SLAB + PLAN_FLOOR : undefined;
+      },
+      insideFloor: (id, i, p) => {
+        const b = this.buildings.get(id);
+        if (!b) return false;
+        const key = `${id}:${i}`;
+        let rings = this.floorRingCache.get(key);
+        if (!rings) this.floorRingCache.set(key, (rings = floorRings(b, i)));
+        return rings.some(([outer, ...holes]) => !!outer && pointInRing(p, outer) && !holes.some((h) => pointInRing(p, h)));
       },
       rain: () => this.weather?.wet ?? 0,
       ringColour: () => this.palette.accent,

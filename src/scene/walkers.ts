@@ -32,6 +32,8 @@ export interface WalkerHost {
   walkMap(): WalkMap | undefined;
   /** Height to stand at inside a building, on a floor; undefined when unknown. */
   floorTop(building: string, floor: number): number | undefined;
+  /** Whether a point is on a floor of a building, for a walker steered by hand indoors. */
+  insideFloor(building: string, floor: number, p: Pt): boolean;
   /** 0-1: how hard it is raining where the walkers are. */
   rain(): number;
   ringColour(): number;
@@ -407,9 +409,9 @@ export class WalkerWorld {
     return Math.abs(d);
   }
 
-  /** Whether a walker steered by hand may step onto a point: free ground out of doors. */
+  /** Whether a walker steered by hand may step onto a point: free ground out of doors, the floor indoors. */
   private walkable(w: Walker, p: Pt): boolean {
-    if (w.indoor) return true;
+    if (w.indoor) return this.host.insideFloor(w.indoor.building, w.indoor.floor, p);
     const map = this.host.walkMap();
     if (!map) return true;
     const box = this.local?.box;

@@ -27,7 +27,7 @@ export const TOOLS = [
   {
     name: "walker_walk",
     description:
-      "Walk to a place on foot, round buildings and along paths: a building number (109), a room code (303-G23: walks to its building, as doors are not mapped), part of a building's name (library), 'east,north' in metres, a campus (Grafton), or another walker's name. Returns when it arrives, with a look from there.",
+      "Walk to a place on foot, round buildings and along paths: a building number (109), a room code (303-G23: into its building, up or down to its floor and to the room, keeping to corridors where it can), part of a building's name (library), 'east,north' in metres, a campus (Grafton), or another walker's name. Returns when it arrives, with a look from there.",
     inputSchema: {
       type: "object",
       properties: { to: { type: "string" }, speed: { type: "number", description: "Metres a second, 0.5-40. Default 4: time sped up a little." }, name: NAME },
@@ -38,6 +38,22 @@ export const TOOLS = [
     name: "walker_step",
     description: "Walk straight on by some metres (negative: back), going round anything in the way.",
     inputSchema: { type: "object", properties: { metres: { type: "number" }, name: NAME }, required: ["metres"] },
+  },
+  {
+    name: "walker_enter",
+    description:
+      "Go into the building the walker stands beside, or walk to a named building and go in, onto its floor at street level. The map opens that building. Doors are not mapped, so it steps in at the nearest point of the floor.",
+    inputSchema: { type: "object", properties: { building: { type: "string" }, name: NAME } },
+  },
+  {
+    name: "walker_floor",
+    description: "Inside a building: take the nearest stairs or lift up, down, or to a floor by its name (G, 1, B...).",
+    inputSchema: { type: "object", properties: { to: { type: "string" }, name: NAME }, required: ["to"] },
+  },
+  {
+    name: "walker_exit",
+    description: "Go out of the building, onto the ground beside it.",
+    inputSchema: { type: "object", properties: { name: NAME } },
   },
   {
     name: "walker_turn",
@@ -96,6 +112,9 @@ const COMMAND_OF: Record<string, string> = {
   walker_look: "look",
   walker_walk: "walk",
   walker_step: "step",
+  walker_enter: "enter",
+  walker_floor: "floor",
+  walker_exit: "exit",
   walker_turn: "turn",
   walker_say: "say",
   walker_listen: "listen",
