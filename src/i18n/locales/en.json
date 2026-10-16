@@ -263,7 +263,7 @@
       "daylight": "The sun stands where it does over the City Campus at the date and time shown, from NOAA's published solar-position equations; below 10° above the horizon it is drawn at 10°, so that shadows stay on the map. Night falls as the sun goes from 6° above the horizon to 8° below. In Now mode the cloud, rain and fog follow Open-Meteo's current weather for the City Campus, and the falling rain is drawn by rule; Preview shows a clear sky, because past and future weather are not known here."
     },
     "privacyTitle": "Privacy",
-    "privacy": "The site has no accounts, sets no cookies and has no analytics. Staff names are deliberately left out. If the weather line is shown, your browser asks Open-Meteo for the current weather in Auckland; nothing about you is sent beyond that request.",
+    "privacy": "The site has no accounts and sets no cookies. Staff names are deliberately left out. Only the copy at campusworldmodel.com is counted: there Cloudflare, which serves the site, counts page views and visits with its Web Analytics. It stores nothing in your browser and does not record which building or room you look at; a content blocker may stop it. If the weather line is shown, your browser asks Open-Meteo for the current weather in Auckland; nothing about you is sent beyond that request.",
     "osm": "Map context © OpenStreetMap contributors, available under the Open Database License.",
     "osmLink": "OpenStreetMap copyright and licence",
     "inspirationTitle": "Inspiration",

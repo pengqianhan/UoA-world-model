@@ -36,6 +36,8 @@ It is built to answer two questions a student actually has:
 
 ## What's new
 
+- **2026-10-17:** About says that Cloudflare counts page views and visits at campusworldmodel.com,
+  where it used to say the site has no analytics.
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
   lifts and toilets; buildings open on the floor at street level, with the floors under the ground
@@ -43,7 +45,6 @@ It is built to answer two questions a student actually has:
   Symonds Street, no longer on it, from outside or opened; outer walls on 40 floors that had none.
 - **2026-10-14:** every space on a floor shows its type, rooms stand as walls, and buildings gain
   roof colours, rims, storeys and windows; a flight to the Tsinghua World Model.
-- **2026-10-13:** first release.
 
 Everything, with its pull request, is in the [changelog](CHANGELOG.md).
 
