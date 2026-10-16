@@ -16,14 +16,6 @@ A change to what the site does or shows adds its line here, and the README's
 
 ## 2026-10-17
 
-### Fixed
-
-- **About said the site has no analytics.** At campusworldmodel.com, Cloudflare, which serves the
-  site, has counted page views and visits with its Web Analytics since the domain was set up. About
-  now says so, and what it does not record (#45).
-
-## 2026-10-16
-
 ### Added
 
 - **A walker on the map.** "Take a walk" puts a small made-up person near the Clock Tower, to walk
@@ -39,6 +31,12 @@ A change to what the site does or shows adds its line here, and the README's
   Behind it, the camera stops in front of a wall, and where a building or a tree hides it, its shape
   shows through. Claude Code and other agents steer it with `npm run walker`, an MCP server or the
   `campus-walker` skill, all on the user's own computer (#40).
+
+### Fixed
+
+- **About said the site has no analytics.** At campusworldmodel.com, Cloudflare, which serves the
+  site, has counted page views and visits with its Web Analytics since the domain was set up. About
+  now says so, and what it does not record (#45).
 
 ## 2026-10-15
 
