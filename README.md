@@ -183,7 +183,9 @@ token it keeps in `.walker/`, and sends nothing anywhere else.
 
 The walker is made up and stands for no real person. Its body is Quaternius's
 ["Animated Human"](https://opengameart.org/content/animated-human-low-poly), given to the public
-domain (CC0); `scripts/walker/make-figure.ts` turns the download into `public/models/walker.glb`.
+domain (CC0); `scripts/walker/make-figure.ts` turns the download into `public/models/walker.glb`,
+and `src/scene/figureBuild.ts` makes it over when the first walk starts: rounded faces, a stance at
+ease, trainers, hair, a mouth, a backpack and an umbrella.
 Doors are not mapped, so a walk to a building ends beside its nearest wall, going in steps onto the
 floor at street level, and a walk inside keeps to corridors where it can and takes the nearest
 stairs or lift between floors. What one walker says to another is its own words: agents are told

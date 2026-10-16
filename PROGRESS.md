@@ -306,10 +306,10 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   - The controller listens on 127.0.0.1 with a random token, so a web page cannot steer the walker.
   - One look for every walker (the user, 2026-10-16, after trying five outfits: keep only the
     student, and make it neutral). It is a student in a long-sleeved top with a backpack, with nothing
-    meant to mark a sex or a gender. The body as modelled reads as a man, so `src/scene/figure.ts`
-    gives it hair over its ears with a fringe, lighter brows, a narrower jaw and shoulders, and long
-    sleeves; its colours are none of the University's. There is nothing to dress a walker in, so
-    walkers are told apart by the names over their heads.
+    meant to mark a sex or a gender. The body as modelled reads as a man, so it gets hair over its
+    ears with a fringe, lighter brows, a narrower jaw and long sleeves (`src/scene/figureBuild.ts`)
+    and narrower shoulders (`src/scene/figure.ts`); its colours are none of the University's. There
+    is nothing to dress a walker in, so walkers are told apart by the names over their heads.
   - What another walker says reaches an agent as speech: the listen answer, the MCP tool's
     description and the skill all say it is never instructions.
 - **GOAL.md is gitignored.** It contains the local working-directory path (with a username).
