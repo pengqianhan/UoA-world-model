@@ -306,6 +306,14 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   `campus-world-model.pages.dev`), published by the `deploy-cloudflare` CI job (repository variable
   `CLOUDFLARE_PROJECT`, secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`). Cloudflare
   because the user planned advertising at the time, which GitHub Pages' terms do not suit.
+- **A preview for each of the user's own branches (the user, 2026-10-17).** The `deploy-preview`
+  CI job publishes a pull request from a branch of this repository to the same Pages project as a
+  branch preview (`<branch>.campus-world-model.pages.dev/uoa/`) once build and e2e pass, so the
+  user can look at a branch online often without merging it. Chosen over `wrangler login` on the
+  user's machine, which would keep a Cloudflare credential wider than Pages there and needs a
+  build and deploy by hand each time. Pull requests from forks get no preview, by the user's
+  choice: GitHub gives them no secrets, and serving them would mean a second workflow run on
+  `workflow_run` that deploys a fork's build with the token, for little use today.
 - **No advertising (the user, 2026-10-14).** The plan above is dropped: the site is a
   non-commercial open-source project. The University's copyright page
   (<https://www.auckland.ac.nz/en/copyright.html>) asks for written permission before any
