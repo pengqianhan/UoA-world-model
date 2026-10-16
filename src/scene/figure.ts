@@ -5,6 +5,8 @@
 // hair, the backpack and the umbrella that ride on its bones. This poses it. It faces north with no
 // turn and stands with its feet at its origin.
 import {
+  AdditiveAnimationBlendMode,
+  AnimationClip,
   AnimationMixer,
   GreaterDepth,
   Group,
@@ -13,10 +15,12 @@ import {
   MeshBasicMaterial,
   NotEqualStencilFunc,
   Quaternion,
+  QuaternionKeyframeTrack,
   ReplaceStencilOp,
   RingGeometry,
   SkinnedMesh,
   Vector3,
+  VectorKeyframeTrack,
   type AnimationAction,
   type Bone,
   type BufferGeometry,
@@ -50,6 +54,8 @@ const STAND: [bone: string, child: string, dir: [number, number, number]][] = [
   ["RightArm", "RightForeArm", [0.2, -1, 0.04]],
   ["RightForeArm", "RightHand", [0.08, -1, -0.22]],
 ];
+/** Radians the feet point out from straight ahead, standing. */
+const TOES_OUT = 0.12;
 /** Radians each joint of the fingers is curled from the line of the hand, standing; and how far the thumb comes in. */
 const CURL = [0.35, 0.8, 1.15];
 const THUMB_IN = 0.35;
@@ -76,8 +82,8 @@ interface Body {
   walk: AnimationAction;
   run: AnimationAction;
   bone: (name: string) => Bone;
-  /** The figure standing at ease: see `standing`. */
-  stand: { bones: Bone[]; turns: Quaternion[]; hips: Bone; lift: Vector3 };
+  /** The figure standing at ease, added to the idle: see `standing`. */
+  stand: AnimationAction;
 }
 
 export class Figure {
@@ -190,14 +196,9 @@ export class Figure {
     b.idle.setEffectiveWeight(1 - moving);
     b.walk.setEffectiveWeight(moving * (1 - this.runBlend));
     b.run.setEffectiveWeight(moving * this.runBlend);
-    b.mixer.update(0);
     // Standing still, it stands at ease; coming to a stop, it comes into it.
-    const still = 1 - moving;
-    if (still > 0) {
-      const { bones, turns, hips, lift } = b.stand;
-      bones.forEach((bone, i) => bone.quaternion.multiply(tmp.q.identity().slerp(turns[i]!, still)));
-      hips.position.addScaledVector(lift, still);
-    }
+    b.stand.setEffectiveWeight(1 - moving);
+    b.mixer.update(0);
     if (this.umbrellaOpen && this.headVisible) this.holdUmbrella(b);
   }
 
@@ -252,7 +253,9 @@ export class Figure {
     for (const side of ["Left", "Right"]) bone(`${side}Hand`).scale.setScalar(HANDS);
     const body = { root, mesh, mixer, idle: action("idle"), walk: action("walk"), run: action("run"), bone };
     this.root.add(root);
-    this.body = { ...body, stand: this.standing(body) };
+    const stand = mixer.clipAction(this.standing(body));
+    stand.play();
+    this.body = { ...body, stand };
     const xray = new SkinnedMesh(mesh.geometry, this.xrayMaterial);
     xray.position.copy(mesh.position);
     xray.quaternion.copy(mesh.quaternion);
@@ -269,13 +272,16 @@ export class Figure {
 
   /**
    * The figure standing at ease. The idle clip stands as the model was made: knees bent, one foot
-   * back, the back bowed, the arms held out and the hands open. This turns the spine upright, the
-   * legs straight under the hips and the arms down by the sides (STAND), keeps the feet flat as they
-   * were, curls the fingers, and raises the hips so the feet stay on the ground. Kept as turns of
-   * each bone from the idle's first frame, so `pose` can add them to the idle's breathing as the
-   * figure comes to a stop.
+   * back, the hips and the shoulders turned, the back bowed, the arms held out and the hands open.
+   * This turns the hips and the shoulders to face ahead, the spine upright, the legs straight under
+   * the hips and the arms down by the sides (STAND), points the feet ahead, keeps them flat as they
+   * were, curls the fingers, and raises the hips so the feet stay on the ground. It is a clip of its
+   * own, the turns of each bone from the idle's first frame, which the mixer adds to the idle's
+   * breathing as the figure comes to a stop. (Turning the bones after the mixer instead would add
+   * the turns up, frame after frame, on any bone the idle holds still: the mixer only sets a bone
+   * whose value has changed.)
    */
-  private standing(b: Omit<Body, "stand">): Body["stand"] {
+  private standing(b: Omit<Body, "stand">): AnimationClip {
     b.idle.time = 0;
     b.idle.setEffectiveWeight(1);
     b.walk.setEffectiveWeight(0);
@@ -284,14 +290,25 @@ export class Figure {
     this.root.updateMatrixWorld(true);
     const sides = ["Left", "Right"] as const;
     const fingers = sides.flatMap((s) => [...CURL.map((_, k) => `${s}HandIndex${k + 1}`), `${s}HandThumb1`]);
-    const bones = [...new Set([...STAND.map(([n]) => n), "LeftFoot", "RightFoot", ...fingers])].map(b.bone);
+    const bones = [...new Set(["Hips", ...STAND.map(([n]) => n), "LeftFoot", "RightFoot", ...fingers])].map(b.bone);
     const idle = bones.map((x) => x.quaternion.clone());
     const local = (name: string) => this.root.worldToLocal(b.bone(name).getWorldPosition(new Vector3()));
-    const toes = sides.map((s) => local(`${s}ToeBase`).sub(local(`${s}Foot`)));
+    // The feet as flat as they were, pointing ahead and a little out.
+    const toes = sides.map((s) => {
+      const toe = local(`${s}ToeBase`).sub(local(`${s}Foot`));
+      const flat = Math.hypot(toe.x, toe.z);
+      const out = (s === "Left" ? -1 : 1) * TOES_OUT;
+      return new Vector3(Math.sin(out) * flat, toe.y, -Math.cos(out) * flat);
+    });
     const v = new Vector3();
     const ankles = () => sides.reduce((y, s) => y + b.bone(`${s}Foot`).getWorldPosition(v).y / 2, 0);
     const before = ankles();
-    for (const [name, child, dir] of STAND) aim(b.bone(name), b.bone(child), this.root, v.set(...dir));
+    // The idle stands a little turned, the hips one way and the shoulders another: both face ahead.
+    square(b.bone("Hips"), b.bone("LeftUpLeg"), b.bone("RightUpLeg"), this.root);
+    for (const [name, child, dir] of STAND) {
+      aim(b.bone(name), b.bone(child), this.root, v.set(...dir));
+      if (name === "Spine2") square(b.bone("Spine2"), b.bone("LeftArm"), b.bone("RightArm"), this.root);
+    }
     sides.forEach((s, i) => aim(b.bone(`${s}Foot`), b.bone(`${s}ToeBase`), this.root, toes[i]!));
     // The hands relaxed: the fingers curled towards the palm, which faces the thigh, and the thumb in.
     for (const s of sides) {
@@ -310,7 +327,11 @@ export class Figure {
     const hips = b.bone("Hips");
     const at = hips.getWorldPosition(new Vector3());
     const lift = hips.parent!.worldToLocal(at.clone().setY(at.y + before - ankles())).sub(hips.parent!.worldToLocal(at.clone()));
-    return { bones, turns: bones.map((x, i) => idle[i]!.clone().invert().multiply(x.quaternion)), hips, lift };
+    const tracks = [
+      ...bones.map((x, i) => new QuaternionKeyframeTrack(`${x.name}.quaternion`, [0], idle[i]!.clone().invert().multiply(x.quaternion).toArray())),
+      new VectorKeyframeTrack(`${hips.name}.position`, [0], lift.toArray()),
+    ];
+    return new AnimationClip("stand", -1, tracks, AdditiveAnimationBlendMode);
   }
 
   /** Takes the gear off. Its shapes and paint are every figure's, and stay. */
@@ -387,12 +408,28 @@ const tmp = { from: new Vector3(), to: new Vector3(), dir: new Vector3(), want: 
 
 /** Turns `bone` so that the way to `child` points along `dir`, given in `frame`'s axes. */
 function aim(bone: Bone, child: Bone, frame: Object3D, dir: Vector3): void {
-  const { from, to, want, q, world, parent } = tmp;
+  const { from, to, want, q } = tmp;
   bone.getWorldPosition(from);
   child.getWorldPosition(to);
   tmp.dir.subVectors(to, from).normalize();
   want.copy(dir).transformDirection(frame.matrixWorld);
-  q.setFromUnitVectors(tmp.dir, want);
+  turn(bone, q.setFromUnitVectors(tmp.dir, want));
+}
+
+/**
+ * Turns `bone` about `frame`'s up so that, seen from above, the way from `left` to `right` runs
+ * along `frame`'s x axis: a body whose left and right those are faces straight ahead.
+ */
+function square(bone: Bone, left: Bone, right: Bone, frame: Object3D): void {
+  const a = frame.worldToLocal(left.getWorldPosition(new Vector3()));
+  const b = frame.worldToLocal(right.getWorldPosition(new Vector3()));
+  const up = new Vector3(0, 1, 0).transformDirection(frame.matrixWorld);
+  turn(bone, tmp.q.setFromAxisAngle(up, Math.atan2(b.z - a.z, b.x - a.x)));
+}
+
+/** Turns `bone` by `q`, a turn in the world. */
+function turn(bone: Bone, q: Quaternion): void {
+  const { world, parent } = tmp;
   bone.getWorldQuaternion(world);
   world.premultiply(q);
   if (bone.parent) bone.parent.getWorldQuaternion(parent);

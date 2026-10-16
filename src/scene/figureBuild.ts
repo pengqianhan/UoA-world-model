@@ -14,6 +14,7 @@ import {
   CylinderGeometry,
   DoubleSide,
   Float32BufferAttribute,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshLambertMaterial,
@@ -510,7 +511,7 @@ function hair(body: Surface): BufferGeometry {
     parts.push(geometry);
   };
   // Locks: `count` of them along a part, each hanging `deep` metres at its tip.
-  const locks = (from: number, length: number, count: number, deep: number) => (phi: number) => deep * (0.5 - 0.5 * Math.cos(((phi - from) / length) * count * Math.PI * 2)) ** 0.7;
+  const locks = (from: number, length: number, count: number, deep: number) => (phi: number) => deep * (0.5 - 0.5 * Math.cos(((phi - from) / length) * count * Math.PI * 2));
   // A three.js sphere's front (-z, where the figure faces) is at phi 3π/2. The fringe hangs over
   // the face only, clear of where the sides begin, so no gap opens between them.
   const open = FACE_OPEN - 0.1;
@@ -554,23 +555,33 @@ function backpack(body: Surface, spine: Vector3, neck: Vector3): BufferGeometry 
   };
   const top = neck.y - P.belowNeck;
   const bottom = top - P.height;
-  // The back panel stands clear of the back wherever the pack covers it.
-  let behind = spine.z;
-  for (let y = bottom; y <= top; y += 0.04) {
-    for (const x of [-P.width / 2.5, 0, P.width / 2.5]) behind = Math.max(behind, outside(new Vector3(x, y, spine.z), new Vector3(x, y, spine.z + 1))?.z ?? spine.z);
+  // The pack leans on the back. Where the back is, down the pack: the furthest of its middle and
+  // either side, at each height.
+  const heights = Array.from({ length: 11 }, (_, i) => bottom + (i / 10) * P.height);
+  const backs = heights.map((y) => Math.max(...[-P.width / 2.5, 0, P.width / 2.5].map((x) => outside(new Vector3(x, y, spine.z), new Vector3(x, y, spine.z + 1))?.z ?? spine.z)));
+  // The lean that leaves the least room between the back and the pack's panel, which touches the
+  // back where it stands out most: the panel is `lean.at` behind the back's top, and leans `lean.by`.
+  let lean = { by: 0, at: 0, room: Infinity };
+  for (let by = -0.4; by <= 0.4; by += 0.02) {
+    const at = Math.max(...heights.map((y, i) => backs[i]! - by * (y - top)));
+    const room = heights.reduce((sum, y, i) => sum + at + by * (y - top) - backs[i]!, 0);
+    if (room < lean.room) lean = { by, at, room };
   }
-  behind += P.clear;
+  const panel = (y: number) => lean.at + lean.by * (y - top) + P.clear;
+  // The pack, its pocket and its loop are made with the panel at z = 0, upright, and then leant.
+  const place = new Matrix4().makeTranslation(0, (top + bottom) / 2, panel((top + bottom) / 2)).multiply(new Matrix4().makeRotationX(Math.atan(lean.by)));
   const parts: BufferGeometry[] = [];
   const add = (g: BufferGeometry, colour: string, x = 0, y = 0, z = 0) => parts.push(paintCorners(g.translate(x, y, z), colour));
+  const onPack = (g: BufferGeometry, colour: string, x: number, y: number, z: number) => add(g.translate(x, y, z).applyMatrix4(place), colour);
   const pack = new RoundedBoxGeometry(P.width, P.height, P.depth, 3, P.round);
   // A little narrower at the top than at the bottom.
   const pp = pack.getAttribute("position");
   for (let i = 0; i < pp.count; i++) pp.setX(i, pp.getX(i) * (1 - P.taper * (pp.getY(i) / P.height + 0.5)));
   pack.computeVertexNormals();
-  add(pack, LOOK.backpack, 0, (top + bottom) / 2, behind + P.depth / 2);
-  add(new RoundedBoxGeometry(P.width * 0.72, P.height * 0.36, P.pocket, 2, P.pocket / 2.5), LOOK.backpackPocket, 0, bottom + P.height * 0.27, behind + P.depth + P.pocket / 2 - 0.012);
-  const loop = new Vector3(0, top - 0.01, behind + P.depth * 0.3);
-  add(sweep(arc(loop, 0.035, 0, Math.PI), loop, 0.014, 0.012), LOOK.backpackStraps);
+  onPack(pack, LOOK.backpack, 0, 0, P.depth / 2);
+  onPack(new RoundedBoxGeometry(P.width * 0.72, P.height * 0.36, P.pocket, 2, P.pocket / 2.5), LOOK.backpackPocket, 0, P.height * (0.27 - 0.5), P.depth + P.pocket / 2 - 0.012);
+  const loop = new Vector3(0, P.height / 2 - 0.01, P.depth * 0.3);
+  onPack(sweep(arc(loop, 0.035, 0, Math.PI), loop, 0.014, 0.012), LOOK.backpackStraps, 0, 0, 0);
   // The straps: from the top of the pack over each shoulder, down the chest and in under the arm,
   // lying on the body. A line through a few points says which way each runs from inside the chest;
   // every point of it is then moved to just outside the shirt that way. Its ends are in the pack and
@@ -578,7 +589,7 @@ function backpack(body: Surface, spine: Vector3, neck: Vector3): BufferGeometry 
   for (const s of [-1, 1]) {
     const centre = new Vector3(s * P.strapX, top - 0.1, spine.z);
     const guide = through([
-      new Vector3(s * 0.08, top - 0.04, behind + 0.01),
+      new Vector3(s * 0.08, top - 0.04, panel(top - 0.04) + 0.01),
       new Vector3(s * P.strapX, top + 0.02, spine.z + 0.3),
       new Vector3(s * P.strapX, top + 0.3, spine.z),
       new Vector3(s * 0.1, top - 0.08, spine.z - 0.3),
