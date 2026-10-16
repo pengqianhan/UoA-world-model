@@ -133,6 +133,11 @@ The same workflow publishes a second copy to Cloudflare Pages under `/uoa/`, wit
 names a Pages project and the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set, so
 a fork deploys to GitHub Pages alone until it has them.
 
+A pull request from a branch of this repository also gets a preview on the same Pages project, at
+`https://<branch>.<project>.pages.dev/uoa/`, once its checks pass; the pull request's "View
+deployment" opens it, and each push updates it. A pull request from a fork gets no preview, because
+GitHub gives it no secrets.
+
 ## Updating the data snapshot
 
 Data is fetched once, cached as raw snapshots under `data/raw/`, and every later build reads the cache.
