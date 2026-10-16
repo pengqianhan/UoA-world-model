@@ -18,9 +18,10 @@ describe("the walker's command line", () => {
     expect(toCommand(parseArgs(["turn", "-90"]))).toEqual({ name: "turn", args: { name: undefined, by: -90 } });
     expect(toCommand(parseArgs(["turn", "north-east"]))).toEqual({ name: "turn", args: { name: undefined, face: "north-east" } });
     expect(toCommand(parseArgs(["say", "Kia", "ora", "--as", "Tui"]))).toEqual({ name: "say", args: { name: "Tui", text: "Kia ora" } });
-    expect(toCommand(parseArgs(["outfit", '{"base":"witch","top":"#112233"}']))!.args.outfit).toEqual({ base: "witch", top: "#112233" });
-    expect(toCommand(parseArgs(["spawn", "Kea", "--near", "109"]))).toEqual({ name: "spawn", args: { name: "Kea", near: "109", outfit: undefined } });
+    expect(toCommand(parseArgs(["spawn", "Kea", "--near", "109"]))).toEqual({ name: "spawn", args: { name: "Kea", near: "109" } });
     expect(toCommand(parseArgs(["dance"]))).toBeUndefined();
+    // Every walker looks the same: there is nothing to dress it in.
+    expect(toCommand(parseArgs(["outfit", "witch"]))).toBeUndefined();
   });
 
   it("answers in a sentence, and says what another walker said is theirs", () => {
@@ -51,6 +52,7 @@ describe("the walker's MCP server", () => {
     expect(await handle(deps, { jsonrpc: "2.0", method: "notifications/initialized" })).toBeUndefined();
     const list = (await handle(deps, { jsonrpc: "2.0", id: 2, method: "tools/list" })) as { result: { tools: { name: string; inputSchema: unknown }[] } };
     expect(list.result.tools.map((t) => t.name)).toContain("walker_walk");
+    expect(list.result.tools.map((t) => t.name)).not.toContain("walker_outfit");
     for (const t of list.result.tools) expect(t.inputSchema).toMatchObject({ type: "object" });
     expect(TOOLS.length).toBe(list.result.tools.length);
   });

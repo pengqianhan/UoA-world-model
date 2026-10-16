@@ -1,9 +1,8 @@
-// The walker's panel: where it is, the three views, a walk to a place, its outfit, and arrows for
-// touch screens. The walker is made up; the panel says so, and that doors are not mapped.
+// The walker's panel: where it is, the three views, a walk to a place, and arrows for touch
+// screens. The walker is made up; the panel says so, and that doors are not mapped.
 import { useRef, useState } from "preact/hooks";
 import { t } from "../app/i18n.ts";
 import { ENTER_REACH, MY_WALKER, run, setView, stopWalking, walkerOn, walkerStatus, walkerView, wanderingNow } from "../app/walker.ts";
-import { OUTFITS } from "../shared/outfit.ts";
 import { Icon } from "./common.tsx";
 import { isLite } from "./SceneHost.tsx";
 import { WALK_SPEED } from "../scene/walkers.ts";
@@ -44,8 +43,6 @@ export function WalkerPanel() {
   if (!walkerOn.value) return null;
   const status = walkerStatus.value;
   const view = walkerView.value;
-  // The outfit the walker wears now, which an agent may have changed: a preset, or its own.
-  const outfit = Object.keys(OUTFITS).find((k) => OUTFITS[k]!.name === status?.outfit) ?? (status?.outfit ? "custom" : "student");
   const touch = isLite();
 
   const act = async (command: string, args: Record<string, unknown>) => {
@@ -130,22 +127,6 @@ export function WalkerPanel() {
           {message}
         </p>
       )}
-      <label class="walker-outfit">
-        <span>{t("walker.outfit")}</span>
-        <select
-          id="walker-outfit"
-          value={outfit}
-          onChange={(e) => {
-            const v = (e.target as HTMLSelectElement).value;
-            if (v !== "custom") void run("outfit", { name: MY_WALKER, outfit: v });
-          }}
-        >
-          {Object.entries(OUTFITS).map(([id, o]) => (
-            <option value={id}>{o.name}</option>
-          ))}
-          {outfit === "custom" && <option value="custom">{status?.outfit}</option>}
-        </select>
-      </label>
       <button
         type="button"
         class={`walker-wander ${wanderingNow.value.has(MY_WALKER) ? "on" : ""}`}

@@ -38,7 +38,8 @@ It is built to answer two questions a student actually has:
 
 - **2026-10-16:** a walker: a small made-up person who walks and runs, to take round the campus
   and into its buildings, seen from behind or through its eyes, which Claude Code and other agents
-  can steer, and which talks with other walkers; five outfits, Halloween's among them.
+  can steer, and which talks with other walkers; one look for every walker, with nothing meant to
+  mark a sex or a gender.
   A wall never hides it: the camera comes in front, and its shape shows through.
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
@@ -146,8 +147,9 @@ a fork deploys to GitHub Pages alone until it has them.
 made-up person near the Clock Tower. W A S D or the arrow keys walk it, Shift breaks into a run,
 and on a phone the arrows in its panel do. Its panel switches between the map, the view from behind it and the view
 through its eyes; there a drag looks round, and a click on a building or the ground walks it there.
-"Let it wander" sends it strolling on its own from building to building. Five outfits, among them a
-raincoat whose umbrella opens when Open-Meteo reports rain, and a pumpkin head for Halloween.
+"Let it wander" sends it strolling on its own from building to building. Every walker looks the
+same: a student with nothing meant to mark a sex or a gender, who opens an umbrella when Open-Meteo
+reports rain.
 Behind it, the camera stops in front of a wall rather than inside it, and wherever a building or a
 tree hides the walker, its shape shows through in the colour of its ring.
 
@@ -177,8 +179,7 @@ claude mcp add campus-walker -- node scripts/walker/mcp.ts
 
 The controller (`scripts/walker/daemon.ts`) runs on your computer only: it serves this checkout with
 Vite on port 5273 (or uses the dev server already there), takes commands on 127.0.0.1 with a random
-token it keeps in `.walker/`, and sends nothing anywhere else. Outfits are data, checked strictly:
-a preset's name, or a JSON object of colours and a few choices (see `src/shared/outfit.ts`).
+token it keeps in `.walker/`, and sends nothing anywhere else.
 
 The walker is made up and stands for no real person. Its body is Quaternius's
 ["Animated Human"](https://opengameart.org/content/animated-human-low-poly), given to the public

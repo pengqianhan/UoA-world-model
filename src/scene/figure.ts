@@ -1,10 +1,12 @@
-// A walker's figure: a small made-up person, 1.75 m tall, dressed in an outfit
-// (src/shared/outfit.ts). No real person is drawn. The body is Quaternius's "Animated Human" (CC0),
-// made into public/models/walker.glb by scripts/walker/make-figure.ts, with its idle, walk and run;
-// the hats, the pumpkin, the backpack, the cape and the umbrella are built here and ride on its
-// bones. It faces north with no turn and stands with its feet at its origin.
+// A walker's figure: a small made-up person, 1.75 m tall. No real person is drawn. Every walker
+// looks the same: a student in a long-sleeved top, trousers and a backpack, with nothing meant to
+// mark a sex or a gender (see LOOK). The body is Quaternius's "Animated Human" (CC0), made into
+// public/models/walker.glb by scripts/walker/make-figure.ts, with its idle, walk and run; the hair,
+// the backpack and the umbrella are built here and ride on its bones. It faces north with no turn
+// and stands with its feet at its origin.
 import {
   AnimationMixer,
+  Box3,
   BoxGeometry,
   CanvasTexture,
   ConeGeometry,
@@ -32,12 +34,45 @@ import {
   type Material,
   type Object3D,
 } from "three";
-import type { Outfit } from "../shared/outfit.ts";
 
 /** Where the eyes are, for the view from the walker. */
 export const EYE_HEIGHT = 1.6;
-/** The bands of the colour strip the body's faces point at; the order make-figure.ts wrote. */
-const PALETTE = ["skin", "eyes", "hair", "top", "bottom", "shoes", "upperArm", "forearm"] as const;
+/**
+ * How every walker looks. The body as modelled reads as a man: short side-parted hair, heavy
+ * brows, a square jaw, broad shoulders and bare muscled arms. So the figure gets hair of middling
+ * length over its ears with a fringe, lighter brows, a narrower jaw (`reshapeFace`), shoulders a
+ * little narrower, and long sleeves. The colours are none of the University's.
+ */
+const LOOK = {
+  skin: "#c98f5e",
+  hair: "#33241a",
+  brows: "#6e4e36",
+  top: "#e2763c",
+  bottom: "#2f3a4a",
+  shoes: "#4a4f57",
+  backpack: "#3f7f6f",
+  umbrella: "#2c6aa8",
+};
+/** The arms' joints are drawn this much nearer the spine than the body has them. */
+const SHOULDERS = 0.88;
+/** Metres the hair reaches below the brows, at the sides and the back: past the ears. */
+const HAIR_BELOW_BROWS = 0.1;
+/** Radians either side of straight ahead that the hair leaves open, for the face. */
+const FACE_OPEN = 1.15;
+/**
+ * The jaw narrows from JAW_FROM under the eyes to JAW_TO (the model's own units, about 0.23 m
+ * each), until it is JAW_NARROW of its width narrower; the chin draws back by CHIN_BACK of its
+ * reach.
+ */
+const JAW_FROM = 0.2;
+const JAW_TO = 0.6;
+const JAW_NARROW = 0.14;
+const CHIN_BACK = 0.06;
+/** The bands of the colour strip make-figure.ts pointed the body's faces at, in its order. */
+const BANDS = ["skin", "eyes", "hair", "top", "bottom", "shoes", "upperArm", "forearm"] as const;
+/** Those bands and one more for the brows, which `reshapeFace` takes from the eyes'. */
+const PALETTE = [...BANDS, "brows"] as const;
+const band = (v: number) => Math.round((1 - v) * PALETTE.length - 0.5);
 /** Metres a walk cycle (two steps) covers at the animation's own pace, and a run cycle. */
 const WALK_CYCLE = 1.4;
 const RUN_CYCLE = 2.4;
@@ -59,8 +94,79 @@ let model: Promise<Model> | undefined;
 function loadModel(): Promise<Model> {
   model ??= import("three/examples/jsm/loaders/GLTFLoader.js")
     .then(({ GLTFLoader }) => new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/walker.glb`))
-    .then((gltf) => ({ scene: gltf.scene, clips: gltf.animations }));
+    .then((gltf) => {
+      gltf.scene.traverse((o) => {
+        if ((o as SkinnedMesh).isSkinnedMesh) reshapeFace((o as SkinnedMesh).geometry);
+      });
+      return { scene: gltf.scene, clips: gltf.animations };
+    });
   return model;
+}
+
+/**
+ * Makes the body's face less a man's, once for every figure, in the model's own space (y up, the
+ * face towards +x, the middle of the face at z = 0, a unit about 0.23 m).
+ *
+ * - The brows get a band of their own, so they can be drawn lighter than the eyes they share a
+ *   band with. Each brow and each eye is a piece of its own; a brow is wider than it is tall, an
+ *   eye is round.
+ * - The jaw narrows towards the chin, and the chin draws back a little. Every face's corners are
+ *   its own, as make-figure.ts wrote them, so each corner moves by where it is: corners that meet
+ *   move together and no seam opens.
+ */
+function reshapeFace(geometry: BufferGeometry): void {
+  const pos = geometry.getAttribute("position");
+  const uv = geometry.getAttribute("uv");
+  const was = (v: number) => BANDS[Math.round((1 - v) * BANDS.length - 0.5)];
+  // Faces of the eyes' band joined into pieces where their corners meet.
+  const at = (i: number) => `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`;
+  const parent = new Map<string, string>();
+  const root = (k: string): string => {
+    while (parent.get(k) !== k) k = parent.get(k)!;
+    return k;
+  };
+  const faces: number[] = [];
+  for (let f = 0; f < pos.count / 3; f++) {
+    if (was(uv.getY(f * 3)) !== "eyes") continue;
+    faces.push(f);
+    const corners = [at(f * 3), at(f * 3 + 1), at(f * 3 + 2)];
+    for (const k of corners) if (!parent.has(k)) parent.set(k, k);
+    for (const k of corners.slice(1)) parent.set(root(k), root(corners[0]!));
+  }
+  const pieces = new Map<string, Box3>();
+  const v = new Vector3();
+  for (const f of faces) {
+    const box = pieces.get(root(at(f * 3))) ?? new Box3();
+    for (let k = 0; k < 3; k++) box.expandByPoint(v.fromBufferAttribute(pos, f * 3 + k));
+    pieces.set(root(at(f * 3)), box);
+  }
+  const brow = new Set<string>();
+  const eyes = new Box3();
+  for (const [k, box] of pieces) {
+    const size = box.getSize(v);
+    if (Math.max(size.x, size.z) > 2 * size.y) brow.add(k);
+    else eyes.union(box);
+  }
+  const eyeY = eyes.getCenter(v).y;
+  const smooth = (from: number, to: number, x: number) => {
+    const t = Math.max(0, Math.min(1, (x - from) / (to - from)));
+    return t * t * (3 - 2 * t);
+  };
+  for (let i = 0; i < pos.count; i++) {
+    const name = was(uv.getY(i))!;
+    const b = name === "eyes" && brow.has(root(at(i))) ? "brows" : name;
+    uv.setY(i, 1 - (PALETTE.indexOf(b) + 0.5) / PALETTE.length);
+    // Below the cheekbones and in front of the ears: from nothing at JAW_FROM under the eyes to
+    // all of it at JAW_TO.
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const w = smooth(eyeY - JAW_FROM, eyeY - JAW_TO, y) * smooth(-0.2, 0.2, x);
+    if (w === 0) continue;
+    pos.setZ(i, pos.getZ(i) * (1 - JAW_NARROW * w));
+    pos.setX(i, x * (1 - CHIN_BACK * w));
+  }
+  uv.needsUpdate = true;
+  pos.needsUpdate = true;
 }
 
 /** A copy of the body with its own skeleton, sharing the geometry. */
@@ -83,9 +189,8 @@ export class Figure {
   /** At the feet; turn with `setHeading`. */
   readonly root = new Group();
   private body?: Body;
-  /** Built for the outfit and fixed to bones; replaced when the outfit changes. */
+  /** The hair and the backpack, fixed to bones. */
   private gear: Object3D[] = [];
-  private pumpkin?: Group;
   private umbrella = new Group();
   private ring: Mesh;
   /** The body again, drawn flat only where something stands in front of it: see `xrayMaterial`. */
@@ -93,13 +198,12 @@ export class Figure {
   private xrayMaterial: MeshBasicMaterial;
   private owned: (BufferGeometry | Material | CanvasTexture)[] = [];
   private skinMaterial?: MeshLambertMaterial;
-  private outfit: Outfit;
   private umbrellaOpen = false;
   private headVisible = true;
   private disposed = false;
   /**
-   * Set when the figure changed without moving (its body arrived, a new outfit), so the scene
-   * draws a frame; read with `takeChanged`.
+   * Set when the figure changed without moving (its body arrived, the umbrella opened), so the
+   * scene draws a frame; read with `takeChanged`.
    */
   private changed = false;
   private last?: number;
@@ -108,8 +212,7 @@ export class Figure {
   private runBlend = 0;
   private stance = { moving: 0, speed: 0, t: 0 };
 
-  constructor(outfit: Outfit, ringColour: number) {
-    this.outfit = outfit;
+  constructor(ringColour: number) {
     // A ring on the ground round the feet, so the walker can be found from above.
     const ringGeometry = new RingGeometry(0.75, 1.05, 32);
     ringGeometry.rotateX(-Math.PI / 2);
@@ -145,12 +248,6 @@ export class Figure {
   /** Turns the figure to face a compass bearing, degrees clockwise from north. */
   setHeading(deg: number): void {
     this.root.rotation.y = (-deg * Math.PI) / 180;
-  }
-
-  setOutfit(outfit: Outfit): void {
-    this.outfit = outfit;
-    this.dress();
-    this.changed = true;
   }
 
   /** Opens or closes the umbrella. */
@@ -238,6 +335,8 @@ export class Figure {
       if (!b) throw new Error(`walker.glb has no bone ${name}`);
       return b;
     };
+    // Narrower shoulders. The clips only turn bones, so where a joint sits stays as set here.
+    for (const side of ["Left", "Right"]) bone(`${side}Arm`).position.multiplyScalar(SHOULDERS);
     this.body = { root, mesh, mixer, idle: action("idle"), walk: action("walk"), run: action("run"), bone };
     const xray = new SkinnedMesh(mesh.geometry, this.xrayMaterial);
     xray.position.copy(mesh.position);
@@ -270,22 +369,23 @@ export class Figure {
     return m;
   }
 
-  /** The strip of the outfit's colours that the body's faces are drawn from. */
-  private paint(o: Outfit): CanvasTexture {
+  /** The strip of colours that the body's faces are drawn from. */
+  private paint(): CanvasTexture {
     const canvas = document.createElement("canvas");
     canvas.width = 1;
     canvas.height = PALETTE.length;
     const g = canvas.getContext("2d")!;
-    const long = o.sleeves === "long";
     const colours: Record<(typeof PALETTE)[number], string> = {
-      skin: o.skin,
+      skin: LOOK.skin,
       eyes: "#221c1a",
-      hair: o.hairStyle === "none" ? o.skin : o.hair,
-      top: o.top,
-      bottom: o.bottom,
-      shoes: o.shoes,
-      upperArm: long ? o.top : o.skin,
-      forearm: long ? o.top : o.skin,
+      hair: LOOK.hair,
+      top: LOOK.top,
+      bottom: LOOK.bottom,
+      shoes: LOOK.shoes,
+      // Long sleeves, to the wrists.
+      upperArm: LOOK.top,
+      forearm: LOOK.top,
+      brows: LOOK.brows,
     };
     PALETTE.forEach((band, i) => {
       g.fillStyle = colours[band];
@@ -303,19 +403,17 @@ export class Figure {
   private undress(): void {
     for (const g of this.gear) g.removeFromParent();
     this.gear = [];
-    this.pumpkin = undefined;
     this.umbrella.clear();
     for (const x of this.owned) x.dispose();
     this.owned = [];
   }
 
-  /** Paints the body and fixes the outfit's gear to its bones. */
+  /** Paints the body and fixes the hair, the backpack and the umbrella to it. */
   private dress(): void {
     const b = this.body;
     if (!b) return;
     this.undress();
-    const o = this.outfit;
-    this.skinMaterial = new MeshLambertMaterial({ map: this.paint(o) });
+    this.skinMaterial = new MeshLambertMaterial({ map: this.paint() });
     this.owned.push(this.skinMaterial);
     b.mesh.material = this.skinMaterial;
 
@@ -328,13 +426,7 @@ export class Figure {
     b.run.setEffectiveWeight(0);
     b.mixer.update(0);
     this.root.updateMatrixWorld(true);
-    const at = (name: string) => this.root.worldToLocal(b.bone(name).getWorldPosition(new Vector3()));
-    const neck = at("Head");
-    const top = at("HeadTop_End");
-    const chest = at("Spine2");
-    // The head: from the neck to the top of the hair, its middle a little in front of the spine.
-    const crown = top.y + 0.07;
-    const mid = new Vector3(neck.x, (neck.y + crown) / 2, (neck.z + top.z) / 2 - 0.01);
+    const chest = this.root.worldToLocal(b.bone("Spine2").getWorldPosition(new Vector3()));
     const fix = (part: Object3D, to: string) => {
       this.root.add(part);
       part.updateMatrixWorld(true);
@@ -342,31 +434,14 @@ export class Figure {
       this.gear.push(part);
     };
 
-    if (o.hat === "pumpkin") {
-      const p = new Group();
-      p.position.copy(mid);
-      this.buildPumpkin(p, o);
-      fix(p, "Neck");
-      this.pumpkin = p;
-    } else {
-      const g = new Group();
-      g.position.set(mid.x, crown, mid.z);
-      this.buildHair(g, o);
-      this.buildHat(g, o);
-      if (g.children.length) fix(g, "Head");
-    }
+    fix(this.hair(b), "Head");
     const back = new Group();
     back.position.set(chest.x, chest.y, chest.z);
-    if (o.backpack) back.add(this.mesh(new BoxGeometry(0.3, 0.38, 0.15), this.material(o.backpack), 0, -0.08, 0.2));
-    if (o.cape) {
-      const c = this.mesh(new BoxGeometry(0.46, 0.85, 0.02), this.material(o.cape, true), 0, -0.3, 0.16);
-      c.rotation.x = 0.12;
-      back.add(c);
-    }
-    if (back.children.length) fix(back, "Spine2");
+    back.add(this.mesh(new BoxGeometry(0.3, 0.38, 0.15), this.material(LOOK.backpack), 0, -0.08, 0.2));
+    fix(back, "Spine2");
 
     // The umbrella stays upright over the right hand; holdUmbrella moves it there.
-    const canopy = this.material(o.umbrellaColour, true);
+    const canopy = this.material(LOOK.umbrella, true);
     this.umbrella.add(this.mesh(new CylinderGeometry(0.012, 0.012, 1.0, 6), this.material("#3a3a3a"), 0, 0.42, 0));
     this.umbrella.add(this.mesh(new ConeGeometry(0.62, 0.26, 10, 1, true), canopy, 0, 0.92, 0));
     this.umbrella.visible = this.umbrellaOpen && this.headVisible;
@@ -385,13 +460,62 @@ export class Figure {
     this.pose(this.stance.moving, this.stance.speed, this.stance.t);
   }
 
-  /** The head shows, or shrinks to nothing: for the view from the eyes, and under a pumpkin. */
+  /**
+   * Hair of middling length over the body's own short hair: a shell round the head from the crown
+   * over the ears to the nape, with a fringe down to the brows, open over the face. It is fitted to
+   * where the body's hair and brows are, standing at the start of its idle.
+   */
+  private hair(b: Body): Group {
+    const pos = b.mesh.geometry.getAttribute("position");
+    const uv = b.mesh.geometry.getAttribute("uv");
+    const hair = new Box3();
+    const brows = new Box3();
+    const v = new Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      const k = PALETTE[band(uv.getY(i))];
+      if (k !== "hair" && k !== "brows") continue;
+      v.fromBufferAttribute(pos, i);
+      b.mesh.applyBoneTransform(i, v);
+      (k === "hair" ? hair : brows).expandByPoint(this.root.worldToLocal(v.applyMatrix4(b.mesh.matrixWorld)));
+    }
+    const pad = 0.015;
+    const middle = hair.getCenter(new Vector3());
+    const half = hair.getSize(new Vector3()).multiplyScalar(0.5);
+    // An ellipsoid centred at the brows' height, its top on the crown.
+    const cy = brows.getCenter(v).y;
+    const r = new Vector3(half.x + pad, hair.max.y + pad - cy, half.z + pad);
+    const down = (y: number) => Math.acos(Math.max(-1, Math.min(1, (y - cy) / r.y)));
+    const fringe = down(brows.max.y);
+    const nape = down(cy - HAIR_BELOW_BROWS);
+    const material = this.material(LOOK.hair, true);
+    material.flatShading = true;
+    const g = new Group();
+    // A part of the shell, its lower edge `uneven`: metres every other point hangs lower.
+    const shell = (phiStart: number, phiLength: number, thetaStart: number, thetaLength: number, across: number, rows: number, uneven: (phi: number) => number) => {
+      const geometry = new SphereGeometry(1, across, rows, phiStart, phiLength, thetaStart, thetaLength);
+      const p = geometry.getAttribute("position");
+      for (let k = 1; k < across; k += 2) {
+        const i = rows * (across + 1) + k;
+        p.setY(i, p.getY(i) - uneven(phiStart + (k / across) * phiLength) / r.y);
+      }
+      geometry.scale(r.x, r.y, r.z);
+      geometry.translate(middle.x, cy, middle.z);
+      g.add(this.mesh(geometry, material));
+    };
+    // A three.js sphere's front (-z, where the figure faces) is at phi 3π/2. The fringe hangs over
+    // the face only, clear of where the sides begin, so no gap opens between them.
+    const face = (phi: number) => Math.abs(phi - 1.5 * Math.PI) < FACE_OPEN - 0.1;
+    shell(0, Math.PI * 2, 0, fringe, 18, 4, (phi) => (face(phi) ? 0.018 : 0));
+    // The sides and back.
+    shell(1.5 * Math.PI + FACE_OPEN, 2 * Math.PI - 2 * FACE_OPEN, fringe, nape - fringe, 13, 3, () => 0.025);
+    return g;
+  }
+
+  /** The head shows, or shrinks to nothing, for the view from the eyes. */
   private showHead(): void {
     const b = this.body;
     if (!b) return;
-    const own = this.headVisible && this.outfit.hat !== "pumpkin";
-    b.bone("Head").scale.setScalar(own ? 1 : 1e-3);
-    if (this.pumpkin) this.pumpkin.visible = this.headVisible;
+    b.bone("Head").scale.setScalar(this.headVisible ? 1 : 1e-3);
     // Seen through its own eyes, the walker has no shape to show through anything.
     if (this.xray) this.xray.visible = this.headVisible;
   }
@@ -403,55 +527,6 @@ export class Figure {
     aim(b.bone("RightForeArm"), b.bone("RightHand"), this.root, new Vector3(0.05, 0.85, -0.45));
     const hand = this.root.worldToLocal(b.bone("RightHand").getWorldPosition(new Vector3()));
     this.umbrella.position.copy(hand);
-  }
-
-  private buildHair(g: Group, o: Outfit): void {
-    // The body has short hair of its own; these add to it, from the crown down.
-    const hair = () => this.material(o.hair);
-    if (o.hairStyle === "long") g.add(this.mesh(new BoxGeometry(0.22, 0.3, 0.07), hair(), 0, -0.24, 0.1));
-    if (o.hairStyle === "bun") g.add(this.mesh(new SphereGeometry(0.06, 10, 8), hair(), 0, -0.06, 0.1));
-  }
-
-  private buildHat(g: Group, o: Outfit): void {
-    if (o.hat === "cap") {
-      const hat = this.material(o.hatColour);
-      g.add(this.mesh(new SphereGeometry(0.135, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.45), hat, 0, -0.08, 0));
-      g.add(this.mesh(new BoxGeometry(0.19, 0.015, 0.13), hat, 0, -0.04, -0.15));
-    } else if (o.hat === "beanie") {
-      const hat = this.material(o.hatColour);
-      g.add(this.mesh(new SphereGeometry(0.14, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), hat, 0, -0.09, 0));
-      g.add(this.mesh(new SphereGeometry(0.04, 8, 6), hat, 0, 0.05, 0));
-    } else if (o.hat === "witch") {
-      const hat = this.material(o.hatColour);
-      g.add(this.mesh(new CylinderGeometry(0.27, 0.27, 0.015, 24), hat, 0, -0.04, 0));
-      const cone = this.mesh(new ConeGeometry(0.14, 0.36, 16), hat, 0, 0.14, 0.02);
-      cone.rotation.x = 0.12;
-      g.add(cone);
-    }
-  }
-
-  private buildPumpkin(g: Group, o: Outfit): void {
-    const orange = this.material(o.hatColour);
-    const ball = this.mesh(new SphereGeometry(0.19, 18, 12), orange, 0, 0.02, 0);
-    ball.scale.set(1.1, 0.88, 1.05);
-    g.add(ball);
-    // Ribs: thinner balls turned round the stem give the lobes.
-    for (let k = 0; k < 4; k++) {
-      const rib = this.mesh(new SphereGeometry(0.19, 14, 10), orange, 0, 0.02, 0);
-      rib.scale.set(0.5, 0.9, 1.12);
-      rib.rotation.y = (k * Math.PI) / 4;
-      g.add(rib);
-    }
-    g.add(this.mesh(new CylinderGeometry(0.02, 0.03, 0.09, 6), this.material("#4d6b2c"), 0, 0.2, 0));
-    // A face cut into the north side: two triangle eyes and a grin.
-    const dark = new MeshBasicMaterial({ color: 0x2a1404 });
-    this.owned.push(dark);
-    for (const x of [-0.07, 0.07]) {
-      const eye = this.mesh(new ConeGeometry(0.04, 0.05, 3), dark, x, 0.06, -0.19);
-      eye.rotation.x = -Math.PI / 2;
-      g.add(eye);
-    }
-    g.add(this.mesh(new BoxGeometry(0.16, 0.035, 0.03), dark, 0, -0.04, -0.19));
   }
 }
 

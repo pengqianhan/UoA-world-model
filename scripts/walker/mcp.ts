@@ -72,12 +72,6 @@ export const TOOLS = [
     inputSchema: { type: "object", properties: { name: NAME } },
   },
   {
-    name: "walker_outfit",
-    description:
-      'Dress the walker: a preset (student, raincoat, explorer, halloween, witch) or an object of colours and choices, e.g. {"base":"explorer","top":"#2a9d8f","hat":"beanie"}. Keys: name, base, skin, hair, hairStyle (short|long|bun|none), top, sleeves (short|long), bottom, shoes, hat (none|cap|beanie|witch|pumpkin), hatColour, backpack (#rrggbb|null), cape (#rrggbb|null), umbrella (auto|always|never), umbrellaColour.',
-    inputSchema: { type: "object", properties: { outfit: { description: "A preset's name, or an outfit object." }, name: NAME }, required: ["outfit"] },
-  },
-  {
     name: "walker_see",
     description:
       "A picture of what the browser shows now, as an image: use view 'eyes' to see through the walker's eyes, 'follow' to see it from behind, 'map' for the campus from above. yaw turns the look (degrees right of ahead), pitch tilts it.",
@@ -98,12 +92,12 @@ export const TOOLS = [
   },
   {
     name: "walker_spawn",
-    description: "Put another walker on the map with a name of its own, near a place, in an outfit.",
-    inputSchema: { type: "object", properties: { name: { type: "string" }, near: { type: "string" }, outfit: {} }, required: ["name"] },
+    description: "Put another walker on the map with a name of its own, near a place. Every walker looks the same; its name shows over its head.",
+    inputSchema: { type: "object", properties: { name: { type: "string" }, near: { type: "string" } }, required: ["name"] },
   },
   {
     name: "walker_list",
-    description: "The walkers on the map: where each is, what it wears, and whether it is walking.",
+    description: "The walkers on the map: where each is, and whether it is walking.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -128,7 +122,6 @@ const COMMAND_OF: Record<string, string> = {
   walker_turn: "turn",
   walker_say: "say",
   walker_listen: "listen",
-  walker_outfit: "outfit",
   walker_wander: "wander",
   walker_stop: "stop",
   walker_spawn: "spawn",

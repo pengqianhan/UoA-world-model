@@ -6,7 +6,6 @@ import { batch, effect, signal } from "@preact/signals";
 import type { CampusScene, WalkerView } from "../scene/CampusScene.ts";
 import { MAX_SPEED, WALK_SPEED, type WalkResult } from "../scene/walkers.ts";
 import type { Pt } from "../shared/geo.ts";
-import { OUTFITS, DEFAULT_OUTFIT, parseOutfit, type Outfit } from "../shared/outfit.ts";
 import { parseRoomCode } from "../shared/roomcode.ts";
 import { formatMinutes } from "../shared/time.ts";
 import { bearing, compass, describeBuilding, look, relative, type Look } from "../shared/walkerLook.ts";
@@ -32,7 +31,7 @@ export const walkerOn = signal(false);
 export const walkerView = signal<WalkerView>("map");
 /** What the panel shows about the visitor's walker, refreshed a few times a second. */
 export const walkerStatus = signal<
-  { near?: string; nearId?: string; nearMetres?: number; walking: boolean; outfit: string; indoor?: string; floor?: string } | undefined
+  { near?: string; nearId?: string; nearMetres?: number; walking: boolean; indoor?: string; floor?: string } | undefined
 >(undefined);
 /** Metres from a building's wall within which a walker can go in. */
 export const ENTER_REACH = 8;
@@ -275,11 +274,11 @@ function startPoint(near: unknown): { at: Pt; heading: number; campus?: string }
 // ---------------------------------------------------------------------------------------------
 
 /** Turns walking on, with the visitor's walker on the campus shown. */
-export function startWalking(opts: { name?: string; outfit?: unknown; near?: unknown } = {}): Reply {
+export function startWalking(opts: { name?: string; near?: unknown } = {}): Reply {
   const s = need();
   walkerOn.value = true;
   const name = cleanName(opts.name);
-  if (!s.walkers.has(name)) spawn({ name, outfit: opts.outfit, near: opts.near });
+  if (!s.walkers.has(name)) spawn({ name, near: opts.near });
   return { walkers: s.walkers.names().map((n) => s.walkers.state(n)) };
 }
 
@@ -297,23 +296,14 @@ export function stopWalking(): void {
   });
 }
 
-export function spawn(args: { name?: unknown; near?: unknown; outfit?: unknown; heading?: unknown }): Reply {
+/** Puts a walker on the map. Every walker looks the same (figure.ts); its name is over its head. */
+export function spawn(args: { name?: unknown; near?: unknown; heading?: unknown }): Reply {
   const s = need();
   walkerOn.value = true;
   const name = cleanName(args.name);
-  let outfit: Outfit = { ...OUTFITS[DEFAULT_OUTFIT]! };
-  if (args.outfit !== undefined) {
-    const parsed = parseOutfit(args.outfit);
-    if (!parsed.outfit) throw new Error(parsed.errors.join(" "));
-    outfit = parsed.outfit;
-  } else if (name !== MY_WALKER) {
-    // A walker an agent starts gets a preset of its own, so two are told apart.
-    const presets = Object.keys(OUTFITS);
-    outfit = { ...OUTFITS[presets[(s.walkers.size + 1) % presets.length]!]! };
-  }
   const start = startPoint(args.near);
   const heading = args.heading !== undefined && Number.isFinite(Number(args.heading)) ? Number(args.heading) : start.heading;
-  const state = s.walkers.spawn(name, start.at, heading, outfit);
+  const state = s.walkers.spawn(name, start.at, heading);
   // A walker started on another campus brings the map there, with that campus's surroundings.
   if (start.campus && start.campus !== selCampus.value && shownWalker(name)) goHome(start.campus);
   return { spawned: state };
@@ -508,15 +498,6 @@ export function listen(args: { name?: unknown }): Reply {
   };
 }
 
-export function dress(args: { name?: unknown; outfit?: unknown }): Reply {
-  const s = need();
-  const name = walkerNamed(args.name as string | undefined);
-  const parsed = parseOutfit(args.outfit);
-  if (!parsed.outfit) throw new Error(parsed.errors.join(" "));
-  s.walkers.setOutfit(name, parsed.outfit);
-  return { walker: name, outfit: parsed.outfit };
-}
-
 export function setView(args: { view?: unknown; name?: unknown; yaw?: unknown; pitch?: unknown }): Reply {
   const s = need();
   const view = String(args.view ?? "map") as WalkerView;
@@ -607,13 +588,11 @@ export const COMMANDS: Record<string, (args: Record<string, unknown>) => Reply |
   turn: (a) => turn(a),
   say: (a) => say(a),
   listen: (a) => listen(a),
-  outfit: (a) => dress(a),
   view: (a) => setView(a),
   stop: (a) => stopWalker(a),
   wander: (a) => wander(a),
   remove: (a) => removeWalker(a),
   list: () => listWalkers(),
-  outfits: () => ({ presets: OUTFITS }),
 };
 
 /** Runs a command by name; an error comes back as `{ error }` rather than a throw. */
@@ -654,7 +633,6 @@ export function bindWalkerScene(s: CampusScene | undefined): void {
       nearId: near?.b.id,
       nearMetres: near ? Math.round(near.distance) : undefined,
       walking: st.walking,
-      outfit: st.outfit.name,
       indoor: inB ? `${inB.id}${buildingName(inB) && !/^Building /.test(buildingName(inB)) ? ` ${buildingName(inB)}` : ""}` : undefined,
       floor: inB && st.indoor ? floorNameOf(inB, st.indoor.floor) : undefined,
     };
@@ -688,15 +666,14 @@ let syncStop: (() => void) | undefined;
 
 /**
  * Starts walking when the address asks: `walk=1` (or `walk=<building or place>` to start there),
- * `view=follow|eyes`, `outfit=<preset>`. Then keeps those in the address, so a copied link
- * starts the same walk.
+ * `view=follow|eyes`. Then keeps those in the address, so a copied link starts the same walk.
  */
 export function startWalkerFromUrl(): void {
   const q = new URLSearchParams(location.search);
   const walkParam = q.get("walk");
   if (walkParam !== null && scene && data.value) {
     try {
-      startWalking({ near: walkParam && walkParam !== "1" ? walkParam : undefined, outfit: q.get("outfit") ?? undefined });
+      startWalking({ near: walkParam && walkParam !== "1" ? walkParam : undefined });
       const v = q.get("view");
       if (v === "follow" || v === "eyes") setView({ view: v, name: MY_WALKER });
     } catch (e) {

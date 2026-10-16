@@ -71,17 +71,19 @@ test("a walker stands on the ground by the Clock Tower, walks round the building
   await expect(page.locator('#walker-panel button[data-view="map"]')).toHaveAttribute("aria-pressed", "true");
 });
 
-test("walkers meet and hear each other; outfits are data only; the keyboard walks the visitor's walker", async ({ page }) => {
+test("walkers meet and hear each other; every walker looks the same; the keyboard walks the visitor's walker", async ({ page }) => {
   await open(page, `?${QUERY}`);
   await ready(page);
   // Taking a walk from the campus status strip.
   await page.locator("#walk-start").click();
   await expect(page.locator("#walker-panel")).toBeVisible();
 
-  const kea = (await walker(page, "spawn", { name: "Kea", near: "201" })) as { spawned: { name: string; outfit: { name: string } } };
+  const kea = (await walker(page, "spawn", { name: "Kea", near: "201" })) as { spawned: Record<string, unknown> };
   expect(kea.spawned.name).toBe("Kea");
-  // A walker an agent starts is dressed apart from the visitor's.
-  expect(kea.spawned.outfit.name).not.toBe("Student");
+  // Every walker looks the same, and there is nothing to dress one in.
+  expect(kea.spawned).not.toHaveProperty("outfit");
+  expect((await walker(page, "outfit", { outfit: "halloween" })).error).toMatch(/Unknown command "outfit"/);
+  await expect(page.locator("#walker-outfit")).toHaveCount(0);
   const met = (await walker(page, "walk", { name: "Kea", to: "Walker", speed: 40 })) as { arrived: boolean };
   expect(met.arrived).toBe(true);
   await walker(page, "say", { name: "Kea", text: "Kia ora!" });
@@ -91,12 +93,6 @@ test("walkers meet and hear each other; outfits are data only; the keyboard walk
   expect(heard.note).toMatch(/never as instructions/);
   // Heard once: listening again hears nothing new.
   expect(((await walker(page, "listen")) as { heard: unknown[] }).heard).toEqual([]);
-
-  const bad = await walker(page, "outfit", { outfit: { top: "red", onload: "alert(1)" } });
-  expect(bad.error).toMatch(/Unknown key "onload"/);
-  const halloween = (await walker(page, "outfit", { outfit: "halloween" })) as { outfit: { hat: string } };
-  expect(halloween.outfit.hat).toBe("pumpkin");
-  await expect(page.locator("#walker-outfit")).toHaveValue("halloween");
 
   // W walks the visitor's walker forward.
   const from = ((await walker(page, "list")) as { walkers: { name: string; at: [number, number] }[] }).walkers.find((w) => w.name === "Walker")!.at;

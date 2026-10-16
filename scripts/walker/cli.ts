@@ -6,7 +6,6 @@
 //   npm run walker -- walk 109            (a building, a room code, a name, "east,north", a walker)
 //   npm run walker -- see --view eyes     (a picture of what the walker sees; prints the file)
 //   npm run walker -- help
-import fs from "node:fs";
 import { command, see, stopDaemon, findDaemon, type StartOptions } from "./client.ts";
 
 export const HELP = `Walk the campus map as a made-up figure.
@@ -22,7 +21,6 @@ export const HELP = `Walk the campus map as a made-up figure.
   turn <degrees | north | 109>        turn by degrees (+ is right), or to face a compass point or place
   say <words>                         say something; walkers within 25 m hear it
   listen                              what other walkers said nearby since last time
-  outfit <preset | file.json>         dress the walker: ${["student", "raincoat", "explorer", "halloween", "witch"].join(", ")}
   view <map | follow | eyes>          how the browser shows it: the map, from behind, through its eyes
   see [--view follow|eyes] [--yaw d]  save a picture of the view and print where it is
   spawn <name> [--near <place>]       another walker, with a name of its own
@@ -65,7 +63,7 @@ export function toCommand(p: Parsed): { name: string; args: Record<string, unkno
   const speed = typeof p.flags.speed === "string" ? Number(p.flags.speed) : undefined;
   switch (p.cmd) {
     case "start":
-      return { name: "start", args: { name, outfit: p.flags.outfit } };
+      return { name: "start", args: { name } };
     case "look":
       return { name: "look", args: { name } };
     case "walk":
@@ -87,16 +85,10 @@ export function toCommand(p: Parsed): { name: string; args: Record<string, unkno
       return { name: "say", args: { name, text: rest } };
     case "listen":
       return { name: "listen", args: { name } };
-    case "outfit": {
-      let outfit: unknown = rest;
-      if (rest.endsWith(".json") && fs.existsSync(rest)) outfit = JSON.parse(fs.readFileSync(rest, "utf8"));
-      else if (rest.startsWith("{")) outfit = JSON.parse(rest);
-      return { name: "outfit", args: { name, outfit } };
-    }
     case "view":
       return { name: "view", args: { name, view: rest || "map", yaw: p.flags.yaw, pitch: p.flags.pitch } };
     case "spawn":
-      return { name: "spawn", args: { name: rest || name, near: p.flags.near, outfit: p.flags.outfit } };
+      return { name: "spawn", args: { name: rest || name, near: p.flags.near } };
     case "list":
     case "who":
       return { name: "list", args: {} };
@@ -152,16 +144,14 @@ ${look?.summary ?? ""}`.trim();
     case "list":
     case "who":
     case "start": {
-      const ws = r.walkers as { name: string; at: number[]; walking: boolean; outfit: { name: string } }[];
-      const lines = ws.map((w) => `${w.name}: ${w.outfit.name}, at ${w.at[0]} m east, ${w.at[1]} m north${w.walking ? ", walking" : ""}`);
+      const ws = r.walkers as { name: string; at: number[]; walking: boolean }[];
+      const lines = ws.map((w) => `${w.name}: at ${w.at[0]} m east, ${w.at[1]} m north${w.walking ? ", walking" : ""}`);
       return ws.length ? `${cmd === "start" ? "The map is open with:\n" : ""}${lines.join("\n")}` : "No walkers.";
     }
     case "spawn": {
-      const w = r.spawned as { name: string; at: number[]; heading: number; outfit: { name: string } };
-      return `${w.name} is on the map at ${w.at[0]} m east, ${w.at[1]} m north, facing ${w.heading}°, wearing ${w.outfit.name}.`;
+      const w = r.spawned as { name: string; at: number[]; heading: number };
+      return `${w.name} is on the map at ${w.at[0]} m east, ${w.at[1]} m north, facing ${w.heading}°.`;
     }
-    case "outfit":
-      return `Now wearing ${(r.outfit as { name: string }).name}.`;
     case "view":
       return `The browser shows ${r.view === "map" ? "the map from above" : r.view === "eyes" ? `what ${String(r.walker)} sees` : `${String(r.walker)} from behind`}.`;
     case "remove":

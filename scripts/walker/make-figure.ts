@@ -4,8 +4,8 @@
 //   node scripts/walker/make-figure.ts "<folder>/Animated Human by @Quaternius"
 //
 // The model is drawn from a strip of flat colours, its UVs each pointing at one band. This keeps
-// that idea but sorts the faces into eight bands (PALETTE below) by what they cover, so an outfit
-// can colour shoes and sleeves as well as skin, hair, shirt and trousers; Figure paints the strip.
+// that idea but sorts the faces into eight bands (PALETTE below) by what they cover, so the figure
+// can colour shoes and sleeves apart from skin, hair, shirt and trousers; Figure paints the strip.
 // It keeps three of the nine animations (idle, walk and run), scales the figure to 1.75 m with its
 // feet at the origin, turns it to face north (-z), and writes it as one binary glTF file. The work
 // is done in a browser page, where three.js has its FBX loader and glTF exporter.

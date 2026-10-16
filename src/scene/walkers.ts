@@ -4,7 +4,6 @@
 // Nothing here is about a real person or where one is.
 import { Group } from "three";
 import type { Pt } from "../shared/geo.ts";
-import type { Outfit } from "../shared/outfit.ts";
 import { WalkMap, type WalkPlan } from "../shared/walkmap.ts";
 import type { WalkGrid } from "../shared/walkpath.ts";
 import { cellOf } from "../shared/walkpath.ts";
@@ -72,7 +71,6 @@ export interface WalkerState {
   heading: number;
   indoor?: { building: string; floor: number };
   walking: boolean;
-  outfit: Outfit;
   saying?: string;
 }
 
@@ -86,7 +84,6 @@ class Walker {
   moving = 0;
   /** Metres a second it is going at, smoothed, for the figure's walk or run. */
   pace = 0;
-  outfit: Outfit;
   /** What it says, for `ms` from the first frame that shows it (`until` is set then). */
   speech?: { text: string; ms: number; until?: number };
   heardUpTo = 0;
@@ -101,13 +98,11 @@ class Walker {
     readonly name: string,
     at: Pt,
     heading: number,
-    outfit: Outfit,
     ring: number,
   ) {
     this.at = at;
     this.heading = heading;
-    this.outfit = outfit;
-    this.figure = new Figure(outfit, ring);
+    this.figure = new Figure(ring);
     this.nameLabel = { id: `walker:${name}`, x: 0, y: 0, z: 0, text: name, priority: 9e6, className: "lbl-walker" };
     this.sayLabel = { id: `say:${name}`, x: 0, y: 0, z: 0, text: "", priority: 1e7, className: "lbl-say" };
   }
@@ -139,9 +134,9 @@ export class WalkerWorld {
   }
 
   /** Puts a walker on the map, facing `heading`. Replaces one of the same name. */
-  spawn(name: string, at: Pt, heading: number, outfit: Outfit): WalkerState {
+  spawn(name: string, at: Pt, heading: number): WalkerState {
     this.remove(name);
-    const w = new Walker(name, at, heading, outfit, this.host.ringColour());
+    const w = new Walker(name, at, heading, this.host.ringColour());
     w.heardUpTo = this.now;
     this.walkers.set(name, w);
     this.group.add(w.figure.root);
@@ -171,7 +166,6 @@ export class WalkerWorld {
       heading: Math.round(w.heading),
       indoor: w.indoor ? { ...w.indoor } : undefined,
       walking: !!w.walk,
-      outfit: { ...w.outfit },
       saying: w.speech && (w.speech.until === undefined || w.speech.until > this.now) ? w.speech.text : undefined,
     };
   }
@@ -184,13 +178,6 @@ export class WalkerWorld {
 
   figure(name: string): Figure | undefined {
     return this.walkers.get(name)?.figure;
-  }
-
-  setOutfit(name: string, outfit: Outfit): void {
-    const w = this.walkers.get(name);
-    if (!w) return;
-    w.outfit = outfit;
-    w.figure.setOutfit(outfit);
   }
 
   /** Walks along a planned way. Resolves when the walker gets there or is stopped. */
@@ -347,8 +334,7 @@ export class WalkerWorld {
       if (Math.abs(w.moving) < 0.01) w.moving = 0;
       if (dt > 0) w.pace += (travelled / dt - w.pace) * Math.min(1, dt * 8);
       if (travelled === 0 && w.moving === 0) w.pace = 0;
-      const umbrella = w.outfit.umbrella === "always" || (w.outfit.umbrella === "auto" && rain > 0 && !w.indoor);
-      w.figure.setUmbrella(umbrella);
+      w.figure.setUmbrella(rain > 0 && !w.indoor);
       if (travelled > 0 || w.moving > 0) this.place(w);
       w.figure.pose(w.moving, w.pace, now / 1000);
       if (w.figure.takeChanged()) changed = true;

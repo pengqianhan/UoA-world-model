@@ -1961,28 +1961,6 @@ select optgroup {
   font-size: 12px;
 }
 
-.walker-outfit {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.walker-outfit select {
-  flex: 1;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text);
-}
-
-.walker-outfit option {
-  background: var(--panel-solid);
-}
-
 .walker-wander {
   height: 30px;
   border: 1px dashed var(--line);
@@ -2101,7 +2079,7 @@ select optgroup {
   }
 
   /* Short, so that it stays below the walker in the view from behind. */
-  .walking.in-building .walker-panel :is(.walker-keys, .walker-note, .walker-outfit, .walker-wander) {
+  .walking.in-building .walker-panel :is(.walker-keys, .walker-note, .walker-wander) {
     display: none;
   }
 }
@@ -2129,8 +2107,7 @@ select optgroup {
   }
 
   .walker-keys,
-  .walker-note,
-  .walker-outfit {
+  .walker-note {
     display: none;
   }
 
