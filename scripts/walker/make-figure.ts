@@ -5,7 +5,8 @@
 //
 // The model is drawn from a strip of flat colours, its UVs each pointing at one band. This keeps
 // that idea but sorts the faces into eight bands (PALETTE below) by what they cover, so the figure
-// can colour shoes and sleeves apart from skin, hair, shirt and trousers; Figure paints the strip.
+// can colour shoes and sleeves apart from skin, hair, shirt and trousers; src/scene/figureBuild.ts
+// paints the strip.
 // It keeps three of the nine animations (idle, walk and run), scales the figure to 1.75 m with its
 // feet at the origin, turns it to face north (-z), and writes it as one binary glTF file. The work
 // is done in a browser page, where three.js has its FBX loader and glTF exporter.
@@ -67,7 +68,7 @@ try {
       const row = Math.floor((1 - v) * 32);
       return row < 6 ? "skin" : row < 11 ? "eyes" : row < 17 ? "hair" : row < 23 ? "top" : "bottom";
     };
-    // Must match PALETTE in src/scene/figure.ts.
+    // Must match BANDS in src/scene/figureBuild.ts.
     const PALETTE = ["skin", "eyes", "hair", "top", "bottom", "shoes", "upperArm", "forearm"];
     const strongest = (i: number) => {
       let best = 0;
