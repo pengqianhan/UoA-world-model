@@ -36,6 +36,8 @@ It is built to answer two questions a student actually has:
 
 ## What's new
 
+- **2026-10-17:** About says that Cloudflare counts page views and visits at campusworldmodel.com,
+  where it used to say the site has no analytics.
 - **2026-10-16:** a walker: a small made-up person who walks and runs, to take round the campus
   and into its buildings, seen from behind or through its eyes, which Claude Code and other agents
   can steer, and which talks with other walkers; one look for every walker, with nothing meant to
@@ -46,8 +48,6 @@ It is built to answer two questions a student actually has:
   lifts and toilets; buildings open on the floor at street level, with the floors under the ground
   seen through it; About's note on the far campuses put right; the Southern Underpass under
   Symonds Street, no longer on it, from outside or opened; outer walls on 40 floors that had none.
-- **2026-10-14:** every space on a floor shows its type, rooms stand as walls, and buildings gain
-  roof colours, rims, storeys and windows; a flight to the Tsinghua World Model.
 
 Everything, with its pull request, is in the [changelog](CHANGELOG.md).
 
@@ -140,6 +140,11 @@ The same workflow publishes a second copy to Cloudflare Pages under `/uoa/`, wit
 `cloudflare/` at the site root. That job runs only when the repository variable `CLOUDFLARE_PROJECT`
 names a Pages project and the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set, so
 a fork deploys to GitHub Pages alone until it has them.
+
+A pull request from a branch of this repository also gets a preview on the same Pages project, at
+`https://<branch>.<project>.pages.dev/uoa/`, once its checks pass; the pull request's "View
+deployment" opens it, and each push updates it. A pull request from a fork gets no preview, because
+GitHub gives it no secrets.
 
 ## Walk the campus
 

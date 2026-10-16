@@ -14,6 +14,14 @@ A change to what the site does or shows adds its line here, and the README's
   the Classes API key arrives, so that what the timetable and the catalogue each supply can be
   settled with both in hand.
 
+## 2026-10-17
+
+### Fixed
+
+- **About said the site has no analytics.** At campusworldmodel.com, Cloudflare, which serves the
+  site, has counted page views and visits with its Web Analytics since the domain was set up. About
+  now says so, and what it does not record (#45).
+
 ## 2026-10-16
 
 ### Added

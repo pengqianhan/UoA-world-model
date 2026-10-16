@@ -103,3 +103,55 @@ jobs:
         run: npx --yes wrangler@4 pages project create "$PROJECT" --production-branch main || true
       - name: Publish to Cloudflare Pages
         run: npx --yes wrangler@4 pages deploy site --project-name "$PROJECT" --branch main
+
+  # A preview of each pull request from a branch of this repository, on the same Cloudflare Pages
+  # project at <branch>.<project>.pages.dev, once the same checks as main have passed; the pull
+  # request's "View deployment" opens it. Production stays main's. A fork's pull request is given
+  # no secrets, so it is skipped.
+  deploy-preview:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      vars.CLOUDFLARE_PROJECT != ''
+    needs: [build, e2e]
+    runs-on: ubuntu-latest
+    environment:
+      name: preview
+      url: ${{ steps.publish.outputs.url }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: ${{ vars.CLOUDFLARE_PROJECT }}
+      SCHOOL: uoa
+      # The branch name goes in through the environment, never into the text of a script.
+      BRANCH: ${{ github.head_ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build for the school's path and lay out the site root
+        run: |
+          BASE_PATH="/$SCHOOL/" npm run build
+          mkdir site
+          mv dist "site/$SCHOOL"
+          cp cloudflare/_headers cloudflare/_redirects site/
+      # Wrangler writes what it published to WRANGLER_OUTPUT_FILE_PATH, one JSON record a line; the
+      # "pages-deploy-detailed" record has the branch's address (alias) and this deployment's (url).
+      - name: Publish the branch as a preview
+        id: publish
+        env:
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
+        run: |
+          npx --yes wrangler@4 pages deploy site --project-name "$PROJECT" --branch "$BRANCH" --commit-hash "$HEAD_SHA"
+          url=$(node -e '
+            const records = require("fs").readFileSync(process.env.WRANGLER_OUTPUT_FILE_PATH, "utf8")
+              .split("\n").filter(Boolean).map((line) => JSON.parse(line));
+            const deploy = records.findLast((r) => r.type === "pages-deploy-detailed");
+            console.log(`${(deploy.alias || deploy.url).replace(/\/$/, "")}/${process.env.SCHOOL}/`);
+          ')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview of \`$BRANCH\`: $url" >> "$GITHUB_STEP_SUMMARY"
