@@ -175,7 +175,7 @@ test("4. Now follows Auckland time; Preview takes any day and time; non-teaching
   await chip.click();
   const panel = page.locator(".time-panel");
   await expect(panel).toBeVisible();
-  await panel.getByRole("button", { name: "Preview" }).click();
+  await panel.getByRole("button", { name: "Preview", exact: true }).click();
   await expect(chip.locator(".chip-mode")).toHaveText("Preview");
   expect(params(page).get("time")).toBe("preview");
   // Preview starts on a teaching day.
@@ -205,7 +205,7 @@ test("4. Now follows Auckland time; Preview takes any day and time; non-teaching
   await expect(panel.locator(".status-line")).toContainText("teaching week");
 
   // Back to Now.
-  await panel.getByRole("button", { name: "Now" }).click();
+  await panel.getByRole("button", { name: "Now", exact: true }).click();
   await expect(chip.locator(".chip-mode")).toHaveText("Now");
   expect(params(page).get("time")).toBeNull();
 });
