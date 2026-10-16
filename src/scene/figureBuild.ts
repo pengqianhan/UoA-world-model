@@ -51,6 +51,7 @@ const LOOK = {
   bottom: "#2f3a4a",
   shoes: "#4a4f57",
   sole: "#e6e1d6",
+  mouth: "#7d4434",
   backpack: "#3f7f6f",
   backpackPocket: "#36705f",
   backpackStraps: "#2b4a43",
@@ -127,6 +128,11 @@ const PACK = {
  * sags between them; and the shaft from the hand to the canopy's edge.
  */
 const UMBRELLA = { radius: 0.62, rise: 0.22, ribs: 8, sag: 0.05, shaft: 0.8 };
+/**
+ * The mouth, in metres: how far below the middle of the eyes; how wide, how much higher its ends
+ * are than its middle, how tall the line of it is, and how far it stands out of the face.
+ */
+const MOUTH = { below: 0.1, width: 0.036, rise: 0.004, tall: 0.006, thick: 0.003 };
 /** Metres from the middle of the shade under the feet to its edge. */
 const BLOT = 0.45;
 
@@ -156,8 +162,8 @@ export function loadBody(): Promise<{ scene: Object3D; clips: AnimationClip[] }>
 export interface Gear {
   /** The body's colours, for its own mesh. */
   skin: Material;
-  /** To fix to the head. */
-  hair: Mesh;
+  /** The hair and the mouth, to fix to the head. */
+  head: Mesh;
   /** To fix to the chest. */
   backpack: Mesh;
   /** Upright, its handle at its origin, to hold in the right hand. */
@@ -167,7 +173,7 @@ export interface Gear {
 }
 
 /** The shapes and paint every figure's gear is made of, built for the first. */
-let made: { skin: Material; parts: Record<"hair" | "backpack" | "umbrella" | "blot", [BufferGeometry, Material]> } | undefined;
+let made: { skin: Material; parts: Record<"head" | "backpack" | "umbrella" | "blot", [BufferGeometry, Material]> } | undefined;
 
 /**
  * A figure's paint and gear, fitted to its body as it stands now. `frame` is the figure's own frame
@@ -184,7 +190,7 @@ export function makeGear(frame: Object3D, mesh: SkinnedMesh, at: (bone: string) 
     return {
       skin: shade(new MeshLambertMaterial({ map: paint() }), mesh.geometry.boundingBox?.max.y ?? 8),
       parts: {
-        hair: [hair(body), material(LOOK.hair)],
+        head: [headGear(body, at("Head")), material("#ffffff", true)],
         backpack: [backpack(body, at("Spine2"), at("Neck")), material("#ffffff", true)],
         umbrella: [umbrella(), material("#ffffff", true)],
         blot: [blot, new MeshBasicMaterial({ color: 0x000000, map: blotTexture(), transparent: true, depthWrite: false })],
@@ -200,7 +206,7 @@ export function makeGear(frame: Object3D, mesh: SkinnedMesh, at: (bone: string) 
   const blot = part("blot");
   blot.position.y = 0.04;
   blot.renderOrder = 1;
-  return { skin: made.skin, hair: part("hair"), backpack: part("backpack"), umbrella: part("umbrella"), blot };
+  return { skin: made.skin, head: part("head"), backpack: part("backpack"), umbrella: part("umbrella"), blot };
 }
 
 /**
@@ -473,6 +479,13 @@ function surface(frame: Object3D, mesh: SkinnedMesh): Surface {
   return out;
 }
 
+/** The hair and the mouth, coloured by their corners. `head` is a point inside the head. */
+function headGear(body: Surface, head: Vector3): BufferGeometry {
+  const eyes = new Box3();
+  for (const c of body) if (c.band === "eyes") eyes.expandByPoint(c.p);
+  return merged([paintCorners(hair(body), LOOK.hair), paintCorners(mouth(body, eyes.getCenter(new Vector3()), head), LOOK.mouth)]);
+}
+
 /**
  * Hair of middling length over the body's own short hair: a shell round the head from the crown
  * over the ears to the nape, with a fringe down to the brows, open over the face, its edges in
@@ -532,27 +545,8 @@ function hair(body: Surface): BufferGeometry {
  */
 function backpack(body: Surface, spine: Vector3, neck: Vector3): BufferGeometry {
   const P = PACK;
-  // The faces of the shirt on the trunk, without the arms hanging by it.
-  const trunk: Vector3[][] = [];
-  for (let i = 0; i + 2 < body.length; i += 3) {
-    const face = [body[i]!, body[i + 1]!, body[i + 2]!];
-    if (face.every((c) => c.band === "top") && Math.abs((face[0]!.p.x + face[1]!.p.x + face[2]!.p.x) / 3) < P.trunk) trunk.push(face.map((c) => c.p));
-  }
-  const ray = new Ray();
-  const hit = new Vector3();
-  /** Where the outside of the trunk is, from `from` inside it going towards `to`; or nothing. */
-  const outside = (from: Vector3, to: Vector3) => {
-    const dir = to.clone().sub(from).normalize();
-    ray.set(from.clone().addScaledVector(dir, 1), dir.clone().negate());
-    let met = Infinity;
-    for (const [a, b, c] of trunk) {
-      if (ray.intersectTriangle(a!, b!, c!, false, hit)) {
-        const d = hit.distanceTo(ray.origin);
-        if (d < 1 && d < met) met = d;
-      }
-    }
-    return met === Infinity ? undefined : from.clone().addScaledVector(dir, 1 - met);
-  };
+  // The shirt on the trunk, without the arms hanging by it.
+  const outside = outsideOf(faces(body, (c) => c.band === "top", (middle) => Math.abs(middle.x) < P.trunk));
   const top = neck.y - P.belowNeck;
   const bottom = top - P.height;
   // The pack leans on the back. Where the back is, down the pack: the furthest of its middle and
@@ -604,6 +598,51 @@ function backpack(body: Surface, spine: Vector3, neck: Vector3): BufferGeometry 
     add(sweep(points, centre, P.strapWidth, P.strapThick), LOOK.backpackStraps);
   }
   return merged(parts);
+}
+
+/**
+ * A small mouth, a little upturned at its ends, on the face below the nose: the body as modelled has
+ * none. `eyes` is the middle of the eyes, `head` a point inside the head.
+ */
+function mouth(body: Surface, eyes: Vector3, head: Vector3): BufferGeometry {
+  const outside = outsideOf(faces(body, (c) => c.band === "skin", (middle) => middle.y > head.y));
+  const y = eyes.y - MOUTH.below;
+  const points = Array.from({ length: 9 }, (_, i) => {
+    const t = i / 4 - 1;
+    const p = new Vector3(eyes.x + (t * MOUTH.width) / 2, y + MOUTH.rise * t * t, head.z);
+    const on = outside(p, p.clone().setZ(head.z - 1));
+    return on ? on.setZ(on.z - MOUTH.thick / 2) : undefined;
+  }).filter((p) => p !== undefined);
+  return sweep(points, new Vector3(eyes.x, y, head.z), MOUTH.tall, MOUTH.thick);
+}
+
+/** The faces of the body whose corners all `keep`, and whose middle `where`. */
+function faces(body: Surface, keep: (c: Surface[number]) => boolean, where: (middle: Vector3) => boolean): Vector3[][] {
+  const out: Vector3[][] = [];
+  for (let i = 0; i + 2 < body.length; i += 3) {
+    const face = [body[i]!, body[i + 1]!, body[i + 2]!];
+    if (face.every(keep) && where(face[0]!.p.clone().add(face[1]!.p).add(face[2]!.p).divideScalar(3))) out.push(face.map((c) => c.p));
+  }
+  return out;
+}
+
+/** Where the outside of `shell` is, from `from` inside it going towards `to`; or nothing. */
+function outsideOf(shell: Vector3[][]): (from: Vector3, to: Vector3) => Vector3 | undefined {
+  const ray = new Ray();
+  const hit = new Vector3();
+  return (from, to) => {
+    // From a metre out back in: the first face met is the outside.
+    const dir = to.clone().sub(from).normalize();
+    ray.set(from.clone().addScaledVector(dir, 1), dir.clone().negate());
+    let met = Infinity;
+    for (const [a, b, c] of shell) {
+      if (ray.intersectTriangle(a!, b!, c!, false, hit)) {
+        const d = hit.distanceTo(ray.origin);
+        if (d < 1 && d < met) met = d;
+      }
+    }
+    return met === Infinity ? undefined : from.clone().addScaledVector(dir, 1 - met);
+  };
 }
 
 /**

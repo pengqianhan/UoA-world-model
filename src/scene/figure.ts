@@ -338,7 +338,7 @@ export class Figure {
   private undress(): void {
     const g = this.gear;
     if (!g) return;
-    for (const part of [g.hair, g.backpack, g.umbrella, g.blot]) part.removeFromParent();
+    for (const part of [g.head, g.backpack, g.umbrella, g.blot]) part.removeFromParent();
     this.gear = undefined;
   }
 
@@ -361,7 +361,7 @@ export class Figure {
     const gear = build.makeGear(this.root, b.mesh, (name) => this.root.worldToLocal(b.bone(name).getWorldPosition(new Vector3())));
     this.gear = gear;
     b.mesh.material = gear.skin;
-    for (const [part, to] of [[gear.hair, "Head"], [gear.backpack, "Spine2"]] as const) {
+    for (const [part, to] of [[gear.head, "Head"], [gear.backpack, "Spine2"]] as const) {
       this.root.add(part);
       part.updateMatrixWorld(true);
       b.bone(to).attach(part);
