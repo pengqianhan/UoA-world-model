@@ -50,8 +50,14 @@ async function site(): Promise<{ url: string; close?: () => Promise<void> }> {
 }
 
 const { url, close: closeSite } = await site();
+// A window someone watches draws on the GPU: on a Mac, SwiftShader shows a walking figure at under
+// one frame a second. Hidden runs keep the software renderer that CI uses.
 const glArgs =
-  process.platform === "win32" ? ["--use-angle=d3d11", "--enable-gpu", "--ignore-gpu-blocklist"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
+  process.platform === "win32"
+    ? ["--use-angle=d3d11", "--enable-gpu", "--ignore-gpu-blocklist"]
+    : process.platform === "darwin" && !headless
+      ? ["--use-angle=metal", "--ignore-gpu-blocklist"]
+      : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
 const browser = await chromium.launch({ headless, args: glArgs });
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
