@@ -17,8 +17,6 @@ export const WALK_SPEED = 1.4;
 export const MAX_SPEED = 40;
 /** Degrees a second a walker turns towards where it is going. */
 const TURN_RATE = 400;
-/** Metres per stride cycle (two steps). */
-const STRIDE = 1.5;
 /** Metres within which a walker hears what another says, out of doors. */
 export const HEAR_RANGE = 25;
 /** Metres the paint of paths and streets lies over the ground (see CampusScene.setContext). */
@@ -85,8 +83,9 @@ class Walker {
   height = 0;
   indoor?: { building: string; floor: number };
   walk?: Walk;
-  phase = 0;
   moving = 0;
+  /** Metres a second it is going at, smoothed, for the figure's walk or run. */
+  pace = 0;
   outfit: Outfit;
   /** What it says, for `ms` from the first frame that shows it (`until` is set then). */
   speech?: { text: string; ms: number; until?: number };
@@ -178,9 +177,9 @@ export class WalkerWorld {
   }
 
   /** The point, heading and height a camera follows. */
-  pose(name: string): { at: Pt; heading: number; height: number } | undefined {
+  pose(name: string): { at: Pt; heading: number; height: number; indoor: boolean } | undefined {
     const w = this.walkers.get(name);
-    return w ? { at: w.at, heading: w.heading, height: w.height } : undefined;
+    return w ? { at: w.at, heading: w.heading, height: w.height, indoor: !!w.indoor } : undefined;
   }
 
   figure(name: string): Figure | undefined {
@@ -346,11 +345,13 @@ export class WalkerWorld {
       const target = travelled > 0 ? 1 : 0;
       w.moving += (target - w.moving) * Math.min(1, dt * 6);
       if (Math.abs(w.moving) < 0.01) w.moving = 0;
-      w.phase += (travelled / STRIDE) * Math.PI * 2;
+      if (dt > 0) w.pace += (travelled / dt - w.pace) * Math.min(1, dt * 8);
+      if (travelled === 0 && w.moving === 0) w.pace = 0;
       const umbrella = w.outfit.umbrella === "always" || (w.outfit.umbrella === "auto" && rain > 0 && !w.indoor);
       w.figure.setUmbrella(umbrella);
       if (travelled > 0 || w.moving > 0) this.place(w);
-      w.figure.pose(w.phase, w.moving, now / 1000);
+      w.figure.pose(w.moving, w.pace, now / 1000);
+      if (w.figure.takeChanged()) changed = true;
       if (w.speech && w.speech.until === undefined) w.speech.until = now + w.speech.ms;
       else if (w.speech && w.speech.until! <= now) {
         w.speech = undefined;

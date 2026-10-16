@@ -6,6 +6,7 @@
 export const HATS = ["none", "cap", "beanie", "witch", "pumpkin"] as const;
 export const HAIR = ["short", "long", "bun", "none"] as const;
 export const UMBRELLA = ["auto", "always", "never"] as const;
+export const SLEEVES = ["short", "long"] as const;
 
 export interface Outfit {
   name: string;
@@ -13,6 +14,8 @@ export interface Outfit {
   hair: string;
   hairStyle: (typeof HAIR)[number];
   top: string;
+  /** Short sleeves show the arms; long ones are the colour of the top to the wrists. */
+  sleeves: (typeof SLEEVES)[number];
   bottom: string;
   shoes: string;
   hat: (typeof HATS)[number];
@@ -33,6 +36,7 @@ export const OUTFITS: Record<string, Outfit> = {
     hair: "#33241a",
     hairStyle: "short",
     top: "#e2763c",
+    sleeves: "short",
     bottom: "#2f3a4a",
     shoes: "#ecebe6",
     hat: "none",
@@ -48,6 +52,7 @@ export const OUTFITS: Record<string, Outfit> = {
     hair: "#1d1612",
     hairStyle: "bun",
     top: "#f2c230",
+    sleeves: "long",
     bottom: "#38424d",
     shoes: "#2b2b2b",
     hat: "none",
@@ -63,6 +68,7 @@ export const OUTFITS: Record<string, Outfit> = {
     hair: "#8a5a2e",
     hairStyle: "long",
     top: "#6f8f4e",
+    sleeves: "long",
     bottom: "#5b4a3a",
     shoes: "#3a2c22",
     hat: "cap",
@@ -78,6 +84,7 @@ export const OUTFITS: Record<string, Outfit> = {
     hair: "#000000",
     hairStyle: "none",
     top: "#f08a24",
+    sleeves: "long",
     bottom: "#26262c",
     shoes: "#141416",
     hat: "pumpkin",
@@ -93,6 +100,7 @@ export const OUTFITS: Record<string, Outfit> = {
     hair: "#2a1c3a",
     hairStyle: "long",
     top: "#4b2a6b",
+    sleeves: "long",
     bottom: "#1f1a2a",
     shoes: "#141416",
     hat: "witch",
@@ -109,7 +117,7 @@ export const DEFAULT_OUTFIT = "student";
 const COLOUR = /^#[0-9a-f]{6}$/i;
 const COLOURS = ["skin", "hair", "top", "bottom", "shoes", "hatColour", "umbrellaColour"] as const;
 const OPTIONAL_COLOURS = ["backpack", "cape"] as const;
-const KEYS = new Set<string>(["name", "base", "hairStyle", "hat", "umbrella", ...COLOURS, ...OPTIONAL_COLOURS]);
+const KEYS = new Set<string>(["name", "base", "hairStyle", "hat", "umbrella", "sleeves", ...COLOURS, ...OPTIONAL_COLOURS]);
 
 /**
  * Reads an outfit from untrusted data: a preset's name, or an object of the keys above. An object
@@ -143,7 +151,7 @@ export function parseOutfit(input: unknown): { outfit?: Outfit; errors: string[]
     else if (typeof o[k] !== "string" || !COLOUR.test(o[k] as string)) errors.push(`${k}: a colour as #rrggbb, or null.`);
     else out[k] = (o[k] as string).toLowerCase();
   }
-  const choose = <T extends string>(k: "hairStyle" | "hat" | "umbrella", options: readonly T[]) => {
+  const choose = <T extends string>(k: "hairStyle" | "hat" | "umbrella" | "sleeves", options: readonly T[]) => {
     if (o[k] === undefined) return;
     if (typeof o[k] !== "string" || !options.includes(o[k] as T)) errors.push(`${k}: one of ${options.join(", ")}.`);
     else (out as unknown as Record<string, string>)[k] = o[k] as string;
@@ -151,5 +159,6 @@ export function parseOutfit(input: unknown): { outfit?: Outfit; errors: string[]
   choose("hairStyle", HAIR);
   choose("hat", HATS);
   choose("umbrella", UMBRELLA);
+  choose("sleeves", SLEEVES);
   return errors.length ? { errors } : { outfit: out, errors: [] };
 }

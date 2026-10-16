@@ -74,7 +74,7 @@ export const TOOLS = [
   {
     name: "walker_outfit",
     description:
-      'Dress the walker: a preset (student, raincoat, explorer, halloween, witch) or an object of colours and choices, e.g. {"base":"explorer","top":"#2a9d8f","hat":"beanie"}. Keys: name, base, skin, hair, hairStyle (short|long|bun|none), top, bottom, shoes, hat (none|cap|beanie|witch|pumpkin), hatColour, backpack (#rrggbb|null), cape (#rrggbb|null), umbrella (auto|always|never), umbrellaColour.',
+      'Dress the walker: a preset (student, raincoat, explorer, halloween, witch) or an object of colours and choices, e.g. {"base":"explorer","top":"#2a9d8f","hat":"beanie"}. Keys: name, base, skin, hair, hairStyle (short|long|bun|none), top, sleeves (short|long), bottom, shoes, hat (none|cap|beanie|witch|pumpkin), hatColour, backpack (#rrggbb|null), cape (#rrggbb|null), umbrella (auto|always|never), umbrellaColour.',
     inputSchema: { type: "object", properties: { outfit: { description: "A preset's name, or an outfit object." }, name: NAME }, required: ["outfit"] },
   },
   {
