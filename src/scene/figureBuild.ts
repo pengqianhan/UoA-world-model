@@ -98,6 +98,8 @@ const RIM = 0.9;
 const GROUND_SHADE = 0.78;
 /** Metres the hair reaches below the brows, at the sides and the back: past the ears. */
 const HAIR_BELOW_BROWS = 0.1;
+/** How much of the hair's colour it has at its lowest and at the crown. */
+const HAIR_SHEEN = { low: 0.8, crown: 1.35 };
 /** Metres above the brows that the fringe ends, between its locks. */
 const FRINGE_ABOVE_BROWS = 0.012;
 /** Radians either side of straight ahead that the hair leaves open, for the face. */
@@ -483,7 +485,18 @@ function surface(frame: Object3D, mesh: SkinnedMesh): Surface {
 function headGear(body: Surface, head: Vector3): BufferGeometry {
   const eyes = new Box3();
   for (const c of body) if (c.band === "eyes") eyes.expandByPoint(c.p);
-  return merged([paintCorners(hair(body), LOOK.hair), paintCorners(mouth(body, eyes.getCenter(new Vector3()), head), LOOK.mouth)]);
+  const hairs = paintCorners(hair(body), LOOK.hair);
+  // Lighter towards the crown, where the light falls, and darker where it hangs: the hair has body.
+  hairs.computeBoundingBox();
+  const { min, max } = hairs.boundingBox!;
+  const pos = hairs.getAttribute("position");
+  const colour = hairs.getAttribute("color");
+  for (let i = 0; i < pos.count; i++) {
+    const up = (pos.getY(i) - min.y) / (max.y - min.y);
+    const k = HAIR_SHEEN.low + (HAIR_SHEEN.crown - HAIR_SHEEN.low) * up * up;
+    colour.setXYZ(i, colour.getX(i) * k, colour.getY(i) * k, colour.getZ(i) * k);
+  }
+  return merged([hairs, paintCorners(mouth(body, eyes.getCenter(new Vector3()), head), LOOK.mouth)]);
 }
 
 /**
