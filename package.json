@@ -14,7 +14,9 @@
     "e2e": "playwright test",
     "data:fetch": "tsx scripts/fetch-mapsindoors.ts && tsx scripts/fetch-osm.ts && tsx scripts/fetch-terrain.ts && tsx scripts/fetch-calendar.ts",
     "data:build": "tsx scripts/build-data.ts",
-    "data:classes": "tsx scripts/fetch-classes.ts"
+    "data:classes": "tsx scripts/fetch-classes.ts",
+    "walker": "node scripts/walker/cli.ts",
+    "walker:mcp": "node scripts/walker/mcp.ts"
   },
   "dependencies": {
     "@preact/signals": "^2.11.3",

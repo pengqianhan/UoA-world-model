@@ -5,12 +5,13 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Claude Code session state stays local. The one thing shared from here is the skill
-# that ports this project to another university.
+# Claude Code session state stays local. Shared from here: the skill that ports this project
+# to another university, and the skill that walks the campus as a made-up figure.
 .claude/*
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/campus-world-model/
+!.claude/skills/campus-walker/
 
 # Raw scraped snapshots of non-open-licensed sources stay local (see data/sources.json
 # for URL, fetch date and hash of every snapshot). OSM extracts (ODbL) and the elevation tiles
@@ -29,3 +30,6 @@ e2e/screenshots/
 
 # Task brief for the build agent; contains a local filesystem path, so it stays local.
 GOAL.md
+
+# The walker's controller: its port and token, its log, and pictures of the view. Local only.
+.walker/

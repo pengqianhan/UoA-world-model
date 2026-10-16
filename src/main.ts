@@ -3,6 +3,7 @@ import { h, render } from "preact";
 import { loadData } from "./app/data.ts";
 import { lang, setLang, t } from "./app/i18n.ts";
 import { data, loadError, readUrl, startClock, startUrlSync } from "./app/state.ts";
+import { startWalkerFromUrl } from "./app/walker.ts";
 import { App } from "./ui/App.tsx";
 import { loadWeather } from "./ui/weather.ts";
 import "./ui/styles.css";
@@ -24,6 +25,7 @@ loadData()
       data.value = d;
       readUrl(d);
     });
+    startWalkerFromUrl();
     startUrlSync();
     // Decorative and optional: fetched after the map is up, and again each half hour, as often
     // as Open-Meteo's current conditions change.

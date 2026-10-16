@@ -259,11 +259,12 @@
       "rooms": "Outlines are simplified from the official campus map. Learning spaces (lecture theatres, teaching rooms, labs, studios, study spaces) are named and can be selected. Every other space on the campus map is drawn as a shape with no code or name, so that a floor reads as a floor plan, and its floor is tinted by the campus map's type for it: offices, other labs, toilets, stairs and lifts, services, and areas the map does not describe. Point at a shape, or tap it, to read that type in the campus map's own words. Stairs, lifts, toilets and showers carry a sign. A room among them is found by its code and marked with a pin, and the shape it stands on is outlined. Walls stand on every outline at a height chosen for the drawing; the campus map has no wall heights and no doors, so none are shown. Floors where people live and childcare centres are left blank, and single parking bays are not drawn. Some floors are blank or nearly blank on the campus map itself, most of them in halls of residence; the floor list marks them and the building bar says so. The furniture drawn in a selected room is decoration laid out by rule; it is not a seating plan and says nothing about capacity.",
       "campuses": "Every campus on the official campus map is modelled in 3D. The City, Grafton and Newmarket campuses share one stretch of the city; Tai Tokerau, Tai Tonga, Leigh, Waiheke and Ardmore, and one Grafton building on Carrick Place, each stand in their own patch of surroundings, a few hundred metres across, and the map jumps between them. Positions far from the City Campus are drawn on the same flat map, so shapes at Tai Tokerau, 125 km north, are about 1.4% narrower east to west than they are. The sea is not drawn: OpenStreetMap maps the coast as a line, which this map does not turn into water, so Leigh and Waiheke stand on land to the edge of their patch.",
       "context": "Surrounding buildings, streets and trees come from OpenStreetMap. Where it maps a building in parts or gives a roof a shape, those are drawn, the roof in a simplified form. Where a height is not mapped, a default is used. A tree standing alone is where OpenStreetMap maps it; its size and shape are drawn by rule. Trees OpenStreetMap tags as deciduous turn in April and May, stand bare from June to August and come into leaf in September and October; the rest are drawn evergreen. Trees inside woodland areas are scattered for decoration.",
+      "walker": "The walker is a made-up figure, not a person: it stands for nobody, and nothing about where it goes leaves your browser. Its walks are planned round the buildings on the map and along OpenStreetMap's paths and streets, off motorways except over footbridges. Doors and entrances are not mapped, so a walk to a building ends beside its nearest wall, and it passes gates, fences and kerbs the map does not have. Its body is the \"Animated Human\" model by Quaternius, given to the public domain (CC0); its stance, trainers, hair, mouth, backpack and umbrella are drawn here by rule, in colours that are none of the University's. Where a building or a tree hides it, its shape shows through. An agent can steer it on your own computer through the scripts in the source code.",
       "calendar": "Semester dates are transcribed by hand from the 2026 University Calendar. Dates for 2027 were not fully published when this was built.",
       "daylight": "The sun stands where it does over the City Campus at the date and time shown, from NOAA's published solar-position equations; below 10° above the horizon it is drawn at 10°, so that shadows stay on the map. Night falls as the sun goes from 6° above the horizon to 8° below. In Now mode the cloud, rain and fog follow Open-Meteo's current weather for the City Campus, and the falling rain is drawn by rule; Preview shows a clear sky, because past and future weather are not known here."
     },
     "privacyTitle": "Privacy",
-    "privacy": "The site has no accounts and sets no cookies. Staff names are deliberately left out. Only the copy at campusworldmodel.com is counted: there Cloudflare, which serves the site, counts page views and visits with its Web Analytics. It stores nothing in your browser and does not record which building or room you look at; a content blocker may stop it. If the weather line is shown, your browser asks Open-Meteo for the current weather in Auckland; nothing about you is sent beyond that request.",
+    "privacy": "The site has no accounts and sets no cookies. Staff names are deliberately left out. Only the copy at campusworldmodel.com is counted: there Cloudflare, which serves the site, counts page views and visits with its Web Analytics. It stores nothing in your browser and does not record which building or room you look at; a content blocker may stop it. If the weather line is shown, your browser asks Open-Meteo for the current weather in Auckland; nothing about you is sent beyond that request. A walk with the walker stays in your browser: where it goes, what it says and what it wears are not sent anywhere.",
     "osm": "Map context © OpenStreetMap contributors, available under the Open Database License.",
     "osmLink": "OpenStreetMap copyright and licence",
     "inspirationTitle": "Inspiration",
@@ -313,5 +314,43 @@
         "place": "Tsinghua University, Beijing"
       }
     }
+  },
+  "walker": {
+    "start": "Take a walk",
+    "startHint": "Walk the campus as a small made-up figure, and see it from its eyes",
+    "heading": "Walker",
+    "close": "Stop walking",
+    "view": {
+      "label": "View",
+      "map": "Map",
+      "follow": "Behind",
+      "eyes": "Eyes"
+    },
+    "goTo": "Walk to",
+    "goToPlaceholder": "Building, room or name",
+    "go": "Go",
+    "walking": "Walking…",
+    "standing": "Standing",
+    "near": "Near {place}",
+    "arrived": "Arrived: {place}",
+    "stopped": "Stopped before getting there",
+    "arrows": "Walk",
+    "arrow": {
+      "up": "Walk forward",
+      "down": "Walk back",
+      "left": "Turn left",
+      "right": "Turn right"
+    },
+    "keys": "W A S D or the arrow keys to walk, Shift to hurry. Drag to look round; click a building or the ground to walk there.",
+    "keysTouch": "Hold the arrows to walk. Drag to look round; tap a building or the ground to walk there.",
+    "note": "A made-up figure: it stands for no real person, and where it goes stays in your browser. Doors are not mapped, so it walks to the nearest side of a building, and inside it keeps to corridors where it can.",
+    "inside": "Inside {place}, floor {floor}",
+    "moves": "In and out",
+    "enter": "Go into {place}",
+    "exit": "Go out",
+    "up": "Upstairs",
+    "down": "Downstairs",
+    "wander": "Let it wander",
+    "wanderStop": "Stop wandering"
   }
 }

@@ -23,6 +23,7 @@ import {
   Object3D,
   OrthographicCamera,
   PCFShadowMap,
+  PerspectiveCamera,
   Plane,
   PlaneGeometry,
   Raycaster,
@@ -43,6 +44,10 @@ import { MeshBuilder, drape, ringsBounds } from "./geometry.ts";
 import { SEA_PLANE, Terrain } from "./terrain.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
+import { EYE_HEIGHT } from "./figure.ts";
+import { WalkerWorld } from "./walkers.ts";
+import { WalkMap } from "../shared/walkmap.ts";
+import { floorRings } from "../shared/indoor.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
 
 export interface Selection {
@@ -53,6 +58,9 @@ export interface Selection {
 }
 
 export type Pick = { type: "building"; id: string } | { type: "room"; code: string } | null;
+
+/** How the scene is seen: the model from above, from behind a walker, or through its eyes. */
+export type WalkerView = "map" | "follow" | "eyes";
 
 /** A pin for a room that is known as a point but has no published outline. */
 export interface PinSpec {
@@ -279,12 +287,31 @@ export class CampusScene {
   private pointerDown?: { x: number; y: number; t: number };
   private disposed = false;
 
+  /** The walkers on the map (walkers.ts). */
+  readonly walkers: WalkerWorld;
+  /** Floor outlines in metres, by building and floor, for walkers steered by hand indoors. */
+  private floorRingCache = new Map<string, [number, number][][][]>();
+  private walkMapCache?: WalkMap;
+  /** The camera of the walker views: behind a walker, or at its eyes. */
+  private persp = new PerspectiveCamera(55, 1, 0.3, 6000);
+  private view: WalkerView = "map";
+  private viewWalker?: string;
+  /** Degrees and metres, set by dragging and the wheel in the walker views. */
+  private follow = { yaw: 0, elevation: 16, distance: 7.5 };
+  private eyes = { yaw: 0, pitch: -4 };
+  private drag?: { x: number; y: number; moved: boolean };
+  private lastFrame = 0;
+  private walkerLabelsVersion = -1;
+  /** A click in a walker view: on a University building, or on the ground at a point. */
+  onWalkPick?: (pick: { building?: string; at?: [number, number] }) => void;
+
   constructor(container: HTMLElement, labelRoot: HTMLElement, opts: SceneOptions) {
     this.container = container;
     this.opts = opts;
     this.labels = new LabelLayer(labelRoot);
 
-    this.renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false });
+    // The stencil lets a hidden walker's shape show through what stands in front of it (figure.ts).
+    this.renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: true });
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.lite ? 1.5 : 2));
     this.renderer.shadowMap.enabled = !opts.lite;
@@ -337,6 +364,25 @@ export class CampusScene {
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground, this.contextGroup, this.uniGroup, this.detailGroup, this.pinGroup);
+    this.walkers = new WalkerWorld({
+      groundAt: (x, y) => this.groundAt(x, y),
+      walkMap: () => this.walkMap(),
+      floorTop: (id, i) => {
+        const b = this.buildings.get(id);
+        return b ? this.floorY(b, i) + SLAB + PLAN_FLOOR : undefined;
+      },
+      insideFloor: (id, i, p) => {
+        const b = this.buildings.get(id);
+        if (!b) return false;
+        const key = `${id}:${i}`;
+        let rings = this.floorRingCache.get(key);
+        if (!rings) this.floorRingCache.set(key, (rings = floorRings(b, i)));
+        return rings.some(([outer, ...holes]) => !!outer && pointInRing(p, outer) && !holes.some((h) => pointInRing(p, h)));
+      },
+      rain: () => this.weather?.wet ?? 0,
+      ringColour: () => this.palette.accent,
+    });
+    this.scene.add(this.walkers.group);
 
     this.wallTexture = this.makeWindowTexture("#ffffff", "#93a3ab", { slab: "#ddd6c8", lintel: "#7d8d96", sill: "#e9e3d6" });
     this.glowTexture = this.makeWindowTexture("#000000", "#ffffff");
@@ -348,6 +394,7 @@ export class CampusScene {
     el.addEventListener("pointermove", this.onPointerMove);
     el.addEventListener("pointerleave", this.onPointerLeave);
     el.addEventListener("contextmenu", (e) => e.preventDefault());
+    el.addEventListener("wheel", this.onWheel, { passive: false });
 
     this.resize();
     this.raf = requestAnimationFrame(this.frame);
@@ -359,6 +406,7 @@ export class CampusScene {
 
   setCampus(campus: CampusData): void {
     this.campus = campus;
+    this.walkMapCache = undefined;
     this.buildings.clear();
     this.roomsByBuilding.clear();
     this.roomsByCode.clear();
@@ -449,6 +497,9 @@ export class CampusScene {
 
   setContext(ctx: ContextData): void {
     this.lastContext = ctx;
+    this.walkMapCache = undefined;
+    // A walker steered by hand keeps a grid of the ground round it: rebuild it with the surroundings.
+    this.walkers.refresh();
     this.contextGroup.clear();
     this.contextMaterials = [];
     const terrain = this.terrain;
@@ -811,7 +862,10 @@ export class CampusScene {
     this.renderer.setClearColor(p.sky);
     this.sun.shadow.intensity = 1 - 0.7 * (this.weather?.cloud ?? 0);
     const fog = this.weather?.fog ?? 0;
-    if (fog > 0) {
+    if (this.view !== "map") {
+      // At a walker's height the map has an edge; haze it into the sky, closer in fog.
+      this.scene.fog = new Fog(p.fog, 60 + 340 * (1 - fog), 220 + 1500 * (1 - fog));
+    } else if (fog > 0) {
       // The camera keeps its distance; zooming changes only the frustum. Haze the far side of the view.
       const d = this.camera.position.distanceTo(this.controls.target);
       this.scene.fog = new Fog(p.fog, d - 300 - 900 * (1 - fog), d + 700 - 300 * fog);
@@ -850,7 +904,15 @@ export class CampusScene {
   private fitShadow(): void {
     const cur = this.currentFloor();
     const sc = this.sun.shadow.camera;
-    if (cur) {
+    const walker = this.view !== "map" && this.viewWalker ? this.walkers.pose(this.viewWalker) : undefined;
+    if (walker) {
+      // Crisp shadows round the walker; they follow it as it goes.
+      this.shadowCentre.set(walker.at[0], 0, -walker.at[1]);
+      sc.left = -170;
+      sc.right = 170;
+      sc.top = 170;
+      sc.bottom = -170;
+    } else if (cur) {
       const [x0, z0, x1, z1] = ringsBounds(cur.b.outline);
       const half = Math.max(110, Math.hypot(x1 - x0, z1 - z0) * 1.1);
       this.shadowCentre.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
@@ -1000,6 +1062,13 @@ export class CampusScene {
     return this.terrain?.height(x, y) ?? 0;
   }
 
+  /** What the walkers walk round and along, built when first wanted after the data changes. */
+  private walkMap(): WalkMap | undefined {
+    if (!this.campus) return undefined;
+    this.walkMapCache ??= new WalkMap(this.campus.buildings, this.campus.floorHeight, this.lastContext);
+    return this.walkMapCache;
+  }
+
   /** The ground a University building stands on (see Terrain.footing). */
   private baseOf(b: Building): number {
     return this.footingOf(b).base;
@@ -1033,6 +1102,7 @@ export class CampusScene {
     this.ground.position.y = SEA_PLANE;
     if (this.campus) this.setCampus(this.campus);
     if (this.lastContext) this.setContext(this.lastContext);
+    this.walkers.refresh();
     if (this.selection.building) {
       this.rebuildDetail();
       this.rebuildPin();
@@ -1372,8 +1442,11 @@ export class CampusScene {
         });
       }
     } else {
+      // From a walker's height only the buildings near it are labelled; the rest would crowd the horizon.
+      const near = this.viewWalker ? this.walkers.pose(this.viewWalker)?.at : undefined;
       for (const b of this.campus.buildings) {
         if (b.offMap) continue;
+        if (near && Math.hypot(b.center[0] - near[0], b.center[1] - near[1]) > 260) continue;
         const l = this.opts.buildingLabel(b);
         const badge = this.badges.get(b.id);
         specs.push({
@@ -1391,6 +1464,7 @@ export class CampusScene {
         });
       }
     }
+    specs.push(...this.walkers.labels());
     this.labels.set(specs);
     this.needsLabels = true;
     this.needsRender = true;
@@ -1564,6 +1638,153 @@ export class CampusScene {
   }
 
   // -------------------------------------------------------------------------------------------
+  // Walkers
+  // -------------------------------------------------------------------------------------------
+
+  /** What the walkers walk round and along, for the walker commands. */
+  walkingMap(): WalkMap | undefined {
+    return this.walkMap();
+  }
+
+  /** The view now: from above, or behind or through the eyes of a walker. */
+  get walkerView(): WalkerView {
+    return this.view;
+  }
+
+  /** Which walker the walker views follow. */
+  get viewedWalker(): string | undefined {
+    return this.viewWalker;
+  }
+
+  /**
+   * Switches between the model seen from above and the views that go with a walker: from behind
+   * it, or through its eyes, in perspective at its height. Back on the map, the camera flies to
+   * where the walker got to.
+   */
+  setWalkerView(view: WalkerView, name?: string): void {
+    if (view !== "map" && (!name || !this.walkers.has(name))) view = "map";
+    const was = this.viewWalker;
+    if (was) {
+      this.walkers.figure(was)?.setHeadVisible(true);
+      this.walkers.figure(was)?.setRingVisible(true);
+    }
+    const from = this.view;
+    this.view = view;
+    this.viewWalker = view === "map" ? undefined : name;
+    this.controls.enabled = view === "map";
+    if (view === "eyes") {
+      this.walkers.figure(name!)?.setHeadVisible(false);
+      this.walkers.figure(name!)?.setRingVisible(false);
+      this.eyes = { yaw: 0, pitch: -4 };
+    }
+    if (view === "follow" && from !== "follow") this.follow = { yaw: 0, elevation: 16, distance: 7.5 };
+    if (view === "map" && from !== "map" && was) {
+      const pose = this.walkers.pose(was);
+      if (pose) this.flyTo(new Vector3(pose.at[0], pose.height, -pose.at[1]), Math.max(this.camera.zoom, 4), false);
+    }
+    this.renderer.domElement.style.cursor = view === "map" ? "" : "grab";
+    this.applyPalette();
+    this.fitShadow();
+    this.rebuildLabels();
+    this.placeWalkerCamera(1);
+    this.needsShadow = true;
+    this.needsRender = true;
+    this.needsLabels = true;
+  }
+
+  /** The walker view's camera, following its walker; `dt` seconds since the last frame. */
+  private placeWalkerCamera(dt: number): void {
+    if (this.view === "map") return;
+    const pose = this.viewWalker ? this.walkers.pose(this.viewWalker) : undefined;
+    if (!pose) {
+      this.setWalkerView("map");
+      return;
+    }
+    const [x, y] = pose.at;
+    if (this.view === "eyes") {
+      const yaw = ((pose.heading + this.eyes.yaw) * Math.PI) / 180;
+      const pitch = (this.eyes.pitch * Math.PI) / 180;
+      this.persp.position.set(x, pose.height + EYE_HEIGHT, -y);
+      this.persp.lookAt(x + Math.sin(yaw) * Math.cos(pitch), pose.height + EYE_HEIGHT + Math.sin(pitch), -y - Math.cos(yaw) * Math.cos(pitch));
+    } else {
+      const yaw = ((pose.heading + this.follow.yaw) * Math.PI) / 180;
+      const up = (this.follow.elevation * Math.PI) / 180;
+      let d = this.follow.distance;
+      // A wall between the walker and the camera would hide it: the camera comes in front of the wall.
+      let blocked = false;
+      const reach = Math.cos(up) * d;
+      const map = pose.indoor ? undefined : this.walkMap();
+      if (map && reach > 1) {
+        const t = map.wallAlong([x, y], [x - Math.sin(yaw) * reach, y - Math.cos(yaw) * reach]);
+        if (t !== undefined) {
+          d = Math.max(1.2, (t * reach - 0.6) / Math.cos(up));
+          blocked = true;
+        }
+      }
+      let cy = pose.height + 1.5 + Math.sin(up) * d;
+      const cx = x - Math.sin(yaw) * Math.cos(up) * d;
+      const cn = y - Math.cos(yaw) * Math.cos(up) * d;
+      // Never under the ground behind a walker on a slope.
+      cy = Math.max(cy, this.groundAt(cx, cn) + 0.8);
+      // It glides after the walker, but out from behind a wall at once.
+      const k = dt >= 1 || blocked ? 1 : 1 - Math.exp(-dt * 7);
+      const want = new Vector3(cx, cy, -cn);
+      if (k >= 1) this.persp.position.copy(want);
+      else this.persp.position.lerp(want, k);
+      this.persp.lookAt(x + Math.sin(yaw) * 2, pose.height + 1.35, -y - Math.cos(yaw) * 2);
+    }
+    this.persp.updateMatrixWorld();
+    // The shadows follow the walker round the map.
+    if (Math.hypot(this.shadowCentre.x - x, this.shadowCentre.z + y) > 70) this.fitShadow();
+    // Draw only when the view moved: a walker standing still in a still view costs nothing.
+    const e = this.persp.matrixWorld.elements;
+    const moved = !this.lastView || e.some((v, i) => Math.abs(v - this.lastView![i]!) > 1e-5);
+    if (moved || dt >= 1) {
+      this.lastView = e.slice();
+      this.needsRender = true;
+      this.needsLabels = true;
+    }
+  }
+  /** The walker view's camera matrix when last drawn. */
+  private lastView?: number[];
+
+  /** Turns the walker view by a drag of the pointer, in pixels. */
+  private turnWalkerView(dx: number, dy: number): void {
+    if (this.view === "eyes") {
+      this.eyes.yaw = (((this.eyes.yaw + dx * 0.25) % 360) + 360) % 360;
+      this.eyes.pitch = Math.max(-60, Math.min(50, this.eyes.pitch - dy * 0.2));
+    } else if (this.view === "follow") {
+      this.follow.yaw = (((this.follow.yaw - dx * 0.3) % 360) + 360) % 360;
+      this.follow.elevation = Math.max(-5, Math.min(70, this.follow.elevation + dy * 0.2));
+    }
+    this.needsRender = true;
+  }
+
+  /** Looks round in the walker view, degrees from straight ahead: for agents and tests. */
+  setWalkerLook(yaw: number, pitch = 0): void {
+    if (this.view === "eyes") this.eyes = { yaw: ((yaw % 360) + 360) % 360, pitch: Math.max(-60, Math.min(50, pitch)) };
+    else if (this.view === "follow") this.follow = { ...this.follow, yaw: ((yaw % 360) + 360) % 360, elevation: Math.max(-5, Math.min(70, 16 + pitch)) };
+    this.placeWalkerCamera(1);
+  }
+
+  private onWheel = (e: WheelEvent): void => {
+    if (this.view !== "follow") return;
+    e.preventDefault();
+    this.follow.distance = Math.max(2.5, Math.min(40, this.follow.distance * Math.exp(e.deltaY * 0.0012)));
+    this.needsRender = true;
+  };
+
+  /** Where a click in a walker view sends the walker: a University building, or a point on the ground. */
+  private walkPickAt(clientX: number, clientY: number): { building?: string; at?: [number, number] } | undefined {
+    const { pick } = this.probeAt(clientX, clientY);
+    if (pick?.type === "building") return { building: pick.id };
+    const hits = this.raycaster.intersectObjects([...this.terrainMeshes, this.ground], false);
+    const hit = hits[0];
+    if (!hit || hit.distance > 1500) return undefined;
+    return { at: [hit.point.x, -hit.point.z] };
+  }
+
+  // -------------------------------------------------------------------------------------------
   // Picking
   // -------------------------------------------------------------------------------------------
 
@@ -1578,7 +1799,7 @@ export class CampusScene {
   private probeAt(clientX: number, clientY: number): { pick: Pick; space?: SpaceType } {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
-    this.raycaster.setFromCamera(ndc, this.camera);
+    this.raycaster.setFromCamera(ndc, this.activeCamera);
     const targets: Object3D[] = [];
     for (const m of this.roomMeshes.values()) targets.push(m);
     for (const m of this.buildingMeshes.values()) if (m.visible) targets.push(m);
@@ -1618,10 +1839,27 @@ export class CampusScene {
   }
 
   private onPointerDown = (e: PointerEvent): void => {
+    if (this.view !== "map") {
+      // A drag turns the walker view; a click sends the walker.
+      this.drag = { x: e.clientX, y: e.clientY, moved: false };
+      this.renderer.domElement.setPointerCapture?.(e.pointerId);
+      this.renderer.domElement.style.cursor = "grabbing";
+      return;
+    }
     this.pointerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
   };
 
   private onPointerUp = (e: PointerEvent): void => {
+    if (this.view !== "map") {
+      const drag = this.drag;
+      this.drag = undefined;
+      this.renderer.domElement.style.cursor = "grab";
+      if (drag && !drag.moved && e.button === 0) {
+        const pick = this.walkPickAt(e.clientX, e.clientY);
+        if (pick) this.onWalkPick?.(pick);
+      }
+      return;
+    }
     const d = this.pointerDown;
     this.pointerDown = undefined;
     if (!d || e.button !== 0) return;
@@ -1644,6 +1882,18 @@ export class CampusScene {
 
   private lastHoverCheck = 0;
   private onPointerMove = (e: PointerEvent): void => {
+    if (this.view !== "map") {
+      const drag = this.drag;
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+      drag.moved = true;
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      this.turnWalkerView(dx, dy);
+      return;
+    }
     if (e.pointerType !== "mouse" || this.pointerDown) return;
     const now = performance.now();
     if (now - this.lastHoverCheck < 40) return;
@@ -1698,6 +1948,8 @@ export class CampusScene {
     this.camera.top = VIEW_HEIGHT / 2;
     this.camera.bottom = -VIEW_HEIGHT / 2;
     this.renderer.setSize(w, h);
+    this.persp.aspect = aspect;
+    this.persp.updateProjectionMatrix();
     this.applyViewShift();
     this.needsRender = true;
     this.needsLabels = true;
@@ -1706,6 +1958,10 @@ export class CampusScene {
   private frame = (now: number): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
+    // Walkers move by the clock, not by frames: on a slow renderer a frame can take a second, and
+    // a walk must still take as long as it takes. A long gap (a hidden tab) counts as two seconds.
+    const dt = this.lastFrame ? Math.min(2, (now - this.lastFrame) / 1000) : 0;
+    this.lastFrame = now;
     if (this.tweens.length) {
       this.tweens = this.tweens.filter((t) => {
         const k = Math.min(1, (now - t.start) / t.duration);
@@ -1714,7 +1970,18 @@ export class CampusScene {
         return k < 1;
       });
     }
-    this.controls.update();
+    if (this.walkers.size) {
+      if (this.walkers.step(dt, now)) {
+        this.needsRender = true;
+        this.needsLabels = true;
+      }
+      if (this.walkers.labelsVersion !== this.walkerLabelsVersion) {
+        this.walkerLabelsVersion = this.walkers.labelsVersion;
+        this.rebuildLabels();
+      }
+    }
+    if (this.view === "map") this.controls.update();
+    else this.placeWalkerCamera(dt);
     if (!this.needsRender) return;
     this.needsRender = false;
     if (this.needsShadow && this.renderer.shadowMap.enabled) {
@@ -1724,26 +1991,32 @@ export class CampusScene {
     this.draw();
     if (this.needsLabels) {
       this.needsLabels = false;
-      this.labels.update(this.camera, this.width, this.height);
+      this.labels.update(this.activeCamera, this.width, this.height);
     }
     this.frames++;
   };
 
+  /** The camera the picture is drawn with. */
+  private get activeCamera(): OrthographicCamera | PerspectiveCamera {
+    return this.view === "map" ? this.camera : this.persp;
+  }
+
   /** A frame of the scene, with an open floor below the ground drawn through it. */
   private draw(): void {
-    this.renderer.render(this.scene, this.camera);
+    const camera = this.activeCamera;
+    this.renderer.render(this.scene, camera);
     if (!this.openBelowGround) return;
     // The open floor again, over the picture, and then the ground over that, see-through.
     const shown = this.scene.children.map((c) => c.visible);
     const only = (keep: (o: Object3D) => boolean) => this.scene.children.forEach((c, k) => (c.visible = shown[k]! && (keep(c) || (c as DirectionalLight).isLight === true)));
     this.renderer.autoClear = false;
     this.renderer.clearDepth();
-    only((c) => c === this.detailGroup || c === this.pinGroup);
-    this.renderer.render(this.scene, this.camera);
+    only((c) => c === this.detailGroup || c === this.pinGroup || c === this.walkers.group);
+    this.renderer.render(this.scene, camera);
     only((c) => c === this.ground || this.terrainMeshes.includes(c as Mesh));
     this.groundVeil.color.setHex(this.palette.ground);
     this.scene.overrideMaterial = this.groundVeil;
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.render(this.scene, camera);
     this.scene.overrideMaterial = null;
     this.scene.children.forEach((c, k) => (c.visible = shown[k]!));
     this.renderer.autoClear = true;
@@ -1943,7 +2216,7 @@ export class CampusScene {
     const v = new Vector3();
     const rect0 = this.renderer.domElement.getBoundingClientRect();
     const toPage = (p: Vector3) => {
-      p.project(this.camera);
+      p.project(this.activeCamera);
       return { x: rect0.left + (p.x * 0.5 + 0.5) * rect0.width, y: rect0.top + (-p.y * 0.5 + 0.5) * rect0.height };
     };
     if (kind === "building") {
@@ -1970,7 +2243,7 @@ export class CampusScene {
       if (!r || !mesh) return undefined;
       v.set(r.c[0], mesh.position.y + mesh.scale.y, -r.c[1]);
     }
-    v.project(this.camera);
+    v.project(this.activeCamera);
     const rect = this.renderer.domElement.getBoundingClientRect();
     return { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
   }
@@ -1993,6 +2266,7 @@ export class CampusScene {
 
   dispose(): void {
     this.disposed = true;
+    this.walkers.clear();
     cancelAnimationFrame(this.raf);
     this.controls.dispose();
     this.renderer.dispose();

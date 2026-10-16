@@ -1830,6 +1830,297 @@ select optgroup {
   }
 }
 
+/* ---- The walker: a made-up figure to walk the campus with ---------------------------------- */
+
+.walk-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  margin-top: 9px;
+  padding: 0 12px 0 9px;
+  border: 1px solid rgba(255, 180, 84, 0.5);
+  border-radius: 999px;
+  background: rgba(255, 180, 84, 0.12);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.walk-start:hover {
+  background: rgba(255, 180, 84, 0.22);
+}
+
+.walker-panel {
+  position: absolute;
+  z-index: 25;
+  right: var(--gap);
+  bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(330px, calc(100vw - 2 * var(--gap)));
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+}
+
+.walker-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.walker-head h2 {
+  color: var(--accent);
+  font: 700 16px/1.2 var(--font-display);
+}
+
+.walker-where {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.walker-views {
+  display: flex;
+  gap: 4px;
+}
+
+.walker-views button {
+  flex: 1;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.walker-views button:hover {
+  color: var(--text);
+}
+
+.walker-views button.on {
+  border-color: var(--accent);
+  background: rgba(255, 180, 84, 0.1);
+  color: var(--accent);
+}
+
+.walker-moves {
+  display: flex;
+  gap: 4px;
+}
+
+.walker-moves button {
+  flex: 1;
+  height: 30px;
+  border: 1px solid rgba(110, 211, 200, 0.45);
+  border-radius: 8px;
+  background: rgba(110, 211, 200, 0.1);
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.walker-moves button:hover {
+  background: rgba(110, 211, 200, 0.2);
+}
+
+.walker-go {
+  display: flex;
+  gap: 6px;
+}
+
+.walker-go input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.walker-go .btn {
+  height: 34px;
+  box-shadow: none;
+}
+
+.walker-message {
+  color: var(--teal);
+  font-size: 12px;
+}
+
+.walker-wander {
+  height: 30px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.walker-wander:hover,
+.walker-wander.on {
+  border-style: solid;
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.walker-keys,
+.walker-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.walker-note {
+  color: #8496a3;
+}
+
+.walker-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(2, 40px);
+  gap: 4px;
+  justify-content: center;
+}
+
+.walker-arrow {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  touch-action: none;
+  user-select: none;
+}
+
+.walker-arrow:active {
+  background: rgba(255, 180, 84, 0.25);
+}
+
+.walker-arrow span {
+  width: 0;
+  height: 0;
+  border: 8px solid transparent;
+}
+
+.arrow-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.arrow-up span {
+  border-top-width: 0;
+  border-bottom-color: var(--text);
+}
+.arrow-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.arrow-left span {
+  border-left-width: 0;
+  border-right-color: var(--text);
+}
+.arrow-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+.arrow-right span {
+  border-right-width: 0;
+  border-left-color: var(--text);
+}
+.arrow-down {
+  grid-column: 2;
+  grid-row: 2;
+}
+.arrow-down span {
+  border-bottom-width: 0;
+  border-top-color: var(--text);
+}
+
+/* The walker's name over its head, in the site's amber, and what it says in a bubble above. */
+.lbl-walker {
+  border-color: transparent;
+  background: rgba(255, 180, 84, 0.94);
+  color: var(--accent-ink);
+}
+
+.lbl-say {
+  max-width: 240px;
+  padding: 5px 10px;
+  border-color: rgba(26, 18, 6, 0.12);
+  border-radius: 12px;
+  background: #fffdf6;
+  color: #1a1206;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+/* In a building the floor list takes the right-hand side, so the walker's panel stands beside the
+   building's dock instead. */
+@media (min-width: 721px) {
+  .walking.in-building .walker-panel {
+    right: auto;
+    left: calc(min(410px, 100vw - 2 * var(--gap)) + 2 * var(--gap));
+    bottom: var(--gap);
+  }
+
+  /* Short, so that it stays below the walker in the view from behind. */
+  .walking.in-building .walker-panel :is(.walker-keys, .walker-note, .walker-wander) {
+    display: none;
+  }
+}
+
+/* A picture of the view for an agent (scripts/walker): the panels step aside, the labels stay. */
+.shot-clean .topbar,
+.shot-clean .walker-panel,
+.shot-clean .status,
+.shot-clean .dock,
+.shot-clean .attribution,
+.shot-clean .space-tip,
+.shot-clean .panel {
+  visibility: hidden;
+}
+
+@media (max-width: 720px) {
+  .walker-panel {
+    top: calc(var(--top) + 4px);
+    right: var(--gap);
+    bottom: auto;
+    left: var(--gap);
+    width: auto;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .walker-keys,
+  .walker-note {
+    display: none;
+  }
+
+  .walker-pad {
+    grid-template-columns: repeat(3, 52px);
+    grid-template-rows: repeat(2, 42px);
+  }
+
+  .walking.in-building .walker-panel .walker-go {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

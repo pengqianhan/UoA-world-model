@@ -205,7 +205,7 @@ test("4. Now follows Auckland time; Preview takes any day and time; non-teaching
   await expect(panel.locator(".status-line")).toContainText("teaching week");
 
   // Back to Now.
-  await panel.getByRole("button", { name: "Now" }).click();
+  await panel.getByRole("button", { name: "Now", exact: true }).click();
   await expect(chip.locator(".chip-mode")).toHaveText("Now");
   expect(params(page).get("time")).toBeNull();
 });

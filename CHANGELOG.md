@@ -16,6 +16,22 @@ A change to what the site does or shows adds its line here, and the README's
 
 ## 2026-10-17
 
+### Added
+
+- **A walker on the map.** "Take a walk" puts a small made-up person near the Clock Tower, to walk
+  with the keyboard or the arrows on a phone. Its body, which walks, runs and stands at ease, is
+  Quaternius's "Animated Human", given to the public domain (CC0). Its walks keep round the
+  buildings, water and tree trunks and to OpenStreetMap's paths and streets, and end beside a
+  building's nearest wall, as doors are not mapped. It goes into a building at street level, takes
+  the nearest stairs or lift, and walks to a room keeping to corridors where it can, the building
+  view following it. It can wander on its own from building to building. It is seen from above, from
+  behind or through its eyes, says things in a bubble that other walkers near it hear, and opens an
+  umbrella when Open-Meteo reports rain. Every walker looks the same: a student in a long-sleeved
+  top and trainers, with a backpack on both shoulders, with nothing meant to mark a sex or a gender.
+  Behind it, the camera stops in front of a wall, and where a building or a tree hides it, its shape
+  shows through. Claude Code and other agents steer it with `npm run walker`, an MCP server or the
+  `campus-walker` skill, all on the user's own computer (#40).
+
 ### Fixed
 
 - **About said the site has no analytics.** At campusworldmodel.com, Cloudflare, which serves the

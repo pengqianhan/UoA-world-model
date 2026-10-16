@@ -12,4 +12,8 @@ their terms:
 - What the site takes from the University of Auckland's public campus map and Calendar
   (buildings, floors, rooms, room types, key dates) remains the University of Auckland's copyright.
 
+public/models/walker.glb, the walker's figure, is made from "Animated Human" by Quaternius
+(https://opengameart.org/content/animated-human-low-poly), which its author dedicated to the public
+domain under CC0 1.0. It is credited here although CC0 asks for no credit.
+
 README.md, "Data sources and licences", gives each source with its terms and how it is used.

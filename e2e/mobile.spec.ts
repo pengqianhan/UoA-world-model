@@ -134,3 +134,36 @@ test("phone: the way to other worlds sits in the status strip, inside the screen
   await expect(flight).toHaveCount(0);
   await expect(page.locator("#status-strip")).toBeVisible();
 });
+
+test("phone: a walk fits the screen, under the top bar, and holding the arrow walks the figure forward", async ({ page }) => {
+  await open(page, "?light=day&time=preview&date=2026-03-20&t=15:00");
+  await page.locator("#walk-start").click();
+  const panel = page.locator("#walker-panel");
+  await expect(panel).toBeVisible();
+  const box = (await panel.boundingBox())!;
+  const top = (await page.locator(".topbar").boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  expect(box.y).toBeGreaterThanOrEqual(top.y + top.height);
+  expect(box.y + box.height).toBeLessThan(500);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  const at = () =>
+    page.evaluate(async () => {
+      const r = (await (window as unknown as { __walker: { run(c: string): Promise<{ walkers: { at: [number, number] }[] }> } }).__walker.run("list")) as { walkers: { at: [number, number] }[] };
+      return r.walkers[0]!.at;
+    });
+  const from = await at();
+  const up = page.locator(".walker-arrow.arrow-up");
+  await expect(up).toBeVisible();
+  const b = (await up.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(900);
+  await page.mouse.up();
+  const to = await at();
+  expect(Math.hypot(to[0] - from[0], to[1] - from[1])).toBeGreaterThan(0.3);
+  await page.locator('#walker-panel button[data-view="follow"]').click();
+  await page.waitForTimeout(400);
+  await expectRealRender(page);
+  await shot(page, "20-walker-phone");
+});
