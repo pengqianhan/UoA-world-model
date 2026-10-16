@@ -310,7 +310,8 @@ export class CampusScene {
     this.opts = opts;
     this.labels = new LabelLayer(labelRoot);
 
-    this.renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false });
+    // The stencil lets a hidden walker's shape show through what stands in front of it (figure.ts).
+    this.renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: true });
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.lite ? 1.5 : 2));
     this.renderer.shadowMap.enabled = !opts.lite;
@@ -1708,13 +1709,25 @@ export class CampusScene {
     } else {
       const yaw = ((pose.heading + this.follow.yaw) * Math.PI) / 180;
       const up = (this.follow.elevation * Math.PI) / 180;
-      const d = this.follow.distance;
+      let d = this.follow.distance;
+      // A wall between the walker and the camera would hide it: the camera comes in front of the wall.
+      let blocked = false;
+      const reach = Math.cos(up) * d;
+      const map = pose.indoor ? undefined : this.walkMap();
+      if (map && reach > 1) {
+        const t = map.wallAlong([x, y], [x - Math.sin(yaw) * reach, y - Math.cos(yaw) * reach]);
+        if (t !== undefined) {
+          d = Math.max(1.2, (t * reach - 0.6) / Math.cos(up));
+          blocked = true;
+        }
+      }
       let cy = pose.height + 1.5 + Math.sin(up) * d;
       const cx = x - Math.sin(yaw) * Math.cos(up) * d;
       const cn = y - Math.cos(yaw) * Math.cos(up) * d;
       // Never under the ground behind a walker on a slope.
       cy = Math.max(cy, this.groundAt(cx, cn) + 0.8);
-      const k = dt >= 1 ? 1 : 1 - Math.exp(-dt * 7);
+      // It glides after the walker, but out from behind a wall at once.
+      const k = dt >= 1 || blocked ? 1 : 1 - Math.exp(-dt * 7);
       const want = new Vector3(cx, cy, -cn);
       if (k >= 1) this.persp.position.copy(want);
       else this.persp.position.lerp(want, k);

@@ -136,6 +136,15 @@ describe("the walking map", () => {
     expect(plan.metres).toBeGreaterThan(100);
   });
 
+  it("finds the first wall on a line, for the camera behind a walker", () => {
+    // From the gap between the two buildings, west into 101's east wall at x = 40.
+    expect(map.wallAlong([50, 5], [30, 5])).toBeCloseTo(0.5);
+    // The surrounding building at 60-80 is a wall too; the bridge, 6 m up, is not.
+    expect(map.wallAlong([50, 15], [70, 15])).toBeCloseTo(0.5);
+    // Water and open ground are no wall.
+    expect(map.wallAlong([50, 55], [50, 90])).toBeUndefined();
+  });
+
   it("knows which building's ground a point is on", () => {
     expect(map.buildingAt([10, 10])).toBe("101");
     expect(map.buildingAt([50, 15])).toBeUndefined();

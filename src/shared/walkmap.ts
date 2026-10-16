@@ -83,6 +83,8 @@ export class WalkMap {
   /** University buildings by id: what stands on the ground of each. */
   readonly footprints = new Map<string, Ring[][]>();
   private obstacles: Shape[] = [];
+  /** The buildings among the obstacles, which a camera behind a walker keeps in front of. */
+  private walls: Shape[] = [];
   private greens: Shape[] = [];
   private lines: Line[] = [];
 
@@ -96,11 +98,14 @@ export class WalkMap {
       this.footprints.set(b.id, polys);
       for (const rings of polys) if (rings[0]?.length) this.obstacles.push(shapeOf(rings));
     }
+    this.walls = [...this.obstacles];
     if (!context) return;
     for (const cb of context.buildings) {
       // A part that starts above the ground (an overhang, a bridge) is walked under.
       if (cb.b) continue;
-      this.obstacles.push(shapeOf([decodeRing(cb.p)]));
+      const shape = shapeOf([decodeRing(cb.p)]);
+      this.obstacles.push(shape);
+      this.walls.push(shape);
     }
     for (const a of context.areas) {
       const rings = [decodeRing(a.p)];
@@ -255,6 +260,34 @@ export class WalkMap {
       }
     }
     return undefined;
+  }
+
+  /**
+   * How far along the line from `from` to `to` (0 to 1) it first meets the wall of a building, or
+   * undefined when it meets none. The camera behind a walker stops short of that wall.
+   */
+  wallAlong(from: Pt, to: Pt): number | undefined {
+    const box: [number, number, number, number] = [Math.min(from[0], to[0]), Math.min(from[1], to[1]), Math.max(from[0], to[0]), Math.max(from[1], to[1])];
+    const dx = to[0] - from[0];
+    const dy = to[1] - from[1];
+    let first: number | undefined;
+    for (const s of this.walls) {
+      if (!overlaps(s.box, box)) continue;
+      for (const ring of s.rings) {
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const [ax, ay] = ring[j]!;
+          const [bx, by] = ring[i]!;
+          const ex = bx - ax;
+          const ey = by - ay;
+          const den = dx * ey - dy * ex;
+          if (Math.abs(den) < 1e-9) continue;
+          const t = ((ax - from[0]) * ey - (ay - from[1]) * ex) / den;
+          const u = ((ax - from[0]) * dy - (ay - from[1]) * dx) / den;
+          if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && (first === undefined || t < first)) first = t;
+        }
+      }
+    }
+    return first;
   }
 
   /** Metres from a point to a University building's walls; 0 inside. */
