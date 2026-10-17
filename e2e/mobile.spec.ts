@@ -1,6 +1,6 @@
 // Criterion 6: on a 390 px wide phone the campus is visible and search leads to building and room details.
-import { expect, test } from "@playwright/test";
-import { expectRealRender, open, params, settle, shot } from "./helpers.ts";
+import { expect, test, type Page } from "@playwright/test";
+import { expectRealRender, open, openStrip, params, settle, shot } from "./helpers.ts";
 
 test("6. phone: search for a room and see the building and class information", async ({ page }) => {
   await open(page, "?light=day");
@@ -9,7 +9,9 @@ test("6. phone: search for a room and see the building and class information", a
   // Nothing may overflow the viewport horizontally.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await expect(page.locator(".brand-name")).toBeVisible();
-  await expect(page.locator("#status-strip")).toContainText("Semester");
+  // The campus panel waits as a button, so the campus has the screen.
+  await expect(page.locator("#status-toggle")).toBeVisible();
+  await expect(page.locator("#status-strip")).toBeHidden();
   await shot(page, "06-mobile-campus");
 
   await page.locator("#search-button").tap();
@@ -114,6 +116,7 @@ test("phone: the way to other worlds sits in the status strip, inside the screen
   for (const width of [390, 360]) {
     await page.setViewportSize({ width, height: 780 });
     await open(page, "?light=day");
+    await openStrip(page);
     const link = page.locator('#status-strip a[data-world="tsinghua"]');
     await expect(link).toBeVisible();
     const box = (await link.boundingBox())!;
@@ -135,35 +138,166 @@ test("phone: the way to other worlds sits in the status strip, inside the screen
   await expect(page.locator("#status-strip")).toBeVisible();
 });
 
-test("phone: a walk fits the screen, under the top bar, and holding the arrow walks the figure forward", async ({ page }) => {
+/**
+ * Fingers on the screen through the browser itself, so that two can be down at once, as two thumbs
+ * are. The browser lifts them all together: it has no way to lift one and leave the other down.
+ */
+async function fingers(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  const down = new Map<number, { x: number; y: number }>();
+  const send = (type: "touchStart" | "touchMove" | "touchEnd") =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [...down].map(([id, p]) => ({ id, ...p })) });
+  return {
+    async down(id: number, x: number, y: number) {
+      down.set(id, { x, y });
+      await send("touchStart");
+    },
+    async move(id: number, x: number, y: number, steps = 1) {
+      const from = down.get(id)!;
+      for (let i = 1; i <= steps; i++) {
+        down.set(id, { x: from.x + ((x - from.x) * i) / steps, y: from.y + ((y - from.y) * i) / steps });
+        await send("touchMove");
+        await page.waitForTimeout(30);
+      }
+    },
+    async lift() {
+      down.clear();
+      await send("touchEnd");
+    },
+  };
+}
+
+async function walkerAt(page: Page): Promise<[number, number]> {
+  const r = (await page.evaluate(() => window.__walker!.run("list"))) as { walkers: { at: [number, number] }[] };
+  return r.walkers[0]!.at;
+}
+
+/** A look's turn from straight ahead, -180 to 180 degrees. */
+const offAhead = (yaw: number) => ((((yaw + 180) % 360) + 360) % 360) - 180;
+
+test("phone: a walk is steered with two thumbs, as in a game: a stick walks and turns the walker while the other thumb drags the view round", async ({ page }) => {
   await open(page, "?light=day&time=preview&date=2026-03-20&t=15:00");
+  await openStrip(page);
   await page.locator("#walk-start").click();
+  await page.waitForFunction(() => window.__walker?.ready(), undefined, { timeout: 30_000 });
   const panel = page.locator("#walker-panel");
   await expect(panel).toBeVisible();
-  const box = (await panel.boundingBox())!;
+  // On a touch screen the walk starts from behind the walker.
+  await expect(panel.locator('button[data-view="follow"]')).toHaveAttribute("aria-pressed", "true");
+  // A bar under the top bar takes a slice of the screen; the rest of the panel waits behind a button.
+  const bar = (await panel.boundingBox())!;
   const top = (await page.locator(".topbar").boundingBox())!;
-  expect(box.x).toBeGreaterThanOrEqual(0);
-  expect(box.x + box.width).toBeLessThanOrEqual(390);
-  expect(box.y).toBeGreaterThanOrEqual(top.y + top.height);
-  expect(box.y + box.height).toBeLessThan(500);
+  expect(bar.x).toBeGreaterThanOrEqual(0);
+  expect(bar.x + bar.width).toBeLessThanOrEqual(390);
+  expect(bar.y).toBeGreaterThanOrEqual(top.y + top.height);
+  expect(bar.height).toBeLessThan(844 * 0.13);
+  await expect(page.locator("#walker-to")).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  const at = () =>
-    page.evaluate(async () => {
-      const r = (await (window as unknown as { __walker: { run(c: string): Promise<{ walkers: { at: [number, number] }[] }> } }).__walker.run("list")) as { walkers: { at: [number, number] }[] };
-      return r.walkers[0]!.at;
-    });
-  const from = await at();
-  const up = page.locator(".walker-arrow.arrow-up");
-  await expect(up).toBeVisible();
-  const b = (await up.boundingBox())!;
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(900);
-  await page.mouse.up();
-  const to = await at();
-  expect(Math.hypot(to[0] - from[0], to[1] - from[1])).toBeGreaterThan(0.3);
-  await page.locator('#walker-panel button[data-view="follow"]').click();
+  // The stick in the bottom left corner, for the left thumb, above the attribution.
+  const stick = (await page.locator("#walker-stick").boundingBox())!;
+  expect(stick.x).toBeLessThan(24);
+  expect(stick.y).toBeGreaterThan(844 * 0.7);
+  expect(stick.y + stick.height).toBeLessThan(844 - 20);
+
+  // Two thumbs at once: the left pushes the stick forward while the right drags the view round.
+  const touch = await fingers(page);
+  const from = await walkerAt(page);
+  const sx = stick.x + stick.width / 2;
+  const sy = stick.y + stick.height / 2;
+  await touch.down(1, sx, sy);
+  await touch.move(1, sx, sy - stick.height / 2, 4);
   await page.waitForTimeout(400);
+  await touch.down(2, 300, 450);
+  await touch.move(2, 180, 450, 6);
+  await page.waitForTimeout(200);
+  const turned = offAhead((await page.evaluate(() => window.__scene!.walkerLook())).yaw);
+  expect(Math.abs(turned), "the right thumb turned the view").toBeGreaterThan(15);
+  const mid = await walkerAt(page);
+  expect(Math.hypot(mid[0] - from[0], mid[1] - from[1]), "the left thumb walked it meanwhile").toBeGreaterThan(1);
+  await touch.lift();
+  // Walked on again, the view comes back round behind the walker, as in a game.
+  await touch.down(1, sx, sy);
+  await touch.move(1, sx, sy - stick.height / 2, 4);
+  await page.waitForTimeout(1500);
+  const settled = offAhead((await page.evaluate(() => window.__scene!.walkerLook())).yaw);
+  await touch.lift();
+  expect(Math.abs(settled)).toBeLessThan(Math.abs(turned) * 0.7);
   await expectRealRender(page);
   await shot(page, "20-walker-phone");
+
+  // Pushed to the side, the stick turns the walker on the spot.
+  const heading = async () => ((await page.evaluate(() => window.__walker!.run("list"))) as { walkers: { heading: number }[] }).walkers[0]!.heading;
+  const before = await heading();
+  await touch.down(1, sx, sy);
+  await touch.move(1, sx + stick.width / 2, sy, 3);
+  await page.waitForTimeout(700);
+  await touch.lift();
+  expect(offAhead((await heading()) - before)).toBeGreaterThan(20);
+
+  // The rest waits behind its button: a walk to a place, wandering, and how to steer.
+  await page.locator("#walker-more").tap();
+  await expect(page.locator("#walker-to")).toBeVisible();
+  await expect(page.locator("#walker-menu")).toContainText("Push the stick");
+  await shot(page, "20-walker-phone-menu");
+  await page.locator("#walker-more").tap();
+  await expect(page.locator("#walker-to")).toBeHidden();
+
+  // Beside a building, the way in is under the right thumb.
+  expect(((await page.evaluate(() => window.__walker!.run("walk", { to: "109", speed: 40 }))) as { arrived: boolean }).arrived).toBe(true);
+  const enter = page.locator("#walker-enter");
+  await expect(enter).toBeVisible();
+  const e = (await enter.boundingBox())!;
+  expect(e.x + e.width).toBeGreaterThan(390 - 30);
+  expect(e.y).toBeGreaterThan(844 * 0.7);
+  await enter.tap();
+  await expect.poll(() => params(page).get("building")).toBe("109");
+  await settle(page);
+  // Inside, the floor strip stays in sight above the bar, and the thumbs' controls stand above the building's card.
+  const floors = (await page.locator(".floors").boundingBox())!;
+  expect((await panel.boundingBox())!.y).toBeGreaterThanOrEqual(floors.y + floors.height);
+  const dock = (await page.locator("#building-bar").boundingBox())!;
+  const lifted = (await page.locator("#walker-stick").boundingBox())!;
+  expect(lifted.y + lifted.height).toBeLessThanOrEqual(dock.y);
+  for (const id of ["#walker-up", "#walker-down", "#walker-exit"]) {
+    const b = (await page.locator(id).boundingBox())!;
+    expect(b.y + b.height, id).toBeLessThanOrEqual(dock.y);
+  }
+  await expectRealRender(page);
+  await shot(page, "20-walker-phone-inside");
+});
+
+test("phone on its side: the map keeps the screen, and a walk puts the stick under the left thumb, clear of the bar", async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await open(page, "?light=day&time=preview&date=2026-03-20&t=15:00");
+  await expect(page.locator("#status-strip")).toBeHidden();
+  const toggle = (await page.locator("#status-toggle").boundingBox())!;
+  expect(toggle.height).toBeLessThanOrEqual(44);
+  expect(toggle.y + toggle.height).toBeGreaterThan(390 - 30);
+  await shot(page, "06-mobile-landscape");
+
+  await openStrip(page);
+  await page.locator("#walk-start").click();
+  await page.waitForFunction(() => window.__walker?.ready(), undefined, { timeout: 30_000 });
+  const panel = page.locator("#walker-panel");
+  await expect(panel).toHaveClass(/touch/);
+  const bar = (await panel.boundingBox())!;
+  const stick = (await page.locator("#walker-stick").boundingBox())!;
+  expect(bar.width).toBeLessThanOrEqual(440);
+  expect(bar.y + bar.height).toBeLessThan(stick.y);
+  expect(stick.x).toBeLessThan(30);
+  expect(stick.y + stick.height).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(844);
+
+  const touch = await fingers(page);
+  const from = await walkerAt(page);
+  const sx = stick.x + stick.width / 2;
+  const sy = stick.y + stick.height / 2;
+  await touch.down(1, sx, sy);
+  await touch.move(1, sx, sy - stick.height / 2, 3);
+  await page.waitForTimeout(900);
+  await touch.lift();
+  const to = await walkerAt(page);
+  expect(Math.hypot(to[0] - from[0], to[1] - from[1])).toBeGreaterThan(1);
+  await expectRealRender(page);
+  await shot(page, "20-walker-phone-landscape");
 });

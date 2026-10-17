@@ -42,7 +42,8 @@ It is built to answer two questions a student actually has:
   mark a sex or a gender. A wall never hides it: the camera comes in front, and its shape shows
   through. About says that Cloudflare counts page views and visits at campusworldmodel.com, where
   it used to say the site has no analytics. Closing a walk now takes the walker's name off the map
-  too.
+  too. The campus panel waits as a small button until it is asked for, and on a phone the walk is
+  steered with two thumbs, as in a game: a stick to walk and turn, and a drag to look round.
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
   lifts and toilets; buildings open on the floor at street level, with the floors under the ground
@@ -150,11 +151,14 @@ GitHub gives it no secrets.
 
 ## Walk the campus
 
-**In the browser:** "Take a walk" in the campus panel (or `?walk=1` in the address) puts a small
-made-up person near the Clock Tower. W A S D or the arrow keys walk it, Shift breaks into a run,
-and on a phone the arrows in its panel do. Its panel switches between the map, the view from behind it and the view
-through its eyes; there a drag looks round, and a click on a building or the ground walks it there.
-"Let it wander" sends it strolling on its own from building to building. Every walker looks the
+**In the browser:** "Take a walk" in the campus panel (the button with the campus's name in the
+bottom-left corner), or `?walk=1` in the address, puts a small made-up person near the Clock Tower.
+W A S D or the arrow keys walk it, and Shift breaks into a run. On a phone or tablet it is steered as
+in a game: a stick under the left thumb walks and turns it, and the other thumb drags the view round.
+Its panel switches between the map, the view from behind it and the view through its eyes. There a
+drag looks round, and a click on a building or the ground walks it there; as it walks by hand, the
+view comes back round behind it. "Let it wander" sends it strolling on its own from building to
+building. Every walker looks the
 same: a student with nothing meant to mark a sex or a gender, who opens an umbrella when Open-Meteo
 reports rain.
 Behind it, the camera stops in front of a wall rather than inside it, and wherever a building or a

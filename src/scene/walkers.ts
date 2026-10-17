@@ -236,7 +236,12 @@ export class WalkerWorld {
     w.figure.setHeading(w.heading);
   }
 
-  /** Steering by hand, for the keyboard: metres a second forward (negative back), degrees a second of turn. */
+  /** Metres a second a walker is steered forward by hand (negative back); 0 when it is not. */
+  handForward(name: string): number {
+    return this.walkers.get(name)?.drive.forward ?? 0;
+  }
+
+  /** Steering by hand, for the keyboard and the thumb stick: metres a second forward (negative back), degrees a second of turn. */
   steer(name: string, forward: number, turn: number): void {
     const w = this.walkers.get(name);
     if (!w) return;

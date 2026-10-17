@@ -691,16 +691,24 @@ export function startWalkerFromUrl(): void {
   });
 }
 
+/**
+ * Steers the visitor's walker by hand, for as long as it is held: metres a second forward (negative
+ * back) and degrees a second of turn (positive to the right). The keys and the thumb stick use it.
+ */
+export function steerByHand(forward: number, turnRate: number): void {
+  const s = scene;
+  if (!s || !walkerOn.value || !s.walkers.has(MY_WALKER)) return;
+  s.walkers.steer(MY_WALKER, forward, turnRate);
+}
+
 /** The keyboard steers the visitor's walker: W A S D or the arrow keys, Shift to hurry. */
 export function startWalkerKeys(): () => void {
   const held = new Set<string>();
   const apply = () => {
-    const s = scene;
-    if (!s || !walkerOn.value || !s.walkers.has(MY_WALKER)) return;
     const fast = held.has("shift") ? 2.5 : 1;
     const forward = (held.has("w") || held.has("arrowup") ? 1 : 0) - (held.has("s") || held.has("arrowdown") ? 1 : 0);
     const turnDir = (held.has("d") || held.has("arrowright") ? 1 : 0) - (held.has("a") || held.has("arrowleft") ? 1 : 0);
-    s.walkers.steer(MY_WALKER, forward * WALK_SPEED * fast * (forward < 0 ? 0.6 : 1), turnDir * 100);
+    steerByHand(forward * WALK_SPEED * fast * (forward < 0 ? 0.6 : 1), turnDir * 100);
   };
   const keys = new Set(["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift"]);
   const typing = (e: KeyboardEvent) => {

@@ -47,6 +47,7 @@ import { LabelLayer, type LabelSpec } from "./labels.ts";
 import { EYE_HEIGHT } from "./figure.ts";
 import { WalkerWorld } from "./walkers.ts";
 import { WalkMap } from "../shared/walkmap.ts";
+import { towardsAhead } from "../shared/walkerLook.ts";
 import { floorRings } from "../shared/indoor.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
 
@@ -392,6 +393,7 @@ export class CampusScene {
     const el = this.renderer.domElement;
     el.addEventListener("pointerdown", this.onPointerDown);
     el.addEventListener("pointerup", this.onPointerUp);
+    el.addEventListener("pointercancel", this.onPointerCancel);
     el.addEventListener("pointermove", this.onPointerMove);
     el.addEventListener("pointerleave", this.onPointerLeave);
     el.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1702,6 +1704,13 @@ export class CampusScene {
       return;
     }
     const [x, y] = pose.at;
+    // Walked by hand, the view comes round to the way the walker goes, as in a game, unless a
+    // finger or the mouse is turning it: so that forward on the stick is forward on the screen.
+    if (dt < 1 && !this.drag && this.walkers.handForward(this.viewWalker!) !== 0) {
+      const k = Math.exp(-dt * 2.5);
+      if (this.view === "eyes") this.eyes.yaw = towardsAhead(this.eyes.yaw, k);
+      else this.follow.yaw = towardsAhead(this.follow.yaw, k);
+    }
     if (this.view === "eyes") {
       const yaw = ((pose.heading + this.eyes.yaw) * Math.PI) / 180;
       const pitch = (this.eyes.pitch * Math.PI) / 180;
@@ -1766,6 +1775,11 @@ export class CampusScene {
     if (this.view === "eyes") this.eyes = { yaw: ((yaw % 360) + 360) % 360, pitch: Math.max(-60, Math.min(50, pitch)) };
     else if (this.view === "follow") this.follow = { ...this.follow, yaw: ((yaw % 360) + 360) % 360, elevation: Math.max(-5, Math.min(70, 16 + pitch)) };
     this.placeWalkerCamera(1);
+  }
+
+  /** Where the walker view looks, degrees from straight ahead, as setWalkerLook takes it: for tests. */
+  walkerLook(): { yaw: number; pitch: number } {
+    return this.view === "eyes" ? { ...this.eyes } : { yaw: this.follow.yaw, pitch: this.follow.elevation - 16 };
   }
 
   private onWheel = (e: WheelEvent): void => {
@@ -1874,6 +1888,13 @@ export class CampusScene {
     // A tapped space says what it is; it is not selected.
     this.showSpace(space, e.clientX, e.clientY);
     if (pick) this.onPick?.(pick);
+  };
+
+  /** A touch the browser took over (a scroll, a system gesture) ends a drag, and selects nothing. */
+  private onPointerCancel = (): void => {
+    this.drag = undefined;
+    this.pointerDown = undefined;
+    if (this.view !== "map") this.renderer.domElement.style.cursor = "grab";
   };
 
   private labelAt(clientX: number, clientY: number): LabelSpec | undefined {
