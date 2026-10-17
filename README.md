@@ -44,7 +44,8 @@ It is built to answer two questions a student actually has:
   it used to say the site has no analytics. Closing a walk now takes the walker's name off the map
   too. The campus panel waits as a small button until it is asked for, and on a phone the walk is
   steered with two thumbs, as in a game: a stick to walk and turn, and a drag to look round; the
-  walker's bar folds into a small button too.
+  walker's bar folds into a small button too. A link to a walk now starts it in a tab opened in the
+  background as well.
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
   lifts and toilets; buildings open on the floor at street level, with the floors under the ground

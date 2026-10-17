@@ -52,6 +52,10 @@ A change to what the site does or shows adds its line here, and the README's
 
 ### Fixed
 
+- **A link to a walk could open without the walker.** Opened in a tab in the background, or
+  wherever the page was slow to draw its first frame, a link with `walk=1` showed the map with no
+  walker, and the address lost `walk=1` and `view=`. The walk now starts once the map and its data
+  are both in, in whichever order they come, and until then the address goes on asking for it (#48).
 - **A walker's name stayed on the map after the walk.** Closing the walk, or an agent taking the
   last walker away, left the walker's name, and anything it was saying, where it had stood, over the
   building names round it, until something else redrew the labels. They now go with the last
