@@ -48,7 +48,7 @@ A change to what the site does or shows adds its line here, and the README's
 - **The walk folds away on a phone too.** On a touch screen the walker's bar (where it is, Map,
   Behind and Eyes) starts folded into a small "Walker" button under the top bar, and opens when
   tapped; its ⌃ folds it again. Each walk starts folded, and the panel opens by itself to say what
-  went wrong when a way in or out fails (#PR).
+  went wrong when a way in or out fails (#49).
 
 ### Fixed
 
