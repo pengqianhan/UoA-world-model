@@ -977,8 +977,10 @@ select optgroup {
   box-shadow: var(--shadow);
 }
 
-/* Shut, the panel is a button with the campus's name, in the corner it opens from. */
-.status-toggle {
+/* Shut, the panel is a button with the campus's name, in the corner it opens from. The walker's
+   panel on a touch screen folds into one like it. */
+.status-toggle,
+.walker-toggle {
   position: absolute;
   z-index: 20;
   bottom: var(--edge-b);
@@ -998,16 +1000,19 @@ select optgroup {
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.status-toggle:hover {
+.status-toggle:hover,
+.walker-toggle:hover {
   border-color: rgba(255, 255, 255, 0.28);
   background: rgba(24, 40, 53, 0.96);
 }
 
-.status-toggle .icon:first-child {
+.status-toggle .icon:first-child,
+.walker-toggle .icon:first-child {
   color: var(--accent);
 }
 
-.status-toggle .icon:last-child {
+.status-toggle .icon:last-child,
+.walker-toggle .icon:last-child {
   color: var(--muted);
 }
 
@@ -2099,6 +2104,17 @@ select optgroup {
 
 /* ---- On a touch screen: a bar at the top, and the thumbs steer, as in a game ---------------- */
 
+.walker-panel[hidden] {
+  display: none;
+}
+
+/* Folded, the bar is a small button where it opens, under the top bar. */
+.walker-toggle {
+  z-index: 25;
+  top: calc(var(--top) + 4px);
+  bottom: auto;
+}
+
 .walker-panel.touch {
   top: calc(var(--top) + 4px);
   right: auto;
@@ -2225,6 +2241,7 @@ select optgroup {
 .shot-clean .topbar,
 .shot-clean .walker-panel,
 .shot-clean .walker-thumbs,
+.shot-clean .walker-toggle,
 .shot-clean .status,
 .shot-clean .status-toggle,
 .shot-clean .dock,
@@ -2246,7 +2263,7 @@ select optgroup {
     width: auto;
   }
 
-  .in-building .walker-panel.touch {
+  .in-building :is(.walker-panel.touch, .walker-toggle) {
     top: calc(var(--top) + 52px);
   }
 }

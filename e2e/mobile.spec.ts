@@ -180,19 +180,32 @@ test("phone: a walk is steered with two thumbs, as in a game: a stick walks and 
   await openStrip(page);
   await page.locator("#walk-start").click();
   await page.waitForFunction(() => window.__walker?.ready(), undefined, { timeout: 30_000 });
+  // The walker's panel waits folded, as a small button under the top bar, so the walk has the screen.
   const panel = page.locator("#walker-panel");
+  const fold = page.locator("#walker-toggle");
+  await expect(panel).toBeHidden();
+  await expect(fold).toBeVisible();
+  const top = (await page.locator(".topbar").boundingBox())!;
+  const folded = (await fold.boundingBox())!;
+  expect(folded.y).toBeGreaterThanOrEqual(top.y + top.height);
+  expect(folded.width).toBeLessThan(160);
+  expect(folded.height).toBeLessThanOrEqual(44);
+  // Opened, it is a bar under the top bar; the rest waits behind its ⋯ button.
+  await fold.tap();
   await expect(panel).toBeVisible();
   // On a touch screen the walk starts from behind the walker.
   await expect(panel.locator('button[data-view="follow"]')).toHaveAttribute("aria-pressed", "true");
-  // A bar under the top bar takes a slice of the screen; the rest of the panel waits behind a button.
   const bar = (await panel.boundingBox())!;
-  const top = (await page.locator(".topbar").boundingBox())!;
   expect(bar.x).toBeGreaterThanOrEqual(0);
   expect(bar.x + bar.width).toBeLessThanOrEqual(390);
   expect(bar.y).toBeGreaterThanOrEqual(top.y + top.height);
   expect(bar.height).toBeLessThan(844 * 0.13);
   await expect(page.locator("#walker-to")).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await shot(page, "20-walker-phone-bar");
+  await page.locator("#walker-hide").tap();
+  await expect(panel).toBeHidden();
+  await expect(fold).toBeVisible();
   // The stick in the bottom left corner, for the left thumb, above the attribution.
   const stick = (await page.locator("#walker-stick").boundingBox())!;
   expect(stick.x).toBeLessThan(24);
@@ -235,12 +248,15 @@ test("phone: a walk is steered with two thumbs, as in a game: a stick walks and 
   expect(offAhead((await heading()) - before)).toBeGreaterThan(20);
 
   // The rest waits behind its button: a walk to a place, wandering, and how to steer.
+  await fold.tap();
   await page.locator("#walker-more").tap();
   await expect(page.locator("#walker-to")).toBeVisible();
   await expect(page.locator("#walker-menu")).toContainText("Push the stick");
   await shot(page, "20-walker-phone-menu");
   await page.locator("#walker-more").tap();
   await expect(page.locator("#walker-to")).toBeHidden();
+  await page.locator("#walker-hide").tap();
+  await expect(panel).toBeHidden();
 
   // Beside a building, the way in is under the right thumb.
   expect(((await page.evaluate(() => window.__walker!.run("walk", { to: "109", speed: 40 }))) as { arrived: boolean }).arrived).toBe(true);
@@ -252,9 +268,9 @@ test("phone: a walk is steered with two thumbs, as in a game: a stick walks and 
   await enter.tap();
   await expect.poll(() => params(page).get("building")).toBe("109");
   await settle(page);
-  // Inside, the floor strip stays in sight above the bar, and the thumbs' controls stand above the building's card.
+  // Inside, the floor strip stays in sight above the folded panel, and the thumbs' controls stand above the building's card.
   const floors = (await page.locator(".floors").boundingBox())!;
-  expect((await panel.boundingBox())!.y).toBeGreaterThanOrEqual(floors.y + floors.height);
+  expect((await fold.boundingBox())!.y).toBeGreaterThanOrEqual(floors.y + floors.height);
   const dock = (await page.locator("#building-bar").boundingBox())!;
   const lifted = (await page.locator("#walker-stick").boundingBox())!;
   expect(lifted.y + lifted.height).toBeLessThanOrEqual(dock.y);
@@ -280,10 +296,17 @@ test("phone on its side: the map keeps the screen, and a walk puts the stick und
   await page.waitForFunction(() => window.__walker?.ready(), undefined, { timeout: 30_000 });
   const panel = page.locator("#walker-panel");
   await expect(panel).toHaveClass(/touch/);
-  const bar = (await panel.boundingBox())!;
+  // Folded at first; opened, the bar still stays clear of the stick.
+  await expect(panel).toBeHidden();
   const stick = (await page.locator("#walker-stick").boundingBox())!;
+  const folded = (await page.locator("#walker-toggle").boundingBox())!;
+  expect(folded.y + folded.height).toBeLessThan(stick.y);
+  await shot(page, "20-walker-phone-landscape");
+  await page.locator("#walker-toggle").tap();
+  const bar = (await panel.boundingBox())!;
   expect(bar.width).toBeLessThanOrEqual(440);
   expect(bar.y + bar.height).toBeLessThan(stick.y);
+  await page.locator("#walker-hide").tap();
   expect(stick.x).toBeLessThan(30);
   expect(stick.y + stick.height).toBeLessThanOrEqual(390);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(844);
@@ -299,5 +322,4 @@ test("phone on its side: the map keeps the screen, and a walk puts the stick und
   const to = await walkerAt(page);
   expect(Math.hypot(to[0] - from[0], to[1] - from[1])).toBeGreaterThan(1);
   await expectRealRender(page);
-  await shot(page, "20-walker-phone-landscape");
 });

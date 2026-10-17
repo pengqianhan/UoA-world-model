@@ -131,8 +131,25 @@ export function WalkerPanel() {
   const [message, setMessage] = useState<string | undefined>(undefined);
   // Everything but the views and the way in and out: shown on a wide screen, behind a button on a touch screen.
   const [more, setMore] = useState(() => !touch);
+  // On a touch screen the whole panel waits as a small button, so the walk has the screen.
+  const [open, setOpen] = useState(false);
+  const shown = !touch || open;
   const input = useRef<HTMLInputElement>(null);
+  const show = useRef<HTMLButtonElement>(null);
+  const hide = useRef<HTMLButtonElement>(null);
   const dock = useDock(touch && walkerOn.value);
+  // Each walk starts with the panel folded away.
+  const on = walkerOn.value;
+  useEffect(() => {
+    if (on) setOpen(false);
+  }, [on]);
+  // Focus goes with the panel, for whoever is using the keyboard: into it, and back to its button.
+  const was = useRef(open);
+  useEffect(() => {
+    if (was.current === open) return;
+    was.current = open;
+    (open ? hide : show).current?.focus();
+  }, [open]);
   if (!walkerOn.value) return null;
   const status = walkerStatus.value;
   const view = walkerView.value;
@@ -141,18 +158,25 @@ export function WalkerPanel() {
   const act = async (command: string, args: Record<string, unknown>) => {
     const r = await run(command, { name: MY_WALKER, ...args });
     setMessage(r.error ? String(r.error) : undefined);
+    // What went wrong is said in the panel, so the panel opens to say it.
+    if (r.error) setOpen(true);
   };
 
   const go = async (e: Event) => {
     e.preventDefault();
     const where = to.trim();
     if (!where) return;
-    // On a touch screen the menu folds away, so that the walk can be watched.
-    if (touch) setMore(false);
+    // On a touch screen the panel folds away, so that the walk can be watched.
+    if (touch) {
+      setMore(false);
+      setOpen(false);
+    }
     setMessage(t("walker.walking"));
     const r = await run("walk", { name: MY_WALKER, to: where, speed: 3 });
-    if (r.error) setMessage(String(r.error));
-    else setMessage(r.arrived ? t("walker.arrived", { place: String(r.to) }) : t("walker.stopped"));
+    if (r.error) {
+      setMessage(String(r.error));
+      setOpen(true);
+    } else setMessage(r.arrived ? t("walker.arrived", { place: String(r.to) }) : t("walker.stopped"));
   };
 
   const moves =
@@ -176,7 +200,29 @@ export function WalkerPanel() {
 
   return (
     <>
-      <section class={`walker-panel view-${view} ${touch ? "touch" : ""} ${more ? "more" : ""}`} id="walker-panel" aria-label={t("walker.heading")}>
+      {!shown && (
+        <button
+          type="button"
+          class="walker-toggle"
+          id="walker-toggle"
+          ref={show}
+          aria-expanded="false"
+          aria-controls="walker-panel"
+          aria-label={t("walker.show")}
+          title={t("walker.show")}
+          onClick={() => setOpen(true)}
+        >
+          <Icon name="walk" size={16} />
+          <span>{t("walker.heading")}</span>
+          <Icon name="chevronDown" size={16} />
+        </button>
+      )}
+      <section
+        class={`walker-panel view-${view} ${touch ? "touch" : ""} ${more ? "more" : ""}`}
+        id="walker-panel"
+        aria-label={t("walker.heading")}
+        hidden={!shown}
+      >
         <div class="walker-head">
           <h2>{t("walker.heading")}</h2>
           <span class="walker-where" id="walker-where" aria-live="polite">
@@ -200,6 +246,21 @@ export function WalkerPanel() {
           >
             <Icon name="more" />
           </button>
+          {touch && (
+            <button
+              type="button"
+              class="btn ghost"
+              id="walker-hide"
+              ref={hide}
+              aria-expanded="true"
+              aria-controls="walker-panel"
+              aria-label={t("walker.hide")}
+              title={t("walker.hide")}
+              onClick={() => setOpen(false)}
+            >
+              <Icon name="chevronUp" />
+            </button>
+          )}
           <button type="button" class="btn ghost" id="walker-close" aria-label={t("walker.close")} title={t("walker.close")} onClick={stopWalking}>
             <Icon name="close" />
           </button>

@@ -45,6 +45,10 @@ A change to what the site does or shows adds its line here, and the README's
   building's card. Before, on a phone, the panel and its arrows covered half the screen and the
   floor list. A phone held sideways gets the same, and the top bar, the stick and the buttons keep
   clear of a notch (#47).
+- **The walk folds away on a phone too.** On a touch screen the walker's bar (where it is, Map,
+  Behind and Eyes) starts folded into a small "Walker" button under the top bar, and opens when
+  tapped; its ⌃ folds it again. Each walk starts folded, and the panel opens by itself to say what
+  went wrong when a way in or out fails (#49).
 
 ### Fixed
 

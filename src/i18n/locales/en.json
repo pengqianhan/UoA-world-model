@@ -337,6 +337,8 @@
     "arrived": "Arrived: {place}",
     "stopped": "Stopped before getting there",
     "more": "Walk to a place, let it wander, and how to steer",
+    "show": "Walker: the map, behind it or its eyes, and more",
+    "hide": "Hide the walker's panel",
     "keys": "W A S D or the arrow keys to walk, Shift to hurry. Drag to look round; click a building or the ground to walk there.",
     "keysTouch": "Push the stick with one thumb to walk and turn, and drag the map with the other to look round. Tap a building or the ground to walk there.",
     "note": "A made-up figure: it stands for no real person, and where it goes stays in your browser. Doors are not mapped, so it walks to the nearest side of a building, and inside it keeps to corridors where it can.",
