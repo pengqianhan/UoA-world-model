@@ -25,6 +25,7 @@ interface SceneHandle {
     deciduous: number;
     deciduousTrees: number;
   };
+  streetState(): { active: boolean; tier: "full" | "basic" | "off"; passes: string[]; sky: boolean; exposure: number };
   floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number; outerWalls: boolean; windowsBelow: boolean };
   openFloorBox(): { left: number; top: number; right: number; bottom: number } | undefined;
   probe(): { width: number; height: number; distinctColours: number; samples: number };

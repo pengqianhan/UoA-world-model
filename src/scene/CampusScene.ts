@@ -10,6 +10,7 @@ import {
   Float32BufferAttribute,
   Fog,
   Group,
+  HalfFloatType,
   HemisphereLight,
   IcosahedronGeometry,
   InstancedMesh,
@@ -32,6 +33,7 @@ import {
   Scene,
   SphereGeometry,
   CylinderGeometry,
+  UnsignedByteType,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -49,6 +51,8 @@ import { WalkerWorld } from "./walkers.ts";
 import { WalkMap } from "../shared/walkmap.ts";
 import { floorRings } from "../shared/indoor.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
+import { StreetLook, type StreetState } from "./street/look.ts";
+import { streetTier } from "./street/tier.ts";
 
 export interface Selection {
   building?: string;
@@ -84,6 +88,14 @@ const JUMP_DISTANCE = 5000;
 
 /** The lowest the sun is drawn, degrees; a real sun lower than this casts shadows off the map. */
 const SUN_MIN_ELEVATION = 10;
+/**
+ * The walker views' camera, vertical degrees and metres to its near plane. Through the eyes it sees
+ * wider and nearer, as a person does; from behind it keeps the frame it had.
+ */
+const EYES_FOV = 64;
+const EYES_NEAR = 0.2;
+const FOLLOW_FOV = 55;
+const FOLLOW_NEAR = 0.3;
 /** Crowns of deciduous trees in April and May, in winter, and in early spring. */
 const AUTUMN_LEAVES = 0xd38b3c;
 const BARE_BRANCHES = 0x9a8a76;
@@ -293,7 +305,9 @@ export class CampusScene {
   private floorRingCache = new Map<string, [number, number][][][]>();
   private walkMapCache?: WalkMap;
   /** The camera of the walker views: behind a walker, or at its eyes. */
-  private persp = new PerspectiveCamera(55, 1, 0.3, 6000);
+  private persp = new PerspectiveCamera(FOLLOW_FOV, 1, FOLLOW_NEAR, 6000);
+  /** The walker views' sky, light and effects (street/look.ts); off on the map. */
+  private street: StreetLook;
   private view: WalkerView = "map";
   private viewWalker?: string;
   /** Degrees and metres, set by dragging and the wheel in the walker views. */
@@ -311,7 +325,16 @@ export class CampusScene {
     this.labels = new LabelLayer(labelRoot);
 
     // The stencil lets a hidden walker's shape show through what stands in front of it (figure.ts).
-    this.renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: true });
+    // Where the walker views can afford it, the renderer keeps a half-float picture for them; on
+    // the map it is never used, and the map is drawn straight to the screen as ever (street/tier.ts).
+    const tier = streetTier(!!opts.lite);
+    this.renderer = new WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+      preserveDrawingBuffer: false,
+      stencil: true,
+      outputBufferType: tier === "full" ? HalfFloatType : UnsignedByteType,
+    });
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.lite ? 1.5 : 2));
     this.renderer.shadowMap.enabled = !opts.lite;
@@ -359,6 +382,14 @@ export class CampusScene {
     sc.near = 100;
     sc.far = 6000;
     this.scene.add(this.hemi, this.ambient, this.sun, this.sun.target);
+    this.street = new StreetLook({
+      renderer: this.renderer,
+      scene: this.scene,
+      camera: this.persp,
+      lights: { sun: this.sun, hemi: this.hemi, ambient: this.ambient },
+      tier,
+      redraw: () => (this.needsRender = true),
+    });
 
     this.ground = new Mesh(new PlaneGeometry(9000, 9000), new MeshLambertMaterial({ color: DAY.ground }));
     this.ground.rotation.x = -Math.PI / 2;
@@ -823,6 +854,7 @@ export class CampusScene {
   setSun(sun: { azimuth: number; elevation: number } | undefined): void {
     this.sunDirection = sun;
     this.placeSun();
+    this.lightStreet();
     this.needsShadow = true;
     this.needsRender = true;
   }
@@ -857,8 +889,16 @@ export class CampusScene {
     return lerpColour(colour, p.tree, this.night * 0.7);
   }
 
+  /**
+   * How far the colours go towards the night palette. The map's night is in its colours; a walker
+   * view keeps the day's colours by night and makes the night with its light (street/look.ts).
+   */
+  private get mood(): number {
+    return this.street.active ? 0 : this.night;
+  }
+
   private applyPalette(): void {
-    const p = (this.palette = weathered(mixPalette(DAY, NIGHT, this.night), this.weather, this.night));
+    const p = (this.palette = weathered(mixPalette(DAY, NIGHT, this.mood), this.weather, this.mood));
     this.renderer.setClearColor(p.sky);
     this.sun.shadow.intensity = 1 - 0.7 * (this.weather?.cloud ?? 0);
     const fog = this.weather?.fog ?? 0;
@@ -882,10 +922,20 @@ export class CampusScene {
     this.placeSun();
     for (const { mat, key } of this.contextMaterials) mat.color.setHex(key(p));
     this.container.style.setProperty("--scene-sky", `#${p.sky.toString(16).padStart(6, "0")}`);
+    this.lightStreet();
+  }
+
+  /**
+   * The walker views light the scene their own way, from the same sun, night and weather: over
+   * the map's light and haze while one is open, and not at all on the map.
+   */
+  private lightStreet(): void {
+    this.street.setLight({ sun: this.sunDirection, night: this.night, weather: this.weather });
   }
 
   private placeSun(): void {
-    const p = this.palette;
+    // A walker view's palette stays the day's (mood); its moon is still the night palette's.
+    const p = this.street.active ? mixPalette(DAY, NIGHT, this.night) : this.palette;
     // By night the light is the palette's moon; by day the real sun, when the host gives one.
     const real = this.night < 0.5 ? this.sunDirection : undefined;
     const az = ((real?.azimuth ?? p.sunAzimuth) * Math.PI) / 180;
@@ -1018,7 +1068,8 @@ export class CampusScene {
       const edges = this.buildingEdges.get(id)!;
       const isSelected = id === selected && this.focus > 0;
       mesh.visible = !isSelected;
-      edges.visible = !isSelected && this.focus < 0.5;
+      // The inked edges are the model's, seen from above; from a walker's height a corner shows by its light.
+      edges.visible = !isSelected && this.focus < 0.5 && this.view === "map";
       mesh.scale.y = scale;
       edges.scale.y = scale;
     }
@@ -1683,7 +1734,21 @@ export class CampusScene {
       if (pose) this.flyTo(new Vector3(pose.at[0], pose.height, -pose.at[1]), Math.max(this.camera.zoom, 4), false);
     }
     this.renderer.domElement.style.cursor = view === "map" ? "" : "grab";
+    this.persp.fov = view === "eyes" ? EYES_FOV : FOLLOW_FOV;
+    this.persp.near = view === "eyes" ? EYES_NEAR : FOLLOW_NEAR;
+    this.persp.updateProjectionMatrix();
+    // The street look goes on before the palette, which then lights it (lightStreet).
+    const mood = this.mood;
+    if (view === "map") this.street.exit();
+    else this.street.enter();
     this.applyPalette();
+    // By night the colours change with the view (mood): the open floor's too. applyFocus restyles the buildings.
+    if (this.mood !== mood) {
+      this.styleRooms();
+      this.rebuildDetailColours();
+      this.rebuildPin();
+    }
+    this.applyFocus();
     this.fitShadow();
     this.rebuildLabels();
     this.placeWalkerCamera(1);
@@ -2003,6 +2068,12 @@ export class CampusScene {
 
   /** A frame of the scene, with an open floor below the ground drawn through it. */
   private draw(): void {
+    // A walker view has a look of its own. From a walker's height the ground hides what lies under
+    // it, as it does on a street, so the floor under the ground is not drawn through it there.
+    if (this.street.active) {
+      this.street.render();
+      return;
+    }
     const camera = this.activeCamera;
     this.renderer.render(this.scene, camera);
     if (!this.openBelowGround) return;
@@ -2177,6 +2248,11 @@ export class CampusScene {
     };
   }
 
+  /** How the walker views are drawn now: tier, passes, sky and exposure; "off" on the map. For tests. */
+  streetState(): StreetState {
+    return this.street.state();
+  }
+
   /** The groups whose floors are drawn on the open floor, each with its colour now. For tests. */
   spaceFloors(): { kind: SpaceKind; colour: number }[] {
     return this.planObjects
@@ -2269,6 +2345,7 @@ export class CampusScene {
     this.walkers.clear();
     cancelAnimationFrame(this.raf);
     this.controls.dispose();
+    this.street.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
     this.labels.clear();
