@@ -7,6 +7,7 @@ type Reply = Record<string, unknown> & { error?: string };
 declare global {
   interface Window {
     __walker?: { run(command: string, args?: Record<string, unknown>): Promise<Reply>; ready(): boolean };
+    __addresses?: string[];
   }
 }
 
@@ -181,4 +182,47 @@ test("a walk to a room goes into its building, up to its floor and into the room
   expect(out.indoor).toBeUndefined();
   expect(out.nearby[0]).toMatchObject({ id: "109" });
   expect(out.nearby[0]!.distance).toBeLessThan(3);
+});
+
+test("a walk the address asks for starts when the data comes in before the scene, as in a tab opened in the background", async ({ page }) => {
+  // A tab opened behind others draws no frames and runs its timers late, so the data comes in
+  // before the scene, which is made after the first frame. Here the page's clock stands still, as
+  // it does there, until the tab comes to the front; the data still loads.
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 1000);
+  // Every address the page writes, to see that none of them lets go of the walk.
+  await page.addInitScript(() => {
+    const replace = history.replaceState.bind(history);
+    window.__addresses = [];
+    history.replaceState = (state, unused, url) => {
+      window.__addresses!.push(String(url));
+      replace(state, unused, url);
+    };
+  });
+  const keptWalk = async () => {
+    for (const url of [...(await page.evaluate(() => window.__addresses!)), page.url()]) {
+      const q = new URL(url, page.url()).searchParams;
+      expect([q.get("walk"), q.get("view")], url).toEqual(["1", "follow"]);
+    }
+  };
+  await page.goto(`./?walk=1&view=follow&${QUERY}`);
+  await expect(page.locator(".splash")).toHaveCount(0);
+  // The data is in, and not a frame has been drawn.
+  expect(await page.evaluate(() => window.__scene?.frames ?? 0)).toBe(0);
+  await keptWalk();
+
+  // The tab comes to the front: one walker, seen from behind, and the address keeps it. The clock
+  // runs on a set time rather than resuming: resumed, it would run every frame it fell behind on,
+  // and a frame drawn in software takes longer than a frame's time, so it would never catch up.
+  await page.clock.runFor(500);
+  await expect(page.locator("#walker-panel")).toBeVisible();
+  await expect(page.locator('#walker-panel button[data-view="follow"]')).toHaveAttribute("aria-pressed", "true");
+  const list = (await walker(page, "list")) as { walkers: { name: string }[]; view: string; viewing: string };
+  expect(list.walkers.map((w) => w.name)).toEqual(["Walker"]);
+  expect(list).toMatchObject({ view: "follow", viewing: "Walker" });
+  await keptWalk();
+  await page.waitForFunction(() => window.__scene!.loading === 0);
+  await page.clock.runFor(500);
+  await expectRealRender(page);
+  await shot(page, "20-walker-background-tab");
 });
