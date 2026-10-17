@@ -37,12 +37,14 @@ import {
   Vector2,
   Vector3,
   WebGLRenderer,
+  type Material,
+  type MeshStandardMaterial,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room, SpaceKind, SpaceType } from "../shared/types.ts";
 import { decodeRing, interiorPoint, pointInRing } from "../shared/geo.ts";
 import { groundLevel, massing, roofRims, withoutStrips } from "../shared/massing.ts";
-import { MeshBuilder, drape, ringsBounds } from "./geometry.ts";
+import { MeshBuilder, drape, ringsBounds, type FacadeSpec } from "./geometry.ts";
 import { SEA_PLANE, Terrain } from "./terrain.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
@@ -53,6 +55,7 @@ import { floorRings } from "../shared/indoor.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
 import { StreetLook, type StreetState } from "./street/look.ts";
 import { streetTier } from "./street/tier.ts";
+import { PART, STYLE, STYLES, buildingSeed, cityStoreys, facadeCode, facadeStyle } from "./street/rules.ts";
 
 export interface Selection {
   building?: string;
@@ -72,6 +75,12 @@ export interface PinSpec {
   at: [number, number];
   text: string;
   title?: string;
+}
+
+/** How many buildings wear the walker views' facades: the University's, and the city's mesh round them. */
+export interface FacadeCount {
+  university: number;
+  city: number;
 }
 
 /** Weather as the scene draws it, each 0-1. */
@@ -208,6 +217,37 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** The middle of a flat ring's points, metres east and north. */
+function ringMiddle(ring: FlatRing): [number, number] {
+  let x = 0;
+  let y = 0;
+  const n = ring.length >> 1;
+  for (let i = 0; i + 1 < ring.length; i += 2) {
+    x += ring[i]!;
+    y += ring[i + 1]!;
+  }
+  return [x / n / 10, y / n / 10];
+}
+
+/**
+ * How the walker views draw a University building's walls (street/facade.ts): storeys a floor high,
+ * as the map draws them, and bays WINDOW_BAY wide, or half that for a curtain wall's mullions.
+ */
+function universityFacade(b: Building, floorHeight: number, base: number): FacadeSpec {
+  const seed = buildingSeed(b.center[0], b.center[1]);
+  const style = facadeStyle(seed, { university: true, height: b.height, pitched: false });
+  return {
+    code: facadeCode(style, seed),
+    storey: floorHeight,
+    ground: floorHeight,
+    top: 1e4,
+    base,
+    anchor: b.center,
+    bay: style === STYLE.glass ? WINDOW_BAY / 2 : WINDOW_BAY,
+    cap: PART.roof,
+  };
+}
+
 /** An unnamed shape on the open floor, as published and in metres, with its type and a point inside it. */
 interface PlanSpace {
   flat: FlatRing[];
@@ -241,6 +281,16 @@ export class CampusScene {
   private uniGroup = new Group();
   private detailGroup = new Group();
   private contextMaterials: { mat: MeshLambertMaterial; key: (p: Palette) => number }[] = [];
+  /** The surrounding buildings, one mesh, and the map's material for it. */
+  private cityBuildings?: { mesh: Mesh; map: MeshLambertMaterial };
+  /**
+   * The walker views' facades (street/facade.ts), made with the first walker view: one for the
+   * city round the campus, one for each University building (for its tint), and two for the open
+   * building's walls below the cut and round the open floor.
+   */
+  private streetMaterials = new Map<string, MeshStandardMaterial>();
+  private cityMaterial?: MeshStandardMaterial;
+  private openMaterials?: { below: MeshStandardMaterial; cut: MeshStandardMaterial };
   private trees?: Group;
   private wallTexture: CanvasTexture;
   private glowTexture: CanvasTexture;
@@ -389,6 +439,7 @@ export class CampusScene {
       lights: { sun: this.sun, hemi: this.hemi, ambient: this.ambient },
       tier,
       redraw: () => (this.needsRender = true),
+      dress: () => this.dressBuildings(),
     });
 
     this.ground = new Mesh(new PlaneGeometry(9000, 9000), new MeshLambertMaterial({ color: DAY.ground }));
@@ -454,9 +505,12 @@ export class CampusScene {
     this.buildingEdges.clear();
     for (const b of campus.buildings) {
       if (b.offMap) continue;
-      const mb = new MeshBuilder(true, true);
+      const mb = new MeshBuilder(true, true, true);
       const blocks = massing(b, campus.floorHeight);
+      const facade = universityFacade(b, campus.floorHeight, 0);
       for (const block of blocks) {
+        // Windows in every whole storey of the block, up to its roof.
+        mb.facade = { ...facade, top: block.y1 };
         const wall = {
           storey: campus.floorHeight,
           bay: WINDOW_BAY,
@@ -469,6 +523,7 @@ export class CampusScene {
       // On a slope, a footing from the ground floor down to the lowest corner. It goes under the
       // ground storey, not the whole footprint, which takes in what lies below ground.
       const { base, low } = this.footingOf(b);
+      mb.facade = facade;
       if (base - low > 0.05) for (const poly of blocks[0]!.outline) mb.extrude(poly, low - base, 0, ROOF_TINT, PLINTH_TINT, false);
       // The creases of the blocks themselves, before the parapets go on: a parapet has no
       // thickness, and its two faces would read as creases everywhere.
@@ -491,6 +546,7 @@ export class CampusScene {
         emissiveIntensity: 0,
       });
       const mesh = new Mesh(geometry, [walls, new MeshLambertMaterial({ color: 0xffffff })]);
+      mesh.userData.mapMaterial = mesh.material;
       // The building stands on the lowest ground under it; squashing it keeps it there.
       mesh.position.y = this.baseOf(b);
       mesh.castShadow = true;
@@ -507,7 +563,7 @@ export class CampusScene {
       this.uniGroup.add(edges);
       this.buildingEdges.set(b.id, edges);
     }
-    this.restyle();
+    this.dressBuildings();
     this.applyFocus();
     this.rebuildLabels();
     this.needsShadow = true;
@@ -588,7 +644,7 @@ export class CampusScene {
       if (mb.vertexCount) add(mb.build(), (p) => p.rail, { ground: true });
     }
     {
-      const mb = new MeshBuilder(true);
+      const mb = new MeshBuilder(true, false, true);
       const rand = mulberry32(7);
       // The ground under each building's vertices, for standing it there and sinking it there.
       const bases: number[] = [];
@@ -598,6 +654,13 @@ export class CampusScene {
         const g = foot.base;
         const start = mb.vertexCount;
         const base = b.b ?? 0;
+        // The walker views draw its walls by rule (street/rules.ts): storeys from its height, a
+        // style from where it stands.
+        const middle = ringMiddle(b.p);
+        const seed = buildingSeed(middle[0], middle[1]);
+        const style = facadeStyle(seed, { university: false, height: b.h, pitched: !!b.roof });
+        const storeys = cityStoreys(b.h, !b.roof);
+        mb.facade = { code: facadeCode(style, seed), storey: storeys.storey, ground: storeys.ground, top: storeys.top, base: g, anchor: middle, bay: STYLES[style]!.bay, cap: PART.roof };
         mb.extrude([b.p], g + base, g + b.h, [shade, shade, shade], [shade * 0.97, shade * 0.97, shade * 0.97], !b.roof, { bottom: base > 0 });
         if (!base && g - foot.low > 0.05) mb.extrude([b.p], foot.low, g, undefined, [shade * 0.9, shade * 0.9, shade * 0.9], false);
         // A shaped roof is a tone darker than the walls it sits on.
@@ -605,12 +668,14 @@ export class CampusScene {
         for (let k = start; k < mb.vertexCount; k++) bases.push(g);
       }
       const mesh = add(mb.build(), (p) => p.context, { shadow: true, vertexColors: true });
+      this.cityBuildings = { mesh, map: mesh.material as MeshLambertMaterial };
       const pos = mesh.geometry.getAttribute("position");
       const y = new Float32Array(pos.count);
       for (let k = 0; k < pos.count; k++) y[k] = pos.getY(k);
       this.contextSquash = { mesh, y, base: Float32Array.from(bases), scale: 1 };
     }
     this.buildTrees(ctx);
+    this.dressBuildings();
     this.applyFocus();
     this.needsShadow = true;
     this.needsRender = true;
@@ -997,7 +1062,7 @@ export class CampusScene {
     const p = this.palette;
     for (const [id, mesh] of this.buildingMeshes) {
       const b = this.buildings.get(id)!;
-      const [walls, roof] = mesh.material as [MeshLambertMaterial, MeshLambertMaterial];
+      const [walls, roof] = mesh.userData.mapMaterial as [MeshLambertMaterial, MeshLambertMaterial];
       const hovered = this.hovered?.type === "building" && this.hovered.id === id;
       // While a building is open its neighbours are flat footprints: tone them towards the ground
       // so the open floor stands out.
@@ -1010,7 +1075,15 @@ export class CampusScene {
       // Windows glow after dark, a little more in buildings that hold learning spaces.
       walls.emissiveIntensity = this.night * (1 - this.focus) * (b.roomCount > 0 ? 0.7 : 0.4);
       (this.buildingEdges.get(id)!.material as LineBasicMaterial).color.setHex(p.uniEdge);
+      // In a walker view the walls are drawn by rule in their own colours, which a hover tints as
+      // on the map; beside an open building they fade towards the ground and their rooms go dark.
+      const street = this.streetMaterials.get(id);
+      if (street) {
+        street.color.setHex(hovered ? lerpColour(0xffffff, p.hover, 0.55) : 0xffffff);
+        this.street.facades?.setAway(street, this.focus);
+      }
     }
+    if (this.cityMaterial) this.street.facades?.setAway(this.cityMaterial, this.focus);
   }
 
   private wallColour(b: Building): number {
@@ -1190,7 +1263,8 @@ export class CampusScene {
     for (const child of [...this.detailGroup.children]) {
       const m = child as Mesh;
       m.geometry?.dispose();
-      const mat = m.material;
+      // The walls' street facade is shared and kept; the map's materials are the mesh's own.
+      const mat = (m.userData.mapMaterial as Material[] | undefined) ?? m.material;
       if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
       else mat?.dispose();
     }
@@ -1211,7 +1285,8 @@ export class CampusScene {
     // The floors below the cut keep the building's walls and windows. Their roofs show where a
     // lower floor reaches out beyond the open one. Floors under the ground are drawn only when the
     // open floor is under it too, as in the campus view.
-    const below = new MeshBuilder(true, true);
+    const below = new MeshBuilder(true, true, true);
+    below.facade = universityFacade(b, H, this.baseOf(b));
     const ground = groundLevel(b);
     for (const f of b.floors) {
       if (f.i >= floor.i) break;
@@ -1224,6 +1299,7 @@ export class CampusScene {
     if (below.vertexCount) {
       const geometry = below.build();
       const mesh = new Mesh(geometry, [this.facadeMaterial(b), new MeshLambertMaterial({ color: this.roofColour(b) })]);
+      mesh.userData.mapMaterial = mesh.material;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.role = "below";
@@ -1250,7 +1326,9 @@ export class CampusScene {
     this.detailGroup.add(slabEdges);
 
     // The open floor's own outer walls, cut at the height of the rooms.
-    const cut = new MeshBuilder(true, true);
+    const cut = new MeshBuilder(true, true, true);
+    // The tops of the cut walls are plain wall, not roof.
+    cut.facade = { ...universityFacade(b, H, this.baseOf(b)), cap: PART.plain };
     const sy = y + SLAB;
     for (const [outer, ...holes] of this.floorOutline(b, floor.i)) {
       const inner = outer && inset(decodeRing(outer), CUT_WALL_THICKNESS);
@@ -1273,6 +1351,7 @@ export class CampusScene {
       walls.polygonOffsetFactor = -1;
       walls.polygonOffsetUnits = -1;
       const mesh = new Mesh(cut.build(), [walls, new MeshLambertMaterial({ color: lerpColour(this.wallColour(b), p.uniEdge, 0.3) })]);
+      mesh.userData.mapMaterial = mesh.material;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.role = "cut";
@@ -1293,6 +1372,7 @@ export class CampusScene {
       this.roomMeshes.set(r.code, mesh);
     }
     this.styleRooms();
+    this.dressBuildings();
   }
 
   /**
@@ -1372,7 +1452,7 @@ export class CampusScene {
     for (const child of this.detailGroup.children) {
       const role = child.userData.role as string | undefined;
       if ((role === "below" || role === "cut") && b) {
-        const [walls, top] = (child as Mesh).material as MeshLambertMaterial[];
+        const [walls, top] = child.userData.mapMaterial as MeshLambertMaterial[];
         walls!.color.setHex(this.wallColour(b));
         walls!.emissiveIntensity = this.openGlow;
         top!.color.setHex(role === "below" ? this.roofColour(b) : lerpColour(this.wallColour(b), p.uniEdge, 0.3));
@@ -1741,6 +1821,7 @@ export class CampusScene {
     const mood = this.mood;
     if (view === "map") this.street.exit();
     else this.street.enter();
+    this.dressBuildings();
     this.applyPalette();
     // By night the colours change with the view (mood): the open floor's too. applyFocus restyles the buildings.
     if (this.mood !== mood) {
@@ -2116,7 +2197,7 @@ export class CampusScene {
     const rooms = [...this.roomMeshes.values()];
     const textured = (role: string) => {
       const mesh = this.detailGroup.children.find((o) => o.userData.role === role) as Mesh | undefined;
-      return !!mesh && !!(mesh.material as MeshLambertMaterial[])[0]?.map;
+      return !!mesh && !!(mesh.userData.mapMaterial as MeshLambertMaterial[])[0]?.map;
     };
     return {
       outerWalls: textured("cut"),
@@ -2248,10 +2329,81 @@ export class CampusScene {
     };
   }
 
-  /** How the walker views are drawn now: tier, passes, sky and exposure; "off" on the map. For tests. */
-  streetState(): StreetState {
-    return this.street.state();
+  /**
+   * How the walker views are drawn now: tier, passes, sky and exposure, and how many buildings
+   * wear the facades drawn by rule; "off" and none on the map. For tests.
+   */
+  streetState(): StreetState & { facades: FacadeCount } {
+    const street = (m: Material | Material[]) => !Array.isArray(m) && m.name.startsWith("StreetFacade");
+    return {
+      ...this.street.state(),
+      facades: {
+        university: [...this.buildingMeshes.values()].filter((m) => street(m.material)).length,
+        city: this.cityBuildings && street(this.cityBuildings.mesh.material) ? 1 : 0,
+      },
+    };
   }
+
+  /**
+   * Gives every building the walls of the view it is seen in: in a walker view the facades drawn by
+   * rule (street/facade.ts), once they have loaded; on the map its own materials, as they were.
+   */
+  private dressBuildings(): void {
+    const facades = this.street.facades;
+    const first = !!facades && this.street.depthFirst;
+    const city = this.cityBuildings;
+    if (city) {
+      city.mesh.material = facades ? (this.cityMaterial ??= facades.material("city")) : city.map;
+      this.depthFirst(city.mesh, first);
+    }
+    for (const [id, mesh] of this.buildingMeshes) {
+      let street = this.streetMaterials.get(id);
+      if (facades && !street) this.streetMaterials.set(id, (street = facades.material("university")));
+      mesh.material = facades && street ? street : (mesh.userData.mapMaterial as Material[]);
+      this.depthFirst(mesh, first);
+    }
+    if (facades && !this.openMaterials) {
+      const cut = facades.material("university");
+      // Where a room or a shape meets the outer wall their faces coincide; the outer wall wins.
+      cut.polygonOffset = true;
+      cut.polygonOffsetFactor = -1;
+      cut.polygonOffsetUnits = -1;
+      this.openMaterials = { below: facades.material("university"), cut };
+    }
+    for (const child of this.detailGroup.children) {
+      const role = child.userData.role as string | undefined;
+      if (role !== "below" && role !== "cut") continue;
+      const mesh = child as Mesh;
+      const street = this.openMaterials?.[role];
+      mesh.material = facades && street ? street : (mesh.userData.mapMaterial as Material[]);
+      // The cut walls stand in front of what they meet; they are few, and drawn without a twin.
+      this.depthFirst(mesh, first && role === "below");
+    }
+    this.restyle();
+    this.needsRender = true;
+  }
+
+  /**
+   * In a walker view on a graphics card a building's walls are first drawn into the depth buffer
+   * alone (StreetLook.depthFirst), so that the facades drawn after them shade only what is in
+   * front: a street of buildings in no particular order would otherwise shade the walls behind as
+   * well. The copy is a little further off than the walls, so that they always pass over it, and
+   * it cannot be picked or cast a shadow.
+   */
+  private depthFirst(mesh: Mesh, on: boolean): void {
+    let twin = mesh.userData.depthTwin as Mesh | undefined;
+    if (on && !twin) {
+      twin = new Mesh(mesh.geometry, this.depthOnly);
+      twin.renderOrder = -1;
+      twin.matrixAutoUpdate = false;
+      twin.userData.noPick = true;
+      twin.raycast = () => {};
+      mesh.add(twin);
+      mesh.userData.depthTwin = twin;
+    }
+    if (twin) twin.visible = on;
+  }
+  private depthOnly = Object.assign(new MeshBasicMaterial({ colorWrite: false }), { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 
   /** The groups whose floors are drawn on the open floor, each with its colour now. For tests. */
   spaceFloors(): { kind: SpaceKind; colour: number }[] {

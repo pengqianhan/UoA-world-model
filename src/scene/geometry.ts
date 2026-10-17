@@ -3,6 +3,7 @@
 import { BufferAttribute, BufferGeometry, ShapeUtils, Vector2 } from "three";
 import { boundingRectangle, type Pt } from "../shared/geo.ts";
 import type { ContextRoof, FlatRing } from "../shared/types.ts";
+import { PART, faceRuns, type FacadePart } from "./street/rules.ts";
 
 type RGB = readonly [number, number, number];
 
@@ -20,13 +21,36 @@ export interface WallOptions {
   plinth?: { top: number; color: RGB };
 }
 
+/**
+ * How the walker views draw a building's walls (street/facade.ts), set on a builder before the
+ * building's extrusions. Every vertex then carries where it lies on its wall: metres along its
+ * face and up from the ground floor, the width of that face's bays, and the building's storeys.
+ */
+export interface FacadeSpec {
+  /** Style and seed in one number (street/rules.ts facadeCode). */
+  code: number;
+  /** Metres of each storey above the ground storey, of the ground storey, and to the top of the last storey, from the ground floor. */
+  storey: number;
+  ground: number;
+  top: number;
+  /** Height of the building's ground floor in the builder's coordinates. */
+  base: number;
+  /** Metres east and north its roofs are laid out from. */
+  anchor: readonly [number, number];
+  /** Metres a bay is drawn about; each face takes a whole number of them. */
+  bay: number;
+  /** What the tops of its extrusions are: a roof, or the plain top of a wall. */
+  cap: FacadePart;
+}
+
 /** A turn sharper than this, in radians, ends one face of a building and starts the next. */
 const CORNER = 0.5;
 
 /**
  * Texture u at the start and end of each edge of a ring, so that every face carries a whole number
  * of window bays. A face is a run of edges between two corners, so a curve drawn as many short
- * edges is one face. A face too short for a bay keeps u = 0, the plain pier of the texture.
+ * edges is one face. A face too short for a bay keeps u = 0, the plain pier of the texture. The
+ * walker views' facades find their faces the same way (street/rules.ts faceRuns).
  */
 function bayCoords(ring: readonly Vector2[], bay: number): number[] {
   const n = ring.length;
@@ -75,12 +99,23 @@ export class MeshBuilder {
   readonly indices: number[] = [];
   /** Triangles of the second material group: the roofs of an extrusion that asked for one. */
   readonly roofIndices: number[] = [];
+  /** Per vertex, for the walker views' facades: see `mark`. */
+  readonly facadeA: number[] = [];
+  readonly facadeB: number[] = [];
+  /** The building the next extrusions belong to, when the builder keeps facades. */
+  facade?: FacadeSpec;
   private withColor: boolean;
   private withUV: boolean;
+  private withFacade: boolean;
 
-  constructor(withColor = false, withUV = false) {
+  /**
+   * `withFacade` adds what the walker views draw walls from (`facade`, `facadeStoreys`). It adds
+   * no vertex and moves none, so a material that does not read them draws the same picture.
+   */
+  constructor(withColor = false, withUV = false, withFacade = false) {
     this.withColor = withColor;
     this.withUV = withUV;
+    this.withFacade = withFacade;
   }
 
   get vertexCount(): number {
@@ -94,6 +129,24 @@ export class MeshBuilder {
     if (this.withColor) this.colors.push(c?.[0] ?? 1, c?.[1] ?? 1, c?.[2] ?? 1);
     if (this.withUV) this.uvs.push(u, v);
     return i;
+  }
+
+  /**
+   * The facade data of the vertex just added: for a wall, metres along its face, metres up from
+   * the ground floor and the width of the face's bays; for anything else, where it stands from the
+   * building's anchor. Then the building's style and seed, its storeys and what the part is.
+   */
+  private mark(part: FacadePart, a: number, b: number, c: number): void {
+    if (!this.withFacade) return;
+    const f = this.facade;
+    this.facadeA.push(a, b, c, f?.code ?? 0);
+    this.facadeB.push(f?.storey ?? 3.3, f?.ground ?? 3.3, f?.top ?? 0, part);
+  }
+
+  /** Marks the vertex just added, at a point of the scene, by where it lies from the building's anchor. */
+  private markAt(part: FacadePart, x: number, y: number, z: number): void {
+    const f = this.facade;
+    this.mark(part, x - (f?.anchor[0] ?? 0), y - (f?.base ?? 0), z + (f?.anchor[1] ?? 0));
   }
 
   /** Pushes a roof triangle wound so that it faces up (counter-clockwise seen from above). */
@@ -129,13 +182,20 @@ export class MeshBuilder {
     if (cap) {
       const base = this.vertexCount;
       const all = holes.length ? contour.concat(...holes) : contour;
-      for (const p of all) this.vertex(p.x, y1, -p.y, 0, 1, 0, topColor);
+      const part = this.facade?.cap ?? PART.roof;
+      for (const p of all) {
+        this.vertex(p.x, y1, -p.y, 0, 1, 0, topColor);
+        this.markAt(part, p.x, y1, -p.y);
+      }
       for (const tri of ShapeUtils.triangulateShape(contour, holes)) this.upFacing(base, all, tri, roofGroup ? this.roofIndices : this.indices);
     }
     if (bottom) {
       const base = this.vertexCount;
       const all = holes.length ? contour.concat(...holes) : contour;
-      for (const p of all) this.vertex(p.x, y0, -p.y, 0, -1, 0, sideColor);
+      for (const p of all) {
+        this.vertex(p.x, y0, -p.y, 0, -1, 0, sideColor);
+        this.markAt(PART.plain, p.x, y0, -p.y);
+      }
       const from = this.indices.length;
       for (const tri of ShapeUtils.triangulateShape(contour, holes)) this.upFacing(base, all, tri);
       // Same triangles as a roof, turned over to face down.
@@ -155,8 +215,10 @@ export class MeshBuilder {
             [split, y1, sideColor],
           ]
         : [[y0, y1, plinth && plinth.top >= y1 - 1e-6 ? plinth.color : sideColor]];
+    const groundFloor = this.facade?.base ?? 0;
     const walls = (ring: Vector2[]) => {
       const us = bay > 0 ? bayCoords(ring, bay) : undefined;
+      const runs = this.withFacade ? faceRuns(ring, this.facade?.bay ?? 0, CORNER) : undefined;
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i]!;
         const b = ring[(i + 1) % ring.length]!;
@@ -169,13 +231,20 @@ export class MeshBuilder {
         const nz = dx / len;
         const ua = us?.[i * 2];
         const ub = us?.[i * 2 + 1];
+        const along0 = runs?.[i * 3] ?? 0;
+        const along1 = runs?.[i * 3 + 1] ?? 0;
+        const width = runs?.[i * 3 + 2] ?? 0;
         for (const [from, to, color] of bands) {
           const v0 = storey > 0 ? from / storey : 0.05;
           const v1 = storey > 0 ? to / storey : 0.05;
           const i0 = this.vertex(a.x, from, -a.y, nx, 0, nz, color, v0, ua);
+          this.mark(PART.wall, along0, from - groundFloor, width);
           const i1 = this.vertex(b.x, from, -b.y, nx, 0, nz, color, v0, ub);
+          this.mark(PART.wall, along1, from - groundFloor, width);
           const i2 = this.vertex(b.x, to, -b.y, nx, 0, nz, color, v1, ub);
+          this.mark(PART.wall, along1, to - groundFloor, width);
           const i3 = this.vertex(a.x, to, -a.y, nx, 0, nz, color, v1, ua);
+          this.mark(PART.wall, along0, to - groundFloor, width);
           this.indices.push(i0, i1, i2, i0, i2, i3);
         }
       }
@@ -194,12 +263,17 @@ export class MeshBuilder {
     // The right of the direction of travel, in scene axes (x east, z south).
     const nx = (by - ay) / len;
     const nz = (bx - ax) / len;
+    const groundFloor = this.facade?.base ?? 0;
     for (const side of [1, -1]) {
       const i = this.vertexCount;
       this.vertex(ax, y0, -ay, nx * side, 0, nz * side, color);
+      this.mark(PART.plain, 0, y0 - groundFloor, 0);
       this.vertex(bx, y0, -by, nx * side, 0, nz * side, color);
+      this.mark(PART.plain, len, y0 - groundFloor, 0);
       this.vertex(bx, y1, -by, nx * side, 0, nz * side, color);
+      this.mark(PART.plain, len, y1 - groundFloor, 0);
       this.vertex(ax, y1, -ay, nx * side, 0, nz * side, color);
+      this.mark(PART.plain, 0, y1 - groundFloor, 0);
       if (side > 0) this.indices.push(i, i + 1, i + 2, i, i + 2, i + 3);
       else this.indices.push(i, i + 2, i + 1, i, i + 3, i + 2);
     }
@@ -220,7 +294,10 @@ export class MeshBuilder {
     const len = Math.hypot(nx, ny, nz);
     if (len < 1e-6) return;
     const i = this.vertexCount;
-    for (const p of [a, b, c]) this.vertex(p[0]!, p[1]!, -p[2]!, nx / len, ny / len, nz / len, color);
+    for (const p of [a, b, c]) {
+      this.vertex(p[0]!, p[1]!, -p[2]!, nx / len, ny / len, nz / len, color);
+      this.markAt(PART.pitched, p[0]!, p[1]!, -p[2]!);
+    }
     this.indices.push(i, i + 1, i + 2);
   }
 
@@ -298,7 +375,10 @@ export class MeshBuilder {
     const contour: Vector2[] = [];
     for (let i = 0; i + 1 < ring.length; i += 2) contour.push(new Vector2(ring[i]! / 10, ring[i + 1]! / 10));
     const base = this.vertexCount;
-    for (const p of contour) this.vertex(p.x, y, -p.y, 0, 1, 0, color);
+    for (const p of contour) {
+      this.vertex(p.x, y, -p.y, 0, 1, 0, color);
+      this.markAt(this.facade?.cap ?? PART.roof, p.x, y, -p.y);
+    }
     for (const tri of ShapeUtils.triangulateShape(contour, [])) this.upFacing(base, contour, tri, second ? this.roofIndices : this.indices);
   }
 
@@ -324,7 +404,9 @@ export class MeshBuilder {
       const nx = -dy;
       const ny = dx;
       this.vertex(px(i) + nx * half, y, -(py(i) + ny * half), 0, 1, 0, color);
+      this.mark(PART.plain, 0, 0, 0);
       this.vertex(px(i) - nx * half, y, -(py(i) - ny * half), 0, 1, 0, color);
+      this.mark(PART.plain, 0, 0, 0);
     }
     for (let i = 0; i < n - 1; i++) {
       const a = base + i * 2;
@@ -339,6 +421,10 @@ export class MeshBuilder {
     g.setAttribute("normal", new BufferAttribute(new Float32Array(this.normals), 3));
     if (this.withColor) g.setAttribute("color", new BufferAttribute(new Float32Array(this.colors), 3));
     if (this.withUV) g.setAttribute("uv", new BufferAttribute(new Float32Array(this.uvs), 2));
+    if (this.withFacade) {
+      g.setAttribute("facade", new BufferAttribute(new Float32Array(this.facadeA), 4));
+      g.setAttribute("facadeStoreys", new BufferAttribute(new Float32Array(this.facadeB), 4));
+    }
     const Index = this.vertexCount > 65535 ? Uint32Array : Uint16Array;
     g.setIndex(new BufferAttribute(new Index(this.roofIndices.length ? this.indices.concat(this.roofIndices) : this.indices), 1));
     // A mesh given a material for walls and one for roofs draws only its groups, so the walls are

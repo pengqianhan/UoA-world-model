@@ -57,6 +57,23 @@ export interface StreetLighting {
   /** How much of the stars and of the moon shows, 0-1. */
   stars: number;
   moon: number;
+  /** What the windows show (facade.ts). */
+  windows: WindowLight;
+}
+
+/** What is seen in and on a window: the rooms behind it, their blinds, and the sky it reflects. */
+export interface WindowLight {
+  /** How much the rooms whose lights are on show, 0 by day to 1 after dark. */
+  glow: number;
+  /** A room's back wall and a blind, lit by the day through the window, in the scene's units. */
+  interior: RGB;
+  blind: RGB;
+  /** The sky overhead and low down, and the ground, as a pane reflects them where there is no environment map. */
+  skyUp: RGB;
+  skyLow: RGB;
+  ground: RGB;
+  /** The glow of the city after dark, which a pane reflects: street lights and lit windows the scene does not draw. */
+  city: RGB;
 }
 
 // Tunables. Radiance is in the scene's own units: a white wall in full sun comes to about 1.
@@ -79,7 +96,7 @@ export const SKYLIGHT_SATURATION = 0.3;
 const SKYLIGHT = 0.6;
 /** The sun high in a clear sky, and the moon. */
 const SUN_INTENSITY = 3.4;
-const MOON_INTENSITY = 0.32;
+const MOON_INTENSITY = 0.22;
 const MOON_COLOUR: RGB = [0.62, 0.72, 1];
 /** What the ground throws back, a mix of paving, road and grass. */
 const GROUND_ALBEDO: RGB = [0.24, 0.21, 0.17];
@@ -88,7 +105,7 @@ const EXPOSURE_DAY = 1;
 const EXPOSURE_NIGHT = 1.7;
 const LOW_SUN_OPENING = 1.9;
 /** Some light in every shadow after dark, cool like the moon's: the city's glow and the eye's adapting. */
-const AMBIENT_NIGHT = 0.15;
+const AMBIENT_NIGHT = 0.1;
 export const AMBIENT_COLOUR: RGB = [0.55, 0.66, 1];
 /**
  * Haze per metre: by day 500 m away is a quarter hidden, 1.2 km mostly, and the map's edge, 2 km
@@ -101,6 +118,18 @@ export const BLOOM_THRESHOLD_DAY = 8;
 const BLOOM_THRESHOLD_NIGHT = 0.55;
 const BLOOM_STRENGTH_DAY = 0.08;
 const BLOOM_STRENGTH_NIGHT = 0.16;
+/**
+ * A room seen through its window by day: lit by the window alone, its back wall is a twentieth or so
+ * as bright as a sunlit wall outside (facade.ts shades its sides), a blind against the glass a few
+ * times that.
+ */
+const INTERIOR = 0.24;
+const BLIND = 0.32;
+/** The city's glow in a pane after dark. */
+const CITY_GLOW: RGB = [0.05, 0.045, 0.04];
+/** Rooms light up from dusk: night 0-1, as the sun goes from just above the horizon to well below it. */
+const GLOW_FROM = 0.3;
+const GLOW_FULL = 0.8;
 /** Where the sky is drawn when the light is forced to night while the sun is up, degrees. */
 const NIGHT_SUN = -8;
 
@@ -286,6 +315,19 @@ export function streetLighting(input: StreetInputs): StreetLighting {
   const lowSun = clamp(Math.pow(Math.sin(45 * RAD) / Math.sin(Math.max(el, 4) * RAD), 0.3), 1, LOW_SUN_OPENING);
   const exposureDay = EXPOSURE_DAY * lowSun * (1 + 0.3 * cloud);
 
+  // What the windows show. A room by day takes the light that falls on the ground outside it.
+  const daylight = (byNight ? 0 : sunOnGround) * 0.5 + luma(fromSky) * SKYLIGHT;
+  const warm: RGB = [1, 0.96, 0.9];
+  const windows: WindowLight = {
+    glow: smoothstep(GLOW_FROM, GLOW_FULL, night),
+    interior: warm.map((c) => c * INTERIOR * daylight) as RGB,
+    blind: warm.map((c) => c * BLIND * daylight) as RGB,
+    skyUp: skyRadiance([0, 1, 0], sky),
+    skyLow: skyRadiance(direction(at.azimuth + 180, 6), sky),
+    ground: sky.ground,
+    city: CITY_GLOW.map((c) => c * night) as RGB,
+  };
+
   return {
     sky,
     lightColour,
@@ -298,5 +340,10 @@ export function streetLighting(input: StreetInputs): StreetLighting {
     bloomStrength: mix(BLOOM_STRENGTH_DAY, BLOOM_STRENGTH_NIGHT, night),
     stars: smoothstep(0.55, 0.95, night) * (1 - cloud) * (1 - fog),
     moon: smoothstep(0.35, 0.8, night) * (1 - 0.85 * cloud) * (1 - fog),
+    windows,
   };
+}
+
+function luma(c: RGB): number {
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 }

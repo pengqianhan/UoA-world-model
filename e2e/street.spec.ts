@@ -1,5 +1,6 @@
-// The street look: what a walker sees has a sky, a light and a haze of its own, and the map is
-// drawn as it always was once the walker view is left.
+// The street look: what a walker sees has a sky, a light and a haze of its own, buildings with
+// storeys, windows and walls drawn by rule, and the map is drawn as it always was once the walker
+// view is left.
 import { expect, test, type Page } from "@playwright/test";
 import { expectRealRender, open, shot } from "./helpers.ts";
 
@@ -42,4 +43,25 @@ test("through a walker's eyes the street has a sky, a light and a haze of its ow
   expect(night.exposure).toBeGreaterThan(day.exposure);
   await expectRealRender(page);
   await shot(page, "21-street-eyes-night");
+});
+
+test("from a walker's height every building has storeys, windows and walls drawn by rule, and the map keeps its own after", async ({ page }) => {
+  await openStreet(page, `?walk=1&view=eyes&light=day&${T}&t=15:00`);
+  // Every University building on the map, and the city round them, which is one mesh.
+  const on = await street(page);
+  expect(on.facades.university).toBeGreaterThan(100);
+  expect(on.facades.city).toBe(1);
+
+  // Close to a wall of the Clock Tower, at eye level: a walk to a building ends beside its nearest wall.
+  const walked = await page.evaluate(() => (window as unknown as { __walker: { run(c: string, a: object): Promise<{ arrived: boolean }> } }).__walker.run("walk", { to: "105", speed: 40 }));
+  expect(walked.arrived).toBe(true);
+  await page.evaluate(() => window.__scene!.setWalkerLook(0, 8));
+  await page.waitForTimeout(400);
+  await expectRealRender(page);
+  await shot(page, "21-street-facade");
+
+  // Back on the map every building has the map's materials again.
+  await page.keyboard.press("Escape");
+  await expect(page.locator('#walker-panel button[data-view="map"]')).toHaveAttribute("aria-pressed", "true");
+  expect((await street(page)).facades).toEqual({ university: 0, city: 0 });
 });

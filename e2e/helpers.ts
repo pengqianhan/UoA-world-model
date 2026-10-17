@@ -25,12 +25,22 @@ interface SceneHandle {
     deciduous: number;
     deciduousTrees: number;
   };
-  streetState(): { active: boolean; tier: "full" | "basic" | "off"; passes: string[]; sky: boolean; exposure: number };
+  streetState(): {
+    active: boolean;
+    tier: "full" | "basic" | "off";
+    passes: string[];
+    sky: boolean;
+    exposure: number;
+    /** How many buildings wear the walker views' facades: University buildings, and the surrounding city's one mesh. */
+    facades: { university: number; city: number };
+  };
   floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number; outerWalls: boolean; windowsBelow: boolean };
   openFloorBox(): { left: number; top: number; right: number; bottom: number } | undefined;
   probe(): { width: number; height: number; distinctColours: number; samples: number };
   cameraState(): { azimuth: number; polar: number; zoom: number; target: [number, number, number] };
   screenPoint(kind: "building" | "room", id: string): { x: number; y: number } | undefined;
+  /** Looks round in the walker view, degrees from straight ahead. */
+  setWalkerLook(yaw: number, pitch?: number): void;
 }
 
 declare global {
