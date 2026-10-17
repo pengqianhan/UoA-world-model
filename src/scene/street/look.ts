@@ -1,9 +1,10 @@
 // The look of the walker views, the street seen from a walker's height: a sky with the sun where it
 // really stands (or stars and a moon by night), the light it throws, haze in the distance, walls
-// with storeys, windows and the grain of what they are made of (facade.ts), and a picture exposed
-// and tone-mapped like a camera's. On a renderer that draws in high dynamic range (tier "full",
-// tier.ts) the scene is drawn into a half-float target, with ambient occlusion and bloom laid on
-// before the tone curve; elsewhere the materials tone-map as they draw.
+// with storeys, windows and the grain of what they are made of (facade.ts), ground of asphalt,
+// kerbs, paving, grass and water (ground.ts), and a picture exposed and tone-mapped like a
+// camera's. On a renderer that draws in high dynamic range (tier "full", tier.ts) the scene is
+// drawn into a half-float target, with ambient occlusion and bloom laid on before the tone curve;
+// elsewhere the materials tone-map as they draw.
 //
 // Everything here is on only while a walker view is: entering it puts the look in place, leaving
 // it takes it all away again, and the map is drawn exactly as before (CampusScene.applyPalette
@@ -27,6 +28,7 @@ import type { StreetSky } from "./sky.ts";
 import type { NightSky } from "./night.ts";
 import type { StreetEffects } from "./effects.ts";
 import type { StreetFacades } from "./facade.ts";
+import type { StreetGround } from "./ground.ts";
 
 export interface StreetLights {
   sun: DirectionalLight;
@@ -77,7 +79,7 @@ export class StreetLook {
   /** Whether the renderer draws into a half-float target before tone-mapping (tier "full" at start). */
   private readonly hdr: boolean;
   private on = false;
-  private kit?: { sky: StreetSky; night: NightSky; effects?: StreetEffects; facades: StreetFacades };
+  private kit?: { sky: StreetSky; night: NightSky; effects?: StreetEffects; facades: StreetFacades; ground: StreetGround };
   private loading?: Promise<void>;
   private inputs: StreetInputs = { night: 0 };
   private lighting?: StreetLighting;
@@ -90,7 +92,7 @@ export class StreetLook {
   private look = new Vector3();
   private toLight = new Vector3();
 
-  /** `dress` puts the facades on the buildings when they arrive while a walker view is open. */
+  /** `dress` puts the facades on the buildings and the ground's materials on it when they arrive while a walker view is open. */
   constructor(o: { renderer: WebGLRenderer; scene: Scene; camera: PerspectiveCamera; lights: StreetLights; tier: StreetTier; redraw: () => void; dress: () => void }) {
     this.renderer = o.renderer;
     this.scene = o.scene;
@@ -118,6 +120,11 @@ export class StreetLook {
   /** What draws the buildings' walls in a walker view, once it has loaded; none on the map. */
   get facades(): StreetFacades | undefined {
     return this.on ? this.kit?.facades : undefined;
+  }
+
+  /** What draws the ground in a walker view, once it has loaded; none on the map. */
+  get ground(): StreetGround | undefined {
+    return this.on ? this.kit?.ground : undefined;
   }
 
   /** Puts the look in place. The light follows from setLight, which the scene calls after. */
@@ -168,6 +175,7 @@ export class StreetLook {
       kit.night.follow(this.camera);
       kit.effects?.follow(this.camera.position);
       kit.facades.tick(performance.now() / 60000);
+      kit.ground.tick(performance.now() / 1000);
       // Made again only when the sky has changed enough to show (sky.ts).
       if (this.hdr) this.scene.environment = kit.sky.environment();
     }
@@ -193,17 +201,19 @@ export class StreetLook {
     this.kit?.night.dispose();
     this.kit?.effects?.dispose();
     this.kit?.facades.dispose();
+    this.kit?.ground.dispose();
   }
 
-  /** The sky, the stars, the effects and the facades come in a chunk of their own with the first walker view. */
+  /** The sky, the stars, the effects, the facades and the ground come in a chunk of their own with the first walker view. */
   private load(): void {
-    this.loading ??= Promise.all([import("./sky.ts"), import("./night.ts"), this.hdr ? import("./effects.ts") : undefined, import("./facade.ts")])
-      .then(([sky, night, effects, facade]) => {
+    this.loading ??= Promise.all([import("./sky.ts"), import("./night.ts"), this.hdr ? import("./effects.ts") : undefined, import("./facade.ts"), import("./ground.ts")])
+      .then(([sky, night, effects, facade, ground]) => {
         this.kit = {
           sky: new sky.StreetSky(this.renderer),
           night: new night.NightSky(),
           effects: effects && new effects.StreetEffects(this.scene, this.camera),
           facades: new facade.StreetFacades(this.renderer),
+          ground: new ground.StreetGround(this.renderer, !this.hdr),
         };
         if (!this.on) return;
         this.install();
@@ -245,6 +255,7 @@ export class StreetLook {
     this.kit?.effects?.setBloom(l.bloomThreshold, l.bloomStrength);
     // The facades' recesses are shaded from the scene's directional light, the sun or the moon.
     this.kit?.facades.setLight({ ...l.windows, sun: this.toLight.subVectors(sun.position, sun.target.position), reflect: 1 / l.skylight });
+    this.kit?.ground.setLight({ wet: l.wet, reflect: 1 / l.skylight, skyUp: l.windows.skyUp, skyLow: l.windows.skyLow, ground: l.windows.ground, glow: l.groundGlow, city: l.windows.city });
     this.redraw();
   }
 

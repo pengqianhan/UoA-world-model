@@ -33,6 +33,8 @@ interface SceneHandle {
     exposure: number;
     /** How many buildings wear the walker views' facades: University buildings, and the surrounding city's one mesh. */
     facades: { university: number; city: number };
+    /** How many of the ground's meshes and layers of paint wear the walker views' surfaces, and whether one is water. */
+    ground: { surfaces: number; water: boolean };
   };
   floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number; outerWalls: boolean; windowsBelow: boolean };
   openFloorBox(): { left: number; top: number; right: number; bottom: number } | undefined;

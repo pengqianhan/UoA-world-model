@@ -2,7 +2,7 @@
 // ambient occlusion, which shades where walls meet the ground and each other, and a gentle bloom,
 // which lets the sun glare by day and lit windows glow by night. The renderer runs them between
 // drawing the scene and tone-mapping it (WebGLRenderer.setEffects). Loaded with the first walker view.
-import { Box3, Vector2, Vector3, type Camera, type Scene } from "three";
+import { Box3, Vector2, Vector3, type Camera, type Object3D, type Scene } from "three";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
@@ -36,8 +36,40 @@ const BLOOM_RADIUS = 0.5;
  * worked out from depth are worked out again for every sample of the denoising.)
  */
 class HalfGTAOPass extends GTAOPass {
+  private hidden: Object3D[] = [];
+
+  constructor(scene: Scene, camera: Camera) {
+    super(scene, camera);
+    const base = GTAOPass.prototype as unknown as Record<string, unknown>;
+    if (typeof base._overrideVisibility !== "function" || typeof base._restoreVisibility !== "function") {
+      throw new Error("three's GTAOPass has changed: effects.ts cannot leave the paint on the ground out of the occlusion");
+    }
+  }
+
   override setSize(width: number, height: number): void {
     super.setSize(Math.max(1, Math.ceil(width / 2)), Math.max(1, Math.ceil(height / 2)));
+  }
+
+  /**
+   * What the pass hides while it draws the scene for its depth and normals: points and lines, as
+   * three's own does, and the paint on the ground (`userData.noAO`). In a walker view the paint
+   * lies on the ground's mesh, which stands for it there, while its own triangles stay where the
+   * map lifted them (ground.ts); drawn as they are, they would cast occlusion on the ground round them.
+   */
+  _overrideVisibility(): void {
+    const hidden = this.hidden;
+    this.scene.traverse((o: Object3D & { isPoints?: boolean; isLine?: boolean; isLine2?: boolean }) => {
+      const line = o.isPoints || o.isLine || o.isLine2;
+      if (o.visible && (line || o.userData.noAO === true)) {
+        o.visible = false;
+        hidden.push(o);
+      }
+    });
+  }
+
+  _restoreVisibility(): void {
+    for (const o of this.hidden) o.visible = true;
+    this.hidden.length = 0;
   }
 }
 

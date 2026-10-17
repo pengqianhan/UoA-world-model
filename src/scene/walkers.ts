@@ -18,8 +18,11 @@ export const MAX_SPEED = 40;
 const TURN_RATE = 400;
 /** Metres within which a walker hears what another says, out of doors. */
 export const HEAR_RANGE = 25;
-/** Metres the paint of paths and streets lies over the ground (see CampusScene.setContext). */
-const GROUND_PAINT = 0.25;
+/**
+ * Metres the paint of paths and streets lies over the ground (see CampusScene.setContext), where a
+ * walker's feet stand. The walker views lay all of the ground there (street/ground.ts).
+ */
+export const GROUND_PAINT = 0.25;
 /** Box of walkable ground kept round a walker steered by hand, metres; rebuilt near its edge. */
 const LOCAL_BOX = 160;
 

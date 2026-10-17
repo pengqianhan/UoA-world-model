@@ -1,6 +1,6 @@
 // The street look: what a walker sees has a sky, a light and a haze of its own, buildings with
-// storeys, windows and walls drawn by rule, and the map is drawn as it always was once the walker
-// view is left.
+// storeys, windows and walls drawn by rule, ground of asphalt, kerbs, paving, grass and water drawn
+// by rule, and the map is drawn as it always was once the walker view is left.
 import { expect, test, type Page } from "@playwright/test";
 import { expectRealRender, open, shot } from "./helpers.ts";
 
@@ -18,7 +18,8 @@ async function openStreet(page: Page, query: string): Promise<void> {
 }
 
 test("through a walker's eyes the street has a sky, a light and a haze of its own, by day and by night, and the map is lit as before after it", async ({ page }) => {
-  await openStreet(page, `?walk=1&view=eyes&light=day&${T}&t=15:00`);
+  // By day on Princes Street, by the Clock Tower.
+  await openStreet(page, `?walk=-12,214&view=eyes&light=day&${T}&t=15:00`);
   const day = await street(page);
   expect(day).toMatchObject({ active: true, sky: true });
   // The full tier on a graphics card; the basic one in software (CI) and on phones.
@@ -26,13 +27,25 @@ test("through a walker's eyes the street has a sky, a light and a haze of its ow
   expect(day.passes[0]).toBe("scene");
   // The distance is hazed into the sky.
   expect((await page.evaluate(() => window.__scene!.lightState())).fog).toBe(true);
+  // The ground and every layer of paint over it, the city's ponds among them, wear surfaces drawn by rule.
+  expect(day.ground.surfaces).toBeGreaterThan(10);
+  expect(day.ground.water).toBe(true);
   await expectRealRender(page);
   await shot(page, "21-street-eyes-day");
+
+  // Down the street at eye level: asphalt with a white line down it, kerbs and footpaths.
+  await page.evaluate(async () => {
+    const walker = (window as unknown as { __walker: { run(c: string): Promise<{ walkers: { heading: number }[] }> } }).__walker;
+    const { heading } = (await walker.run("list")).walkers[0]!;
+    window.__scene!.setWalkerLook(200 - heading, -6);
+  });
+  await expectRealRender(page);
+  await shot(page, "21-street-ground");
 
   // Escape goes back to the map: the look is gone, and the map by day has no haze, as before.
   await page.keyboard.press("Escape");
   await expect(page.locator('#walker-panel button[data-view="map"]')).toHaveAttribute("aria-pressed", "true");
-  expect(await street(page)).toMatchObject({ active: false, tier: "off", passes: [], exposure: 1 });
+  expect(await street(page)).toMatchObject({ active: false, tier: "off", passes: [], exposure: 1, ground: { surfaces: 0, water: false } });
   expect((await page.evaluate(() => window.__scene!.lightState())).fog).toBe(false);
   await expectRealRender(page);
 

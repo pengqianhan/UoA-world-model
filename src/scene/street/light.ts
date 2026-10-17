@@ -59,6 +59,10 @@ export interface StreetLighting {
   moon: number;
   /** What the windows show (facade.ts). */
   windows: WindowLight;
+  /** How wet the ground is, 0-1: rain darkens it and makes it shine (ground.ts). */
+  wet: number;
+  /** Light on the ground after dark from the city round it (ground.ts), irradiance in the scene's units. */
+  groundGlow: RGB;
 }
 
 /** What is seen in and on a window: the rooms behind it, their blinds, and the sky it reflects. */
@@ -127,6 +131,12 @@ const INTERIOR = 0.24;
 const BLIND = 0.32;
 /** The city's glow in a pane after dark. */
 const CITY_GLOW: RGB = [0.05, 0.045, 0.04];
+/**
+ * The light that falls on the ground after dark from what the scene does not draw: street lamps,
+ * which are not mapped, lit rooms and shop fronts, and the glow of the clouds over the city. It is
+ * warm, and enough for a street to be made out by: dark asphalt reads, pale kerbs and lines show.
+ */
+const GROUND_GLOW: RGB = [0.29, 0.26, 0.21];
 /** Rooms light up from dusk: night 0-1, as the sun goes from just above the horizon to well below it. */
 const GLOW_FROM = 0.3;
 const GLOW_FULL = 0.8;
@@ -341,6 +351,8 @@ export function streetLighting(input: StreetInputs): StreetLighting {
     stars: smoothstep(0.55, 0.95, night) * (1 - cloud) * (1 - fog),
     moon: smoothstep(0.35, 0.8, night) * (1 - 0.85 * cloud) * (1 - fog),
     windows,
+    wet: clamp(input.weather?.wet ?? 0, 0, 1),
+    groundGlow: GROUND_GLOW.map((c) => c * smoothstep(GLOW_FROM, GLOW_FULL, night) * (1 - 0.5 * fog)) as RGB,
   };
 }
 

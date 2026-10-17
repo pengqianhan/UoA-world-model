@@ -44,18 +44,19 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room, SpaceKind, SpaceType } from "../shared/types.ts";
 import { decodeRing, interiorPoint, pointInRing } from "../shared/geo.ts";
 import { groundLevel, massing, roofRims, withoutStrips } from "../shared/massing.ts";
-import { MeshBuilder, drape, ringsBounds, type FacadeSpec } from "./geometry.ts";
+import { MeshBuilder, drape, levelSlope, ringsBounds, type FacadeSpec } from "./geometry.ts";
 import { SEA_PLANE, Terrain } from "./terrain.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
 import { EYE_HEIGHT } from "./figure.ts";
-import { WalkerWorld } from "./walkers.ts";
+import { GROUND_PAINT, WalkerWorld } from "./walkers.ts";
 import { WalkMap } from "../shared/walkmap.ts";
 import { floorRings } from "../shared/indoor.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
 import { StreetLook, type StreetState } from "./street/look.ts";
 import { streetTier } from "./street/tier.ts";
 import { PART, STYLE, STYLES, buildingSeed, cityStoreys, facadeCode, facadeStyle } from "./street/rules.ts";
+import { GROUND, RAIL_WIDTH, ROAD_EDGE_WIDTH, ROAD_WIDTH, type GroundKind } from "./street/roads.ts";
 
 export interface Selection {
   building?: string;
@@ -81,6 +82,12 @@ export interface PinSpec {
 export interface FacadeCount {
   university: number;
   city: number;
+}
+
+/** How much of the ground wears the walker views' surfaces: its meshes and its layers of paint, and whether there is water. */
+export interface GroundCount {
+  surfaces: number;
+  water: boolean;
 }
 
 /** Weather as the scene draws it, each 0-1. */
@@ -147,12 +154,19 @@ interface Tween {
 
 const VIEW_HEIGHT = 1000; // metres visible vertically at zoom 1
 const CAMERA_DISTANCE = 3200;
-const ROAD_WIDTH = { motorway: 15, major: 11, street: 7.5, service: 4.2, path: 2.2, steps: 2.2 } as const;
 const ROAD_Y = { path: 0.12, steps: 0.12, service: 0.14, street: 0.16, major: 0.18, motorway: 0.2 } as const;
 const AREA_Y = { park: 0.02, grass: 0.04, wood: 0.06, pitch: 0.08, water: 0.1 } as const;
 /** Street edges lie under every carriageway and path, so that a junction stays clean. */
 const ROAD_EDGE_Y = 0.11;
-const ROAD_EDGE_WIDTH = 1.6;
+const RAIL_Y = 0.11;
+/**
+ * The order the walker views draw the ground in (street/ground.ts), between the buildings' depth
+ * drawn first (renderOrder -1) and everything else (0): the paint, top layer first; then the ground
+ * under it where no paint covers it, after its own depth on a graphics card, before the paint elsewhere.
+ */
+const PAINT_ORDER = -0.5;
+const GROUND_ORDER_AFTER = -0.3;
+const GROUND_ORDER_BEFORE = -0.9;
 const SLAB = 0.35;
 const ROOM_HEIGHT = 1.5;
 /** Metres between window centres on University buildings. A drawing convention, like the storey height. */
@@ -277,6 +291,10 @@ export class CampusScene {
   private opts: SceneOptions;
 
   private ground: Mesh;
+  /** The map's material for the ground plane and the terrain's meshes. */
+  private groundMaterial: MeshLambertMaterial;
+  /** The map's paint on the ground (areas, roads, railways), each with what it is and how high the map lays it. */
+  private groundLayers: Mesh[] = [];
   private contextGroup = new Group();
   private uniGroup = new Group();
   private detailGroup = new Group();
@@ -442,7 +460,8 @@ export class CampusScene {
       dress: () => this.dressBuildings(),
     });
 
-    this.ground = new Mesh(new PlaneGeometry(9000, 9000), new MeshLambertMaterial({ color: DAY.ground }));
+    this.groundMaterial = new MeshLambertMaterial({ color: DAY.ground });
+    this.ground = new Mesh(new PlaneGeometry(9000, 9000), this.groundMaterial);
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground, this.contextGroup, this.uniGroup, this.detailGroup, this.pinGroup);
@@ -589,22 +608,25 @@ export class CampusScene {
     this.walkers.refresh();
     this.contextGroup.clear();
     this.contextMaterials = [];
+    this.groundLayers = [];
     const terrain = this.terrain;
     // Paint on the ground follows it. Layers a few centimetres apart cannot keep their order over
     // a slope once each is split its own way, so on terrain they are lifted further and pulled
-    // forward in depth, the later the more.
+    // forward in depth, the later the more. Each also keeps the slope under it, which the map does
+    // not draw and the walker views do (street/ground.ts), and the paint along a line keeps where
+    // each point lies along it and across it.
     let layer = 0;
     const onGround = (geometry: BufferGeometry): BufferGeometry => {
-      if (!terrain) return geometry;
+      if (!terrain) return levelSlope(geometry);
       geometry.translate(0, 0.15 + layer * 0.04, 0);
-      const draped = drape(geometry, (x, y) => terrain.height(x, y));
+      const draped = drape(geometry, (x, y) => terrain.height(x, y), 10, (x, y, out) => terrain.normal(x, y, out));
       geometry.dispose();
       return draped;
     };
     const add = (
       geometry: BufferGeometry,
       key: (p: Palette) => number,
-      opts: { shadow?: boolean; receive?: boolean; vertexColors?: boolean; ground?: boolean } = {},
+      opts: { shadow?: boolean; receive?: boolean; vertexColors?: boolean; ground?: { kind: Exclude<GroundKind, "open">; y: number } } = {},
     ) => {
       const mat = new MeshLambertMaterial({ color: key(this.palette), vertexColors: !!opts.vertexColors });
       if (opts.ground && terrain) {
@@ -618,6 +640,11 @@ export class CampusScene {
       mesh.receiveShadow = opts.receive ?? true;
       mesh.userData.noPick = true;
       mesh.matrixAutoUpdate = false;
+      if (opts.ground) {
+        mesh.userData.mapMaterial = mat;
+        mesh.userData.groundLayer = { kind: opts.ground.kind, lift: opts.ground.y + (terrain ? 0.15 + layer * 0.04 : 0) };
+        this.groundLayers.push(mesh);
+      }
       this.contextGroup.add(mesh);
       this.contextMaterials.push({ mat, key });
       return mesh;
@@ -626,22 +653,22 @@ export class CampusScene {
     for (const k of ["park", "grass", "wood", "pitch", "water"] as const) {
       const mb = new MeshBuilder();
       for (const a of ctx.areas) if (a.k === k) mb.flat(a.p, AREA_Y[k]);
-      if (mb.vertexCount) add(mb.build(), (p) => p.area[k], { ground: true });
+      if (mb.vertexCount) add(mb.build(), (p) => p.area[k], { ground: { kind: k, y: AREA_Y[k] } });
     }
     {
-      const mb = new MeshBuilder();
+      const mb = new MeshBuilder(false, false, false, true);
       for (const r of ctx.roads) if (r.k === "street" || r.k === "major" || r.k === "motorway") mb.ribbon(r.p, ROAD_WIDTH[r.k] + ROAD_EDGE_WIDTH, ROAD_EDGE_Y);
-      if (mb.vertexCount) add(mb.build(), (p) => p.roadEdge, { ground: true });
+      if (mb.vertexCount) add(mb.build(), (p) => p.roadEdge, { ground: { kind: "edge", y: ROAD_EDGE_Y } });
     }
     for (const k of ["path", "steps", "service", "street", "major", "motorway"] as const) {
-      const mb = new MeshBuilder();
+      const mb = new MeshBuilder(false, false, false, true);
       for (const r of ctx.roads) if (r.k === k) mb.ribbon(r.p, ROAD_WIDTH[k], ROAD_Y[k]);
-      if (mb.vertexCount) add(mb.build(), (p) => p.road[k], { ground: true });
+      if (mb.vertexCount) add(mb.build(), (p) => p.road[k], { ground: { kind: k, y: ROAD_Y[k] } });
     }
     {
-      const mb = new MeshBuilder();
-      for (const r of ctx.rails) mb.ribbon(r, 2.6, 0.11);
-      if (mb.vertexCount) add(mb.build(), (p) => p.rail, { ground: true });
+      const mb = new MeshBuilder(false, false, false, true);
+      for (const r of ctx.rails) mb.ribbon(r, RAIL_WIDTH, RAIL_Y);
+      if (mb.vertexCount) add(mb.build(), (p) => p.rail, { ground: { kind: "rail", y: RAIL_Y } });
     }
     {
       const mb = new MeshBuilder(true, false, true);
@@ -977,7 +1004,7 @@ export class CampusScene {
     } else {
       this.scene.fog = null;
     }
-    (this.ground.material as MeshLambertMaterial).color.setHex(p.ground);
+    this.groundMaterial.color.setHex(p.ground);
     this.hemi.color.setHex(p.ambient);
     this.hemi.groundColor.setHex(p.ambientGround);
     this.hemi.intensity = p.ambientIntensity;
@@ -1217,13 +1244,16 @@ export class CampusScene {
       m.geometry.dispose();
     }
     this.terrainMeshes = terrain.meshes().map((g) => {
-      const m = new Mesh(g, this.ground.material);
+      const m = new Mesh(g, this.groundMaterial);
       m.receiveShadow = true;
       m.userData.noPick = true;
       this.scene.add(m);
       return m;
     });
     this.ground.position.y = SEA_PLANE;
+    // A walker view lays the plane where the walkers' feet are again (dressGround).
+    this.ground.userData.mapY = undefined;
+    this.dressGround();
     if (this.campus) this.setCampus(this.campus);
     if (this.lastContext) this.setContext(this.lastContext);
     this.walkers.refresh();
@@ -1629,6 +1659,12 @@ export class CampusScene {
     // The ground is a square round what is shown; it follows a move to another area.
     if (Math.hypot(target.x - this.ground.position.x, target.z - this.ground.position.z) > 2000) {
       this.ground.position.set(target.x, 0, target.z);
+      // In a walker view the plane stays where a walker's feet are, and goes back here after (dressGround).
+      const plane = this.ground.userData as { mapY?: number };
+      if (plane.mapY !== undefined) {
+        plane.mapY = 0;
+        this.ground.position.y += GROUND_PAINT;
+      }
       this.needsShadow = true;
     }
     const fromT = this.controls.target.clone();
@@ -2333,13 +2369,19 @@ export class CampusScene {
    * How the walker views are drawn now: tier, passes, sky and exposure, and how many buildings
    * wear the facades drawn by rule; "off" and none on the map. For tests.
    */
-  streetState(): StreetState & { facades: FacadeCount } {
+  streetState(): StreetState & { facades: FacadeCount; ground: GroundCount } {
     const street = (m: Material | Material[]) => !Array.isArray(m) && m.name.startsWith("StreetFacade");
+    const ground = (m: Material | Material[]) => !Array.isArray(m) && m.name.startsWith("StreetGround");
+    const surfaces = [...this.terrainMeshes, this.ground, ...this.groundLayers].filter((m) => ground(m.material));
     return {
       ...this.street.state(),
       facades: {
         university: [...this.buildingMeshes.values()].filter((m) => street(m.material)).length,
         city: this.cityBuildings && street(this.cityBuildings.mesh.material) ? 1 : 0,
+      },
+      ground: {
+        surfaces: surfaces.length,
+        water: surfaces.some((m) => (m.material as Material).name === "StreetGround-water"),
       },
     };
   }
@@ -2379,8 +2421,44 @@ export class CampusScene {
       // The cut walls stand in front of what they meet; they are few, and drawn without a twin.
       this.depthFirst(mesh, first && role === "below");
     }
+    this.dressGround();
     this.restyle();
     this.needsRender = true;
+  }
+
+  /**
+   * Gives the ground the materials of the view it is seen in: in a walker view, once they have
+   * loaded, the ground drawn by rule (street/ground.ts), laid where a walker's feet stand; on the
+   * map its own, as it was. In a walker view the terrain is lifted to the walker's feet, the paint
+   * lowered to it in its shader, and the paint drawn top layer first, before the ground under it.
+   */
+  private dressGround(): void {
+    const ground = this.street.ground;
+    const twins = !!ground && this.street.depthFirst;
+    for (const mesh of [...this.terrainMeshes, this.ground]) {
+      mesh.material = ground ? ground.open : this.groundMaterial;
+      // On a graphics card the ground's depth goes in first and its colour after the paint; elsewhere it is drawn before.
+      mesh.renderOrder = !ground ? 0 : twins ? GROUND_ORDER_AFTER : GROUND_ORDER_BEFORE;
+      if (mesh !== this.ground) {
+        mesh.position.y = ground ? GROUND_PAINT : 0;
+        this.depthFirst(mesh, twins);
+      }
+    }
+    // The plane round the terrain goes back to exactly where the map had it.
+    const plane = this.ground.userData as { mapY?: number };
+    if (ground && plane.mapY === undefined) {
+      plane.mapY = this.ground.position.y;
+      this.ground.position.y += GROUND_PAINT;
+    } else if (!ground && plane.mapY !== undefined) {
+      this.ground.position.y = plane.mapY;
+      plane.mapY = undefined;
+    }
+    for (const mesh of this.groundLayers) {
+      const { kind, lift } = mesh.userData.groundLayer as { kind: Exclude<GroundKind, "open">; lift: number };
+      mesh.material = ground ? ground.paint(kind, lift - GROUND_PAINT) : (mesh.userData.mapMaterial as Material);
+      mesh.renderOrder = ground ? PAINT_ORDER - GROUND[kind] / 100 : 0;
+      mesh.userData.noAO = !!ground;
+    }
   }
 
   /**
