@@ -3,6 +3,7 @@
 import { BufferAttribute, BufferGeometry, ShapeUtils, Vector2 } from "three";
 import { boundingRectangle, type Pt } from "../shared/geo.ts";
 import type { ContextRoof, FlatRing } from "../shared/types.ts";
+import { PART, faceRuns, type FacadePart } from "./street/rules.ts";
 
 type RGB = readonly [number, number, number];
 
@@ -20,13 +21,36 @@ export interface WallOptions {
   plinth?: { top: number; color: RGB };
 }
 
+/**
+ * How the walker views draw a building's walls (street/facade.ts), set on a builder before the
+ * building's extrusions. Every vertex then carries where it lies on its wall: metres along its
+ * face and up from the ground floor, the width of that face's bays, and the building's storeys.
+ */
+export interface FacadeSpec {
+  /** Style and seed in one number (street/rules.ts facadeCode). */
+  code: number;
+  /** Metres of each storey above the ground storey, of the ground storey, and to the top of the last storey, from the ground floor. */
+  storey: number;
+  ground: number;
+  top: number;
+  /** Height of the building's ground floor in the builder's coordinates. */
+  base: number;
+  /** Metres east and north its roofs are laid out from. */
+  anchor: readonly [number, number];
+  /** Metres a bay is drawn about; each face takes a whole number of them. */
+  bay: number;
+  /** What the tops of its extrusions are: a roof, or the plain top of a wall. */
+  cap: FacadePart;
+}
+
 /** A turn sharper than this, in radians, ends one face of a building and starts the next. */
 const CORNER = 0.5;
 
 /**
  * Texture u at the start and end of each edge of a ring, so that every face carries a whole number
  * of window bays. A face is a run of edges between two corners, so a curve drawn as many short
- * edges is one face. A face too short for a bay keeps u = 0, the plain pier of the texture.
+ * edges is one face. A face too short for a bay keeps u = 0, the plain pier of the texture. The
+ * walker views' facades find their faces the same way (street/rules.ts faceRuns).
  */
 function bayCoords(ring: readonly Vector2[], bay: number): number[] {
   const n = ring.length;
@@ -75,12 +99,30 @@ export class MeshBuilder {
   readonly indices: number[] = [];
   /** Triangles of the second material group: the roofs of an extrusion that asked for one. */
   readonly roofIndices: number[] = [];
+  /** Per vertex, for the walker views' facades: see `mark`. */
+  readonly facadeA: number[] = [];
+  readonly facadeB: number[] = [];
+  /** Per vertex, for the walker views' ground (street/ground.ts): see `ribbon`. */
+  readonly ribbons: number[] = [];
+  /** The building the next extrusions belong to, when the builder keeps facades. */
+  facade?: FacadeSpec;
   private withColor: boolean;
   private withUV: boolean;
+  private withFacade: boolean;
+  private withRibbon: boolean;
+  /** Where the next vertex lies on its ribbon; nowhere for anything else. */
+  private ribbonAt: [number, number, number, number] = [0, 0, 0, 0];
 
-  constructor(withColor = false, withUV = false) {
+  /**
+   * `withFacade` adds what the walker views draw walls from (`facade`, `facadeStoreys`), and
+   * `withRibbon` what they draw roads, paths and railways from (`ribbon`). Neither adds a vertex
+   * or moves one, so a material that does not read them draws the same picture.
+   */
+  constructor(withColor = false, withUV = false, withFacade = false, withRibbon = false) {
     this.withColor = withColor;
     this.withUV = withUV;
+    this.withFacade = withFacade;
+    this.withRibbon = withRibbon;
   }
 
   get vertexCount(): number {
@@ -93,7 +135,26 @@ export class MeshBuilder {
     this.normals.push(nx, ny, nz);
     if (this.withColor) this.colors.push(c?.[0] ?? 1, c?.[1] ?? 1, c?.[2] ?? 1);
     if (this.withUV) this.uvs.push(u, v);
+    if (this.withRibbon) this.ribbons.push(...this.ribbonAt);
     return i;
+  }
+
+  /**
+   * The facade data of the vertex just added: for a wall, metres along its face, metres up from
+   * the ground floor and the width of the face's bays; for anything else, where it stands from the
+   * building's anchor. Then the building's style and seed, its storeys and what the part is.
+   */
+  private mark(part: FacadePart, a: number, b: number, c: number): void {
+    if (!this.withFacade) return;
+    const f = this.facade;
+    this.facadeA.push(a, b, c, f?.code ?? 0);
+    this.facadeB.push(f?.storey ?? 3.3, f?.ground ?? 3.3, f?.top ?? 0, part);
+  }
+
+  /** Marks the vertex just added, at a point of the scene, by where it lies from the building's anchor. */
+  private markAt(part: FacadePart, x: number, y: number, z: number): void {
+    const f = this.facade;
+    this.mark(part, x - (f?.anchor[0] ?? 0), y - (f?.base ?? 0), z + (f?.anchor[1] ?? 0));
   }
 
   /** Pushes a roof triangle wound so that it faces up (counter-clockwise seen from above). */
@@ -129,13 +190,20 @@ export class MeshBuilder {
     if (cap) {
       const base = this.vertexCount;
       const all = holes.length ? contour.concat(...holes) : contour;
-      for (const p of all) this.vertex(p.x, y1, -p.y, 0, 1, 0, topColor);
+      const part = this.facade?.cap ?? PART.roof;
+      for (const p of all) {
+        this.vertex(p.x, y1, -p.y, 0, 1, 0, topColor);
+        this.markAt(part, p.x, y1, -p.y);
+      }
       for (const tri of ShapeUtils.triangulateShape(contour, holes)) this.upFacing(base, all, tri, roofGroup ? this.roofIndices : this.indices);
     }
     if (bottom) {
       const base = this.vertexCount;
       const all = holes.length ? contour.concat(...holes) : contour;
-      for (const p of all) this.vertex(p.x, y0, -p.y, 0, -1, 0, sideColor);
+      for (const p of all) {
+        this.vertex(p.x, y0, -p.y, 0, -1, 0, sideColor);
+        this.markAt(PART.plain, p.x, y0, -p.y);
+      }
       const from = this.indices.length;
       for (const tri of ShapeUtils.triangulateShape(contour, holes)) this.upFacing(base, all, tri);
       // Same triangles as a roof, turned over to face down.
@@ -155,8 +223,10 @@ export class MeshBuilder {
             [split, y1, sideColor],
           ]
         : [[y0, y1, plinth && plinth.top >= y1 - 1e-6 ? plinth.color : sideColor]];
+    const groundFloor = this.facade?.base ?? 0;
     const walls = (ring: Vector2[]) => {
       const us = bay > 0 ? bayCoords(ring, bay) : undefined;
+      const runs = this.withFacade ? faceRuns(ring, this.facade?.bay ?? 0, CORNER) : undefined;
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i]!;
         const b = ring[(i + 1) % ring.length]!;
@@ -169,13 +239,20 @@ export class MeshBuilder {
         const nz = dx / len;
         const ua = us?.[i * 2];
         const ub = us?.[i * 2 + 1];
+        const along0 = runs?.[i * 3] ?? 0;
+        const along1 = runs?.[i * 3 + 1] ?? 0;
+        const width = runs?.[i * 3 + 2] ?? 0;
         for (const [from, to, color] of bands) {
           const v0 = storey > 0 ? from / storey : 0.05;
           const v1 = storey > 0 ? to / storey : 0.05;
           const i0 = this.vertex(a.x, from, -a.y, nx, 0, nz, color, v0, ua);
+          this.mark(PART.wall, along0, from - groundFloor, width);
           const i1 = this.vertex(b.x, from, -b.y, nx, 0, nz, color, v0, ub);
+          this.mark(PART.wall, along1, from - groundFloor, width);
           const i2 = this.vertex(b.x, to, -b.y, nx, 0, nz, color, v1, ub);
+          this.mark(PART.wall, along1, to - groundFloor, width);
           const i3 = this.vertex(a.x, to, -a.y, nx, 0, nz, color, v1, ua);
+          this.mark(PART.wall, along0, to - groundFloor, width);
           this.indices.push(i0, i1, i2, i0, i2, i3);
         }
       }
@@ -194,12 +271,17 @@ export class MeshBuilder {
     // The right of the direction of travel, in scene axes (x east, z south).
     const nx = (by - ay) / len;
     const nz = (bx - ax) / len;
+    const groundFloor = this.facade?.base ?? 0;
     for (const side of [1, -1]) {
       const i = this.vertexCount;
       this.vertex(ax, y0, -ay, nx * side, 0, nz * side, color);
+      this.mark(PART.plain, 0, y0 - groundFloor, 0);
       this.vertex(bx, y0, -by, nx * side, 0, nz * side, color);
+      this.mark(PART.plain, len, y0 - groundFloor, 0);
       this.vertex(bx, y1, -by, nx * side, 0, nz * side, color);
+      this.mark(PART.plain, len, y1 - groundFloor, 0);
       this.vertex(ax, y1, -ay, nx * side, 0, nz * side, color);
+      this.mark(PART.plain, 0, y1 - groundFloor, 0);
       if (side > 0) this.indices.push(i, i + 1, i + 2, i, i + 2, i + 3);
       else this.indices.push(i, i + 2, i + 1, i, i + 3, i + 2);
     }
@@ -220,7 +302,10 @@ export class MeshBuilder {
     const len = Math.hypot(nx, ny, nz);
     if (len < 1e-6) return;
     const i = this.vertexCount;
-    for (const p of [a, b, c]) this.vertex(p[0]!, p[1]!, -p[2]!, nx / len, ny / len, nz / len, color);
+    for (const p of [a, b, c]) {
+      this.vertex(p[0]!, p[1]!, -p[2]!, nx / len, ny / len, nz / len, color);
+      this.markAt(PART.pitched, p[0]!, p[1]!, -p[2]!);
+    }
     this.indices.push(i, i + 1, i + 2);
   }
 
@@ -298,17 +383,27 @@ export class MeshBuilder {
     const contour: Vector2[] = [];
     for (let i = 0; i + 1 < ring.length; i += 2) contour.push(new Vector2(ring[i]! / 10, ring[i + 1]! / 10));
     const base = this.vertexCount;
-    for (const p of contour) this.vertex(p.x, y, -p.y, 0, 1, 0, color);
+    for (const p of contour) {
+      this.vertex(p.x, y, -p.y, 0, 1, 0, color);
+      this.markAt(this.facade?.cap ?? PART.roof, p.x, y, -p.y);
+    }
     for (const tri of ShapeUtils.triangulateShape(contour, [])) this.upFacing(base, contour, tri, second ? this.roofIndices : this.indices);
   }
 
-  /** A flat ribbon of the given width along a polyline. */
+  /**
+   * A flat ribbon of the given width along a polyline. With `withRibbon`, each vertex also carries
+   * where it lies on the ribbon: metres along the line from its start, metres across it from the
+   * middle (left positive), half the width, and the length of the whole line.
+   */
   ribbon(line: FlatRing, width: number, y: number, color?: RGB): void {
     const n = line.length / 2;
     if (n < 2) return;
     const half = width / 2;
     const px = (i: number) => line[i * 2]! / 10;
     const py = (i: number) => line[i * 2 + 1]! / 10;
+    const along: number[] = [0];
+    for (let i = 1; i < n; i++) along.push(along[i - 1]! + Math.hypot(px(i) - px(i - 1), py(i) - py(i - 1)));
+    const length = along[n - 1]!;
     const base = this.vertexCount;
     for (let i = 0; i < n; i++) {
       const ax = px(Math.max(i - 1, 0));
@@ -323,9 +418,14 @@ export class MeshBuilder {
       // Left-hand normal in (east, north).
       const nx = -dy;
       const ny = dx;
+      this.ribbonAt = [along[i]!, half, half, length];
       this.vertex(px(i) + nx * half, y, -(py(i) + ny * half), 0, 1, 0, color);
+      this.mark(PART.plain, 0, 0, 0);
+      this.ribbonAt = [along[i]!, -half, half, length];
       this.vertex(px(i) - nx * half, y, -(py(i) - ny * half), 0, 1, 0, color);
+      this.mark(PART.plain, 0, 0, 0);
     }
+    this.ribbonAt = [0, 0, 0, 0];
     for (let i = 0; i < n - 1; i++) {
       const a = base + i * 2;
       // Left edge is at even indices, right edge at odd; wind counter-clockwise seen from above.
@@ -339,6 +439,11 @@ export class MeshBuilder {
     g.setAttribute("normal", new BufferAttribute(new Float32Array(this.normals), 3));
     if (this.withColor) g.setAttribute("color", new BufferAttribute(new Float32Array(this.colors), 3));
     if (this.withUV) g.setAttribute("uv", new BufferAttribute(new Float32Array(this.uvs), 2));
+    if (this.withFacade) {
+      g.setAttribute("facade", new BufferAttribute(new Float32Array(this.facadeA), 4));
+      g.setAttribute("facadeStoreys", new BufferAttribute(new Float32Array(this.facadeB), 4));
+    }
+    if (this.withRibbon) g.setAttribute("ribbon", new BufferAttribute(new Float32Array(this.ribbons), 4));
     const Index = this.vertexCount > 65535 ? Uint32Array : Uint16Array;
     g.setIndex(new BufferAttribute(new Index(this.roofIndices.length ? this.indices.concat(this.roofIndices) : this.indices), 1));
     // A mesh given a material for walls and one for roofs draws only its groups, so the walls are
@@ -373,16 +478,30 @@ export function ringsBounds(rings: readonly FlatRing[]): [number, number, number
 /**
  * A flat geometry laid over the ground: its triangles split until no edge is longer than
  * `maxEdge` metres, then each vertex raised by the ground under it. Normals stay straight up,
- * which suits paint on the ground. Only positions are kept.
+ * which suits paint on the ground as the map draws it. Positions are kept, and every other
+ * attribute (a ribbon's coordinates) is carried along, halved at each split as the positions
+ * are. With `slopeAt`, which gives the ground's own normal at a point, every vertex also gets
+ * that normal (`slope`): the walker views shade the paint with it, the map does not read it.
  */
-export function drape(g: BufferGeometry, ground: (east: number, north: number) => number, maxEdge = 10): BufferGeometry {
+export function drape(
+  g: BufferGeometry,
+  ground: (east: number, north: number) => number,
+  maxEdge = 10,
+  slopeAt?: (east: number, north: number, out: number[]) => void,
+): BufferGeometry {
   const pos = g.getAttribute("position");
   const index = g.getIndex();
+  const carried = Object.entries(g.attributes).filter(([name]) => name !== "position" && name !== "normal");
+  const size = 3 + carried.reduce((s, [, a]) => s + a.itemSize, 0);
   const out: number[] = [];
   const limit = maxEdge * maxEdge;
-  type V = [number, number, number];
-  const d2 = (a: V, b: V) => (a[0] - b[0]) ** 2 + (a[2] - b[2]) ** 2;
-  const mid = (a: V, b: V): V => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+  type V = number[];
+  const d2 = (a: V, b: V) => (a[0]! - b[0]!) ** 2 + (a[2]! - b[2]!) ** 2;
+  const mid = (a: V, b: V): V => {
+    const m = new Array<number>(size);
+    for (let k = 0; k < size; k++) m[k] = (a[k]! + b[k]!) / 2;
+    return m;
+  };
   // Split the longest edge at its middle; both halves keep the triangle's winding.
   const tri = (a: V, b: V, c: V): void => {
     const ab = d2(a, b);
@@ -390,7 +509,7 @@ export function drape(g: BufferGeometry, ground: (east: number, north: number) =
     const ca = d2(c, a);
     const m = Math.max(ab, bc, ca);
     if (m <= limit) {
-      out.push(...a, ...b, ...c);
+      for (const p of [a, b, c]) for (let k = 0; k < size; k++) out.push(p[k]!);
       return;
     }
     if (m === ab) {
@@ -407,17 +526,53 @@ export function drape(g: BufferGeometry, ground: (east: number, north: number) =
       tri(d, b, c);
     }
   };
-  const v = (i: number): V => [pos.getX(i), pos.getY(i), pos.getZ(i)];
+  const v = (i: number): V => {
+    const p = [pos.getX(i), pos.getY(i), pos.getZ(i)];
+    for (const [, a] of carried) for (let c = 0; c < a.itemSize; c++) p.push(a.getComponent(i, c));
+    return p;
+  };
   const count = index ? index.count : pos.count;
   for (let k = 0; k + 2 < count; k += 3) {
     const [i, j, l] = index ? [index.getX(k), index.getX(k + 1), index.getX(k + 2)] : [k, k + 1, k + 2];
     tri(v(i), v(j), v(l));
   }
-  for (let k = 0; k < out.length; k += 3) out[k + 1] = out[k + 1]! + ground(out[k]!, -out[k + 2]!);
-  const normals = new Float32Array(out.length);
+  const n = out.length / size;
+  const positions = new Float32Array(n * 3);
+  for (let k = 0; k < n; k++) {
+    const o = k * size;
+    positions[k * 3] = out[o]!;
+    positions[k * 3 + 1] = out[o + 1]! + ground(out[o]!, -out[o + 2]!);
+    positions[k * 3 + 2] = out[o + 2]!;
+  }
+  const normals = new Float32Array(n * 3);
   for (let k = 1; k < normals.length; k += 3) normals[k] = 1;
   const draped = new BufferGeometry();
-  draped.setAttribute("position", new BufferAttribute(new Float32Array(out), 3));
+  draped.setAttribute("position", new BufferAttribute(positions, 3));
   draped.setAttribute("normal", new BufferAttribute(normals, 3));
+  let at = 3;
+  for (const [name, a] of carried) {
+    const values = new Float32Array(n * a.itemSize);
+    for (let k = 0; k < n; k++) for (let c = 0; c < a.itemSize; c++) values[k * a.itemSize + c] = out[k * size + at + c]!;
+    draped.setAttribute(name, new BufferAttribute(values, a.itemSize));
+    at += a.itemSize;
+  }
+  if (slopeAt) {
+    const slope = new Int8Array(n * 3);
+    const s = [0, 1, 0];
+    for (let k = 0; k < n; k++) {
+      slopeAt(positions[k * 3]!, -positions[k * 3 + 2]!, s);
+      for (let c = 0; c < 3; c++) slope[k * 3 + c] = Math.round(s[c]! * 127);
+    }
+    draped.setAttribute("slope", new BufferAttribute(slope, 3, true));
+  }
   return draped;
+}
+
+/** Gives a geometry laid flat a `slope` that is straight up everywhere, as drape's is on level ground. */
+export function levelSlope(g: BufferGeometry): BufferGeometry {
+  const n = g.getAttribute("position").count;
+  const slope = new Int8Array(n * 3);
+  for (let k = 1; k < slope.length; k += 3) slope[k] = 127;
+  g.setAttribute("slope", new BufferAttribute(slope, 3, true));
+  return g;
 }

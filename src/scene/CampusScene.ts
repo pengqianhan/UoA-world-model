@@ -10,6 +10,7 @@ import {
   Float32BufferAttribute,
   Fog,
   Group,
+  HalfFloatType,
   HemisphereLight,
   IcosahedronGeometry,
   InstancedMesh,
@@ -32,24 +33,32 @@ import {
   Scene,
   SphereGeometry,
   CylinderGeometry,
+  UnsignedByteType,
   Vector2,
   Vector3,
   WebGLRenderer,
+  type Material,
+  type MeshStandardMaterial,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Building, CampusData, ContextData, FlatRing, Floor, FloorPlans, Room, SpaceKind, SpaceType } from "../shared/types.ts";
 import { decodeRing, interiorPoint, pointInRing } from "../shared/geo.ts";
 import { groundLevel, massing, roofRims, withoutStrips } from "../shared/massing.ts";
-import { MeshBuilder, drape, ringsBounds } from "./geometry.ts";
+import { MeshBuilder, drape, levelSlope, ringsBounds, type FacadeSpec } from "./geometry.ts";
 import { SEA_PLANE, Terrain } from "./terrain.ts";
 import { WALL_HEIGHT, buildInterior, disposeGroup, inset } from "./interior.ts";
 import { LabelLayer, type LabelSpec } from "./labels.ts";
 import { EYE_HEIGHT } from "./figure.ts";
-import { WalkerWorld } from "./walkers.ts";
+import { GROUND_PAINT, WalkerWorld } from "./walkers.ts";
 import { WalkMap } from "../shared/walkmap.ts";
 import { towardsAhead } from "../shared/walkerLook.ts";
 import { floorRings } from "../shared/indoor.ts";
 import { DAY, NIGHT, ROOM_COLOURS, lerpColour, mixPalette, type Palette } from "./palette.ts";
+import { StreetLook, type StreetState } from "./street/look.ts";
+import { streetTier } from "./street/tier.ts";
+import { PART, STYLE, STYLES, buildingSeed, cityStoreys, facadeCode, facadeStyle } from "./street/rules.ts";
+import { GROUND, RAIL_WIDTH, ROAD_EDGE_WIDTH, ROAD_WIDTH, type GroundKind } from "./street/roads.ts";
+import type { TreeSpec } from "./street/crowns.ts";
 
 export interface Selection {
   building?: string;
@@ -71,6 +80,24 @@ export interface PinSpec {
   title?: string;
 }
 
+/** How many buildings wear the walker views' facades: the University's, and the city's mesh round them. */
+export interface FacadeCount {
+  university: number;
+  city: number;
+}
+
+/** How much of the ground wears the walker views' surfaces: its meshes and its layers of paint, and whether there is water. */
+export interface GroundCount {
+  surfaces: number;
+  water: boolean;
+}
+
+/** The walker views' trees: how many are planted, and how many cards of leaves are drawn round the camera. */
+export interface TreeCount {
+  street: number;
+  cards: number;
+}
+
 /** Weather as the scene draws it, each 0-1. */
 export interface SceneWeather {
   cloud: number;
@@ -85,6 +112,14 @@ const JUMP_DISTANCE = 5000;
 
 /** The lowest the sun is drawn, degrees; a real sun lower than this casts shadows off the map. */
 const SUN_MIN_ELEVATION = 10;
+/**
+ * The walker views' camera, vertical degrees and metres to its near plane. Through the eyes it sees
+ * wider and nearer, as a person does; from behind it keeps the frame it had.
+ */
+const EYES_FOV = 64;
+const EYES_NEAR = 0.2;
+const FOLLOW_FOV = 55;
+const FOLLOW_NEAR = 0.3;
 /** Crowns of deciduous trees in April and May, in winter, and in early spring. */
 const AUTUMN_LEAVES = 0xd38b3c;
 const BARE_BRANCHES = 0x9a8a76;
@@ -127,12 +162,19 @@ interface Tween {
 
 const VIEW_HEIGHT = 1000; // metres visible vertically at zoom 1
 const CAMERA_DISTANCE = 3200;
-const ROAD_WIDTH = { motorway: 15, major: 11, street: 7.5, service: 4.2, path: 2.2, steps: 2.2 } as const;
 const ROAD_Y = { path: 0.12, steps: 0.12, service: 0.14, street: 0.16, major: 0.18, motorway: 0.2 } as const;
 const AREA_Y = { park: 0.02, grass: 0.04, wood: 0.06, pitch: 0.08, water: 0.1 } as const;
 /** Street edges lie under every carriageway and path, so that a junction stays clean. */
 const ROAD_EDGE_Y = 0.11;
-const ROAD_EDGE_WIDTH = 1.6;
+const RAIL_Y = 0.11;
+/**
+ * The order the walker views draw the ground in (street/ground.ts), between the buildings' depth
+ * drawn first (renderOrder -1) and everything else (0): the paint, top layer first; then the ground
+ * under it where no paint covers it, after its own depth on a graphics card, before the paint elsewhere.
+ */
+const PAINT_ORDER = -0.5;
+const GROUND_ORDER_AFTER = -0.3;
+const GROUND_ORDER_BEFORE = -0.9;
 const SLAB = 0.35;
 const ROOM_HEIGHT = 1.5;
 /** Metres between window centres on University buildings. A drawing convention, like the storey height. */
@@ -197,6 +239,37 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** The middle of a flat ring's points, metres east and north. */
+function ringMiddle(ring: FlatRing): [number, number] {
+  let x = 0;
+  let y = 0;
+  const n = ring.length >> 1;
+  for (let i = 0; i + 1 < ring.length; i += 2) {
+    x += ring[i]!;
+    y += ring[i + 1]!;
+  }
+  return [x / n / 10, y / n / 10];
+}
+
+/**
+ * How the walker views draw a University building's walls (street/facade.ts): storeys a floor high,
+ * as the map draws them, and bays WINDOW_BAY wide, or half that for a curtain wall's mullions.
+ */
+function universityFacade(b: Building, floorHeight: number, base: number): FacadeSpec {
+  const seed = buildingSeed(b.center[0], b.center[1]);
+  const style = facadeStyle(seed, { university: true, height: b.height, pitched: false });
+  return {
+    code: facadeCode(style, seed),
+    storey: floorHeight,
+    ground: floorHeight,
+    top: 1e4,
+    base,
+    anchor: b.center,
+    bay: style === STYLE.glass ? WINDOW_BAY / 2 : WINDOW_BAY,
+    cap: PART.roof,
+  };
+}
+
 /** An unnamed shape on the open floor, as published and in metres, with its type and a point inside it. */
 interface PlanSpace {
   flat: FlatRing[];
@@ -226,11 +299,28 @@ export class CampusScene {
   private opts: SceneOptions;
 
   private ground: Mesh;
+  /** The map's material for the ground plane and the terrain's meshes. */
+  private groundMaterial: MeshLambertMaterial;
+  /** The map's paint on the ground (areas, roads, railways), each with what it is and how high the map lays it. */
+  private groundLayers: Mesh[] = [];
   private contextGroup = new Group();
   private uniGroup = new Group();
   private detailGroup = new Group();
   private contextMaterials: { mat: MeshLambertMaterial; key: (p: Palette) => number }[] = [];
+  /** The surrounding buildings, one mesh, and the map's material for it. */
+  private cityBuildings?: { mesh: Mesh; map: MeshLambertMaterial };
+  /**
+   * The walker views' facades (street/facade.ts), made with the first walker view: one for the
+   * city round the campus, one for each University building (for its tint), and two for the open
+   * building's walls below the cut and round the open floor.
+   */
+  private streetMaterials = new Map<string, MeshStandardMaterial>();
+  private cityMaterial?: MeshStandardMaterial;
+  private openMaterials?: { below: MeshStandardMaterial; cut: MeshStandardMaterial };
   private trees?: Group;
+  /** The map's trees as the walker views draw them again (street/trees.ts), and the ones they last planted. */
+  private treeSpecs: TreeSpec[] = [];
+  private treesPlanted?: TreeSpec[];
   private wallTexture: CanvasTexture;
   private glowTexture: CanvasTexture;
 
@@ -294,7 +384,9 @@ export class CampusScene {
   private floorRingCache = new Map<string, [number, number][][][]>();
   private walkMapCache?: WalkMap;
   /** The camera of the walker views: behind a walker, or at its eyes. */
-  private persp = new PerspectiveCamera(55, 1, 0.3, 6000);
+  private persp = new PerspectiveCamera(FOLLOW_FOV, 1, FOLLOW_NEAR, 6000);
+  /** The walker views' sky, light and effects (street/look.ts); off on the map. */
+  private street: StreetLook;
   private view: WalkerView = "map";
   private viewWalker?: string;
   /** Degrees and metres, set by dragging and the wheel in the walker views. */
@@ -313,7 +405,16 @@ export class CampusScene {
     this.labels = new LabelLayer(labelRoot);
 
     // The stencil lets a hidden walker's shape show through what stands in front of it (figure.ts).
-    this.renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: true });
+    // Where the walker views can afford it, the renderer keeps a half-float picture for them; on
+    // the map it is never used, and the map is drawn straight to the screen as ever (street/tier.ts).
+    const tier = streetTier(!!opts.lite);
+    this.renderer = new WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+      preserveDrawingBuffer: false,
+      stencil: true,
+      outputBufferType: tier === "full" ? HalfFloatType : UnsignedByteType,
+    });
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.lite ? 1.5 : 2));
     this.renderer.shadowMap.enabled = !opts.lite;
@@ -361,8 +462,18 @@ export class CampusScene {
     sc.near = 100;
     sc.far = 6000;
     this.scene.add(this.hemi, this.ambient, this.sun, this.sun.target);
+    this.street = new StreetLook({
+      renderer: this.renderer,
+      scene: this.scene,
+      camera: this.persp,
+      lights: { sun: this.sun, hemi: this.hemi, ambient: this.ambient },
+      tier,
+      redraw: () => (this.needsRender = true),
+      dress: () => this.dressBuildings(),
+    });
 
-    this.ground = new Mesh(new PlaneGeometry(9000, 9000), new MeshLambertMaterial({ color: DAY.ground }));
+    this.groundMaterial = new MeshLambertMaterial({ color: DAY.ground });
+    this.ground = new Mesh(new PlaneGeometry(9000, 9000), this.groundMaterial);
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground, this.contextGroup, this.uniGroup, this.detailGroup, this.pinGroup);
@@ -426,9 +537,12 @@ export class CampusScene {
     this.buildingEdges.clear();
     for (const b of campus.buildings) {
       if (b.offMap) continue;
-      const mb = new MeshBuilder(true, true);
+      const mb = new MeshBuilder(true, true, true);
       const blocks = massing(b, campus.floorHeight);
+      const facade = universityFacade(b, campus.floorHeight, 0);
       for (const block of blocks) {
+        // Windows in every whole storey of the block, up to its roof.
+        mb.facade = { ...facade, top: block.y1 };
         const wall = {
           storey: campus.floorHeight,
           bay: WINDOW_BAY,
@@ -441,6 +555,7 @@ export class CampusScene {
       // On a slope, a footing from the ground floor down to the lowest corner. It goes under the
       // ground storey, not the whole footprint, which takes in what lies below ground.
       const { base, low } = this.footingOf(b);
+      mb.facade = facade;
       if (base - low > 0.05) for (const poly of blocks[0]!.outline) mb.extrude(poly, low - base, 0, ROOF_TINT, PLINTH_TINT, false);
       // The creases of the blocks themselves, before the parapets go on: a parapet has no
       // thickness, and its two faces would read as creases everywhere.
@@ -463,6 +578,7 @@ export class CampusScene {
         emissiveIntensity: 0,
       });
       const mesh = new Mesh(geometry, [walls, new MeshLambertMaterial({ color: 0xffffff })]);
+      mesh.userData.mapMaterial = mesh.material;
       // The building stands on the lowest ground under it; squashing it keeps it there.
       mesh.position.y = this.baseOf(b);
       mesh.castShadow = true;
@@ -479,7 +595,7 @@ export class CampusScene {
       this.uniGroup.add(edges);
       this.buildingEdges.set(b.id, edges);
     }
-    this.restyle();
+    this.dressBuildings();
     this.applyFocus();
     this.rebuildLabels();
     this.needsShadow = true;
@@ -505,22 +621,25 @@ export class CampusScene {
     this.walkers.refresh();
     this.contextGroup.clear();
     this.contextMaterials = [];
+    this.groundLayers = [];
     const terrain = this.terrain;
     // Paint on the ground follows it. Layers a few centimetres apart cannot keep their order over
     // a slope once each is split its own way, so on terrain they are lifted further and pulled
-    // forward in depth, the later the more.
+    // forward in depth, the later the more. Each also keeps the slope under it, which the map does
+    // not draw and the walker views do (street/ground.ts), and the paint along a line keeps where
+    // each point lies along it and across it.
     let layer = 0;
     const onGround = (geometry: BufferGeometry): BufferGeometry => {
-      if (!terrain) return geometry;
+      if (!terrain) return levelSlope(geometry);
       geometry.translate(0, 0.15 + layer * 0.04, 0);
-      const draped = drape(geometry, (x, y) => terrain.height(x, y));
+      const draped = drape(geometry, (x, y) => terrain.height(x, y), 10, (x, y, out) => terrain.normal(x, y, out));
       geometry.dispose();
       return draped;
     };
     const add = (
       geometry: BufferGeometry,
       key: (p: Palette) => number,
-      opts: { shadow?: boolean; receive?: boolean; vertexColors?: boolean; ground?: boolean } = {},
+      opts: { shadow?: boolean; receive?: boolean; vertexColors?: boolean; ground?: { kind: Exclude<GroundKind, "open">; y: number } } = {},
     ) => {
       const mat = new MeshLambertMaterial({ color: key(this.palette), vertexColors: !!opts.vertexColors });
       if (opts.ground && terrain) {
@@ -534,6 +653,11 @@ export class CampusScene {
       mesh.receiveShadow = opts.receive ?? true;
       mesh.userData.noPick = true;
       mesh.matrixAutoUpdate = false;
+      if (opts.ground) {
+        mesh.userData.mapMaterial = mat;
+        mesh.userData.groundLayer = { kind: opts.ground.kind, lift: opts.ground.y + (terrain ? 0.15 + layer * 0.04 : 0) };
+        this.groundLayers.push(mesh);
+      }
       this.contextGroup.add(mesh);
       this.contextMaterials.push({ mat, key });
       return mesh;
@@ -542,25 +666,25 @@ export class CampusScene {
     for (const k of ["park", "grass", "wood", "pitch", "water"] as const) {
       const mb = new MeshBuilder();
       for (const a of ctx.areas) if (a.k === k) mb.flat(a.p, AREA_Y[k]);
-      if (mb.vertexCount) add(mb.build(), (p) => p.area[k], { ground: true });
+      if (mb.vertexCount) add(mb.build(), (p) => p.area[k], { ground: { kind: k, y: AREA_Y[k] } });
     }
     {
-      const mb = new MeshBuilder();
+      const mb = new MeshBuilder(false, false, false, true);
       for (const r of ctx.roads) if (r.k === "street" || r.k === "major" || r.k === "motorway") mb.ribbon(r.p, ROAD_WIDTH[r.k] + ROAD_EDGE_WIDTH, ROAD_EDGE_Y);
-      if (mb.vertexCount) add(mb.build(), (p) => p.roadEdge, { ground: true });
+      if (mb.vertexCount) add(mb.build(), (p) => p.roadEdge, { ground: { kind: "edge", y: ROAD_EDGE_Y } });
     }
     for (const k of ["path", "steps", "service", "street", "major", "motorway"] as const) {
-      const mb = new MeshBuilder();
+      const mb = new MeshBuilder(false, false, false, true);
       for (const r of ctx.roads) if (r.k === k) mb.ribbon(r.p, ROAD_WIDTH[k], ROAD_Y[k]);
-      if (mb.vertexCount) add(mb.build(), (p) => p.road[k], { ground: true });
+      if (mb.vertexCount) add(mb.build(), (p) => p.road[k], { ground: { kind: k, y: ROAD_Y[k] } });
     }
     {
-      const mb = new MeshBuilder();
-      for (const r of ctx.rails) mb.ribbon(r, 2.6, 0.11);
-      if (mb.vertexCount) add(mb.build(), (p) => p.rail, { ground: true });
+      const mb = new MeshBuilder(false, false, false, true);
+      for (const r of ctx.rails) mb.ribbon(r, RAIL_WIDTH, RAIL_Y);
+      if (mb.vertexCount) add(mb.build(), (p) => p.rail, { ground: { kind: "rail", y: RAIL_Y } });
     }
     {
-      const mb = new MeshBuilder(true);
+      const mb = new MeshBuilder(true, false, true);
       const rand = mulberry32(7);
       // The ground under each building's vertices, for standing it there and sinking it there.
       const bases: number[] = [];
@@ -570,6 +694,13 @@ export class CampusScene {
         const g = foot.base;
         const start = mb.vertexCount;
         const base = b.b ?? 0;
+        // The walker views draw its walls by rule (street/rules.ts): storeys from its height, a
+        // style from where it stands.
+        const middle = ringMiddle(b.p);
+        const seed = buildingSeed(middle[0], middle[1]);
+        const style = facadeStyle(seed, { university: false, height: b.h, pitched: !!b.roof });
+        const storeys = cityStoreys(b.h, !b.roof);
+        mb.facade = { code: facadeCode(style, seed), storey: storeys.storey, ground: storeys.ground, top: storeys.top, base: g, anchor: middle, bay: STYLES[style]!.bay, cap: PART.roof };
         mb.extrude([b.p], g + base, g + b.h, [shade, shade, shade], [shade * 0.97, shade * 0.97, shade * 0.97], !b.roof, { bottom: base > 0 });
         if (!base && g - foot.low > 0.05) mb.extrude([b.p], foot.low, g, undefined, [shade * 0.9, shade * 0.9, shade * 0.9], false);
         // A shaped roof is a tone darker than the walls it sits on.
@@ -577,12 +708,14 @@ export class CampusScene {
         for (let k = start; k < mb.vertexCount; k++) bases.push(g);
       }
       const mesh = add(mb.build(), (p) => p.context, { shadow: true, vertexColors: true });
+      this.cityBuildings = { mesh, map: mesh.material as MeshLambertMaterial };
       const pos = mesh.geometry.getAttribute("position");
       const y = new Float32Array(pos.count);
       for (let k = 0; k < pos.count; k++) y[k] = pos.getY(k);
       this.contextSquash = { mesh, y, base: Float32Array.from(bases), scale: 1 };
     }
     this.buildTrees(ctx);
+    this.dressBuildings();
     this.applyFocus();
     this.needsShadow = true;
     this.needsRender = true;
@@ -643,12 +776,16 @@ export class CampusScene {
     const turn = new Matrix4();
     const shade = new Color();
     const vary = mulberry32(99);
+    // The walker views draw each tree again where it stands, at its size, turn and shade (street/trees.ts).
+    const specs: TreeSpec[] = [];
     [...pts, ...deciduous].forEach(([x, y], i) => {
       const width = 5.5 + vary() * 5;
       const height = width * (0.95 + vary() * 0.6);
+      const angle = vary() * Math.PI * 2;
+      const ground = this.groundAt(x, y);
       m.makeScale(width, height, width);
-      m.multiply(turn.makeRotationY(vary() * Math.PI * 2));
-      m.setPosition(x, this.groundAt(x, y), -y);
+      m.multiply(turn.makeRotationY(angle));
+      m.setPosition(x, ground, -y);
       trunks?.setMatrixAt(i, m);
       // Lighter and darker greens, and now and then one turned towards yellow.
       const light = 0.84 + vary() * 0.34;
@@ -660,7 +797,9 @@ export class CampusScene {
         deciduousCrowns.setMatrixAt(i - pts.length, m);
         deciduousCrowns.setColorAt(i - pts.length, shade.setRGB(light, light, light));
       }
+      specs.push({ x, y: ground, z: -y, width, height, turn: angle, shade: [shade.r, shade.g, shade.b], deciduous: i >= pts.length });
     });
+    this.treeSpecs = specs;
     this.deciduousMaterial = deciduousMaterial;
     const group = new Group();
     for (const mesh of trunks ? [crowns, deciduousCrowns, trunks] : [crowns, deciduousCrowns]) {
@@ -826,6 +965,7 @@ export class CampusScene {
   setSun(sun: { azimuth: number; elevation: number } | undefined): void {
     this.sunDirection = sun;
     this.placeSun();
+    this.lightStreet();
     this.needsShadow = true;
     this.needsRender = true;
   }
@@ -850,6 +990,9 @@ export class CampusScene {
     if (month === this.month) return;
     this.month = month;
     if (this.deciduousMaterial) this.deciduousMaterial.color.setHex(this.deciduousColour(this.palette));
+    this.street.setSeason(month);
+    // In a walker view a bare tree casts the shadow of its boughs, not of its leaves.
+    if (this.street.active) this.needsShadow = true;
     this.needsRender = true;
   }
 
@@ -860,8 +1003,16 @@ export class CampusScene {
     return lerpColour(colour, p.tree, this.night * 0.7);
   }
 
+  /**
+   * How far the colours go towards the night palette. The map's night is in its colours; a walker
+   * view keeps the day's colours by night and makes the night with its light (street/look.ts).
+   */
+  private get mood(): number {
+    return this.street.active ? 0 : this.night;
+  }
+
   private applyPalette(): void {
-    const p = (this.palette = weathered(mixPalette(DAY, NIGHT, this.night), this.weather, this.night));
+    const p = (this.palette = weathered(mixPalette(DAY, NIGHT, this.mood), this.weather, this.mood));
     this.renderer.setClearColor(p.sky);
     this.sun.shadow.intensity = 1 - 0.7 * (this.weather?.cloud ?? 0);
     const fog = this.weather?.fog ?? 0;
@@ -875,7 +1026,7 @@ export class CampusScene {
     } else {
       this.scene.fog = null;
     }
-    (this.ground.material as MeshLambertMaterial).color.setHex(p.ground);
+    this.groundMaterial.color.setHex(p.ground);
     this.hemi.color.setHex(p.ambient);
     this.hemi.groundColor.setHex(p.ambientGround);
     this.hemi.intensity = p.ambientIntensity;
@@ -885,10 +1036,20 @@ export class CampusScene {
     this.placeSun();
     for (const { mat, key } of this.contextMaterials) mat.color.setHex(key(p));
     this.container.style.setProperty("--scene-sky", `#${p.sky.toString(16).padStart(6, "0")}`);
+    this.lightStreet();
+  }
+
+  /**
+   * The walker views light the scene their own way, from the same sun, night and weather: over
+   * the map's light and haze while one is open, and not at all on the map.
+   */
+  private lightStreet(): void {
+    this.street.setLight({ sun: this.sunDirection, night: this.night, weather: this.weather });
   }
 
   private placeSun(): void {
-    const p = this.palette;
+    // A walker view's palette stays the day's (mood); its moon is still the night palette's.
+    const p = this.street.active ? mixPalette(DAY, NIGHT, this.night) : this.palette;
     // By night the light is the palette's moon; by day the real sun, when the host gives one.
     const real = this.night < 0.5 ? this.sunDirection : undefined;
     const az = ((real?.azimuth ?? p.sunAzimuth) * Math.PI) / 180;
@@ -950,7 +1111,7 @@ export class CampusScene {
     const p = this.palette;
     for (const [id, mesh] of this.buildingMeshes) {
       const b = this.buildings.get(id)!;
-      const [walls, roof] = mesh.material as [MeshLambertMaterial, MeshLambertMaterial];
+      const [walls, roof] = mesh.userData.mapMaterial as [MeshLambertMaterial, MeshLambertMaterial];
       const hovered = this.hovered?.type === "building" && this.hovered.id === id;
       // While a building is open its neighbours are flat footprints: tone them towards the ground
       // so the open floor stands out.
@@ -963,7 +1124,15 @@ export class CampusScene {
       // Windows glow after dark, a little more in buildings that hold learning spaces.
       walls.emissiveIntensity = this.night * (1 - this.focus) * (b.roomCount > 0 ? 0.7 : 0.4);
       (this.buildingEdges.get(id)!.material as LineBasicMaterial).color.setHex(p.uniEdge);
+      // In a walker view the walls are drawn by rule in their own colours, which a hover tints as
+      // on the map; beside an open building they fade towards the ground and their rooms go dark.
+      const street = this.streetMaterials.get(id);
+      if (street) {
+        street.color.setHex(hovered ? lerpColour(0xffffff, p.hover, 0.55) : 0xffffff);
+        this.street.facades?.setAway(street, this.focus);
+      }
     }
+    if (this.cityMaterial) this.street.facades?.setAway(this.cityMaterial, this.focus);
   }
 
   private wallColour(b: Building): number {
@@ -1021,7 +1190,8 @@ export class CampusScene {
       const edges = this.buildingEdges.get(id)!;
       const isSelected = id === selected && this.focus > 0;
       mesh.visible = !isSelected;
-      edges.visible = !isSelected && this.focus < 0.5;
+      // The inked edges are the model's, seen from above; from a walker's height a corner shows by its light.
+      edges.visible = !isSelected && this.focus < 0.5 && this.view === "map";
       mesh.scale.y = scale;
       edges.scale.y = scale;
     }
@@ -1096,13 +1266,16 @@ export class CampusScene {
       m.geometry.dispose();
     }
     this.terrainMeshes = terrain.meshes().map((g) => {
-      const m = new Mesh(g, this.ground.material);
+      const m = new Mesh(g, this.groundMaterial);
       m.receiveShadow = true;
       m.userData.noPick = true;
       this.scene.add(m);
       return m;
     });
     this.ground.position.y = SEA_PLANE;
+    // A walker view lays the plane where the walkers' feet are again (dressGround).
+    this.ground.userData.mapY = undefined;
+    this.dressGround();
     if (this.campus) this.setCampus(this.campus);
     if (this.lastContext) this.setContext(this.lastContext);
     this.walkers.refresh();
@@ -1142,7 +1315,8 @@ export class CampusScene {
     for (const child of [...this.detailGroup.children]) {
       const m = child as Mesh;
       m.geometry?.dispose();
-      const mat = m.material;
+      // The walls' street facade is shared and kept; the map's materials are the mesh's own.
+      const mat = (m.userData.mapMaterial as Material[] | undefined) ?? m.material;
       if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
       else mat?.dispose();
     }
@@ -1163,7 +1337,8 @@ export class CampusScene {
     // The floors below the cut keep the building's walls and windows. Their roofs show where a
     // lower floor reaches out beyond the open one. Floors under the ground are drawn only when the
     // open floor is under it too, as in the campus view.
-    const below = new MeshBuilder(true, true);
+    const below = new MeshBuilder(true, true, true);
+    below.facade = universityFacade(b, H, this.baseOf(b));
     const ground = groundLevel(b);
     for (const f of b.floors) {
       if (f.i >= floor.i) break;
@@ -1176,6 +1351,7 @@ export class CampusScene {
     if (below.vertexCount) {
       const geometry = below.build();
       const mesh = new Mesh(geometry, [this.facadeMaterial(b), new MeshLambertMaterial({ color: this.roofColour(b) })]);
+      mesh.userData.mapMaterial = mesh.material;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.role = "below";
@@ -1202,7 +1378,9 @@ export class CampusScene {
     this.detailGroup.add(slabEdges);
 
     // The open floor's own outer walls, cut at the height of the rooms.
-    const cut = new MeshBuilder(true, true);
+    const cut = new MeshBuilder(true, true, true);
+    // The tops of the cut walls are plain wall, not roof.
+    cut.facade = { ...universityFacade(b, H, this.baseOf(b)), cap: PART.plain };
     const sy = y + SLAB;
     for (const [outer, ...holes] of this.floorOutline(b, floor.i)) {
       const inner = outer && inset(decodeRing(outer), CUT_WALL_THICKNESS);
@@ -1225,6 +1403,7 @@ export class CampusScene {
       walls.polygonOffsetFactor = -1;
       walls.polygonOffsetUnits = -1;
       const mesh = new Mesh(cut.build(), [walls, new MeshLambertMaterial({ color: lerpColour(this.wallColour(b), p.uniEdge, 0.3) })]);
+      mesh.userData.mapMaterial = mesh.material;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.role = "cut";
@@ -1245,6 +1424,7 @@ export class CampusScene {
       this.roomMeshes.set(r.code, mesh);
     }
     this.styleRooms();
+    this.dressBuildings();
   }
 
   /**
@@ -1324,7 +1504,7 @@ export class CampusScene {
     for (const child of this.detailGroup.children) {
       const role = child.userData.role as string | undefined;
       if ((role === "below" || role === "cut") && b) {
-        const [walls, top] = (child as Mesh).material as MeshLambertMaterial[];
+        const [walls, top] = child.userData.mapMaterial as MeshLambertMaterial[];
         walls!.color.setHex(this.wallColour(b));
         walls!.emissiveIntensity = this.openGlow;
         top!.color.setHex(role === "below" ? this.roofColour(b) : lerpColour(this.wallColour(b), p.uniEdge, 0.3));
@@ -1501,6 +1681,12 @@ export class CampusScene {
     // The ground is a square round what is shown; it follows a move to another area.
     if (Math.hypot(target.x - this.ground.position.x, target.z - this.ground.position.z) > 2000) {
       this.ground.position.set(target.x, 0, target.z);
+      // In a walker view the plane stays where a walker's feet are, and goes back here after (dressGround).
+      const plane = this.ground.userData as { mapY?: number };
+      if (plane.mapY !== undefined) {
+        plane.mapY = 0;
+        this.ground.position.y += GROUND_PAINT;
+      }
       this.needsShadow = true;
     }
     const fromT = this.controls.target.clone();
@@ -1686,7 +1872,22 @@ export class CampusScene {
       if (pose) this.flyTo(new Vector3(pose.at[0], pose.height, -pose.at[1]), Math.max(this.camera.zoom, 4), false);
     }
     this.renderer.domElement.style.cursor = view === "map" ? "" : "grab";
+    this.persp.fov = view === "eyes" ? EYES_FOV : FOLLOW_FOV;
+    this.persp.near = view === "eyes" ? EYES_NEAR : FOLLOW_NEAR;
+    this.persp.updateProjectionMatrix();
+    // The street look goes on before the palette, which then lights it (lightStreet).
+    const mood = this.mood;
+    if (view === "map") this.street.exit();
+    else this.street.enter();
+    this.dressBuildings();
     this.applyPalette();
+    // By night the colours change with the view (mood): the open floor's too. applyFocus restyles the buildings.
+    if (this.mood !== mood) {
+      this.styleRooms();
+      this.rebuildDetailColours();
+      this.rebuildPin();
+    }
+    this.applyFocus();
     this.fitShadow();
     this.rebuildLabels();
     this.placeWalkerCamera(1);
@@ -2024,6 +2225,12 @@ export class CampusScene {
 
   /** A frame of the scene, with an open floor below the ground drawn through it. */
   private draw(): void {
+    // A walker view has a look of its own. From a walker's height the ground hides what lies under
+    // it, as it does on a street, so the floor under the ground is not drawn through it there.
+    if (this.street.active) {
+      this.street.render();
+      return;
+    }
     const camera = this.activeCamera;
     this.renderer.render(this.scene, camera);
     if (!this.openBelowGround) return;
@@ -2066,7 +2273,7 @@ export class CampusScene {
     const rooms = [...this.roomMeshes.values()];
     const textured = (role: string) => {
       const mesh = this.detailGroup.children.find((o) => o.userData.role === role) as Mesh | undefined;
-      return !!mesh && !!(mesh.material as MeshLambertMaterial[])[0]?.map;
+      return !!mesh && !!(mesh.userData.mapMaterial as MeshLambertMaterial[])[0]?.map;
     };
     return {
       outerWalls: textured("cut"),
@@ -2198,6 +2405,151 @@ export class CampusScene {
     };
   }
 
+  /**
+   * How the walker views are drawn now: tier, passes, sky and exposure, and how many buildings
+   * wear the facades drawn by rule; "off" and none on the map. For tests.
+   */
+  streetState(): StreetState & { facades: FacadeCount; ground: GroundCount; trees: TreeCount } {
+    const street = (m: Material | Material[]) => !Array.isArray(m) && m.name.startsWith("StreetFacade");
+    const ground = (m: Material | Material[]) => !Array.isArray(m) && m.name.startsWith("StreetGround");
+    const surfaces = [...this.terrainMeshes, this.ground, ...this.groundLayers].filter((m) => ground(m.material));
+    return {
+      ...this.street.state(),
+      facades: {
+        university: [...this.buildingMeshes.values()].filter((m) => street(m.material)).length,
+        city: this.cityBuildings && street(this.cityBuildings.mesh.material) ? 1 : 0,
+      },
+      ground: {
+        surfaces: surfaces.length,
+        water: surfaces.some((m) => (m.material as Material).name === "StreetGround-water"),
+      },
+      trees: this.street.trees?.count() ?? { street: 0, cards: 0 },
+    };
+  }
+
+  /**
+   * Gives every building the walls of the view it is seen in: in a walker view the facades drawn by
+   * rule (street/facade.ts), once they have loaded; on the map its own materials, as they were.
+   */
+  private dressBuildings(): void {
+    const facades = this.street.facades;
+    const first = !!facades && this.street.depthFirst;
+    const city = this.cityBuildings;
+    if (city) {
+      city.mesh.material = facades ? (this.cityMaterial ??= facades.material("city")) : city.map;
+      this.depthFirst(city.mesh, first);
+    }
+    for (const [id, mesh] of this.buildingMeshes) {
+      let street = this.streetMaterials.get(id);
+      if (facades && !street) this.streetMaterials.set(id, (street = facades.material("university")));
+      mesh.material = facades && street ? street : (mesh.userData.mapMaterial as Material[]);
+      this.depthFirst(mesh, first);
+    }
+    if (facades && !this.openMaterials) {
+      const cut = facades.material("university");
+      // Where a room or a shape meets the outer wall their faces coincide; the outer wall wins.
+      cut.polygonOffset = true;
+      cut.polygonOffsetFactor = -1;
+      cut.polygonOffsetUnits = -1;
+      this.openMaterials = { below: facades.material("university"), cut };
+    }
+    for (const child of this.detailGroup.children) {
+      const role = child.userData.role as string | undefined;
+      if (role !== "below" && role !== "cut") continue;
+      const mesh = child as Mesh;
+      const street = this.openMaterials?.[role];
+      mesh.material = facades && street ? street : (mesh.userData.mapMaterial as Material[]);
+      // The cut walls stand in front of what they meet; they are few, and drawn without a twin.
+      this.depthFirst(mesh, first && role === "below");
+    }
+    this.dressGround();
+    this.dressTrees();
+    this.restyle();
+    this.needsRender = true;
+  }
+
+  /**
+   * Gives the trees the look of the view they are seen in: in a walker view, once it has loaded,
+   * trees of bark and leaves drawn by rule where the map's stand (street/trees.ts), planted the
+   * first time; on the map its own, as they were. Both stand in the map's group of trees, which
+   * goes while a building is open.
+   */
+  private dressTrees(): void {
+    const group = this.trees;
+    const trees = this.street.trees;
+    if (!group) return;
+    if (trees && this.treesPlanted !== this.treeSpecs) {
+      trees.plant(this.treeSpecs);
+      this.treesPlanted = this.treeSpecs;
+    }
+    if (trees && trees.group.parent !== group) group.add(trees.group);
+    // The shadows are drawn again only when the trees that cast them change.
+    let changed = false;
+    for (const child of group.children) {
+      const show = child.name === "StreetTrees" ? !!trees : !trees;
+      if (child.visible !== show) changed = true;
+      child.visible = show;
+    }
+    if (changed) this.needsShadow = true;
+  }
+
+  /**
+   * Gives the ground the materials of the view it is seen in: in a walker view, once they have
+   * loaded, the ground drawn by rule (street/ground.ts), laid where a walker's feet stand; on the
+   * map its own, as it was. In a walker view the terrain is lifted to the walker's feet, the paint
+   * lowered to it in its shader, and the paint drawn top layer first, before the ground under it.
+   */
+  private dressGround(): void {
+    const ground = this.street.ground;
+    const twins = !!ground && this.street.depthFirst;
+    for (const mesh of [...this.terrainMeshes, this.ground]) {
+      mesh.material = ground ? ground.open : this.groundMaterial;
+      // On a graphics card the ground's depth goes in first and its colour after the paint; elsewhere it is drawn before.
+      mesh.renderOrder = !ground ? 0 : twins ? GROUND_ORDER_AFTER : GROUND_ORDER_BEFORE;
+      if (mesh !== this.ground) {
+        mesh.position.y = ground ? GROUND_PAINT : 0;
+        this.depthFirst(mesh, twins);
+      }
+    }
+    // The plane round the terrain goes back to exactly where the map had it.
+    const plane = this.ground.userData as { mapY?: number };
+    if (ground && plane.mapY === undefined) {
+      plane.mapY = this.ground.position.y;
+      this.ground.position.y += GROUND_PAINT;
+    } else if (!ground && plane.mapY !== undefined) {
+      this.ground.position.y = plane.mapY;
+      plane.mapY = undefined;
+    }
+    for (const mesh of this.groundLayers) {
+      const { kind, lift } = mesh.userData.groundLayer as { kind: Exclude<GroundKind, "open">; lift: number };
+      mesh.material = ground ? ground.paint(kind, lift - GROUND_PAINT) : (mesh.userData.mapMaterial as Material);
+      mesh.renderOrder = ground ? PAINT_ORDER - GROUND[kind] / 100 : 0;
+      mesh.userData.noAO = !!ground;
+    }
+  }
+
+  /**
+   * In a walker view on a graphics card a building's walls are first drawn into the depth buffer
+   * alone (StreetLook.depthFirst), so that the facades drawn after them shade only what is in
+   * front: a street of buildings in no particular order would otherwise shade the walls behind as
+   * well. The copy is a little further off than the walls, so that they always pass over it, and
+   * it cannot be picked or cast a shadow.
+   */
+  private depthFirst(mesh: Mesh, on: boolean): void {
+    let twin = mesh.userData.depthTwin as Mesh | undefined;
+    if (on && !twin) {
+      twin = new Mesh(mesh.geometry, this.depthOnly);
+      twin.renderOrder = -1;
+      twin.matrixAutoUpdate = false;
+      twin.userData.noPick = true;
+      twin.raycast = () => {};
+      mesh.add(twin);
+      mesh.userData.depthTwin = twin;
+    }
+    if (twin) twin.visible = on;
+  }
+  private depthOnly = Object.assign(new MeshBasicMaterial({ colorWrite: false }), { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+
   /** The groups whose floors are drawn on the open floor, each with its colour now. For tests. */
   spaceFloors(): { kind: SpaceKind; colour: number }[] {
     return this.planObjects
@@ -2290,6 +2642,7 @@ export class CampusScene {
     this.walkers.clear();
     cancelAnimationFrame(this.raf);
     this.controls.dispose();
+    this.street.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
     this.labels.clear();

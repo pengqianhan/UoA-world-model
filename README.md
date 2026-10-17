@@ -25,6 +25,10 @@ An **unofficial**, student-made 3D map of University of Auckland buildings, floo
 | --- | --- |
 | ![A lecture theatre selected on a cut-away floor](docs/room.jpg) | ![The campus at night with lit windows](docs/campus-night.jpg) |
 
+| Behind the walker on Symonds Street | Albert Park at night, through the walker's eyes |
+| --- | --- |
+| ![The walker from behind on a street with lane lines, kerbs, trees and buildings drawn by rule](docs/walker-street.jpg) | ![A park at night with trees, stars and the city's lit windows beyond](docs/walker-night.jpg) |
+
 It is built to answer two questions a student actually has:
 
 1. *Which building and floor is my room in?* Type a room code such as `303-G23`, a building name or
@@ -36,6 +40,11 @@ It is built to answer two questions a student actually has:
 
 ## What's new
 
+- **2026-10-18:** the walker's views at street level look near the real thing, by rule from the
+  map's own data: a sky lit from the real sun, stars and a moon, haze and exposure; every building
+  with storeys, windows, glass that reflects the sky and walls of plaster, brick, concrete, stone,
+  glass or weatherboard, lit room by room after dark; asphalt with lane lines, kerbs, footpaths,
+  lawn and water, wet in rain; trees with bark and leaves. The map view is unchanged.
 - **2026-10-17:** a walker: a small made-up person who walks and runs, to take round the campus
   and into its buildings, seen from behind or through its eyes, which Claude Code and other agents
   can steer, and which talks with other walkers; one look for every walker, with nothing meant to
@@ -51,8 +60,6 @@ It is built to answer two questions a student actually has:
   lifts and toilets; buildings open on the floor at street level, with the floors under the ground
   seen through it; About's note on the far campuses put right; the Southern Underpass under
   Symonds Street, no longer on it, from outside or opened; outer walls on 40 floors that had none.
-- **2026-10-14:** every space on a floor shows its type, rooms stand as walls, and buildings gain
-  roof colours, rims, storeys and windows; a flight to the Tsinghua World Model.
 
 Everything, with its pull request, is in the [changelog](CHANGELOG.md).
 
