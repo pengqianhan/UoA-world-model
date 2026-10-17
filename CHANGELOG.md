@@ -44,7 +44,7 @@ A change to what the site does or shows adds its line here, and the README's
   and the ways into and out of a building are buttons in the bottom-right corner, above the
   building's card. Before, on a phone, the panel and its arrows covered half the screen and the
   floor list. A phone held sideways gets the same, and the top bar, the stick and the buttons keep
-  clear of a notch (#PR).
+  clear of a notch (#47).
 
 ### Fixed
 
