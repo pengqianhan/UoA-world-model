@@ -1,6 +1,7 @@
 // The street look: what a walker sees has a sky, a light and a haze of its own, buildings with
 // storeys, windows and walls drawn by rule, ground of asphalt, kerbs, paving, grass and water drawn
-// by rule, and the map is drawn as it always was once the walker view is left.
+// by rule, trees of bark and leaves drawn by rule, and the map is drawn as it always was once the
+// walker view is left.
 import { expect, test, type Page } from "@playwright/test";
 import { expectRealRender, open, shot } from "./helpers.ts";
 
@@ -30,6 +31,9 @@ test("through a walker's eyes the street has a sky, a light and a haze of its ow
   // The ground and every layer of paint over it, the city's ponds among them, wear surfaces drawn by rule.
   expect(day.ground.surfaces).toBeGreaterThan(10);
   expect(day.ground.water).toBe(true);
+  // Every tree on the map stands again in bark and leaves, with cards of leaves on those round the walker.
+  expect(day.trees.street).toBeGreaterThan(1000);
+  await expect.poll(async () => (await street(page)).trees.cards).toBeGreaterThan(100);
   await expectRealRender(page);
   await shot(page, "21-street-eyes-day");
 
@@ -42,10 +46,19 @@ test("through a walker's eyes the street has a sky, a light and a haze of its ow
   await expectRealRender(page);
   await shot(page, "21-street-ground");
 
+  // West across the street into Albert Park: crowns of leaves on trunks of bark across the lawn.
+  await page.evaluate(async () => {
+    const walker = (window as unknown as { __walker: { run(c: string): Promise<{ walkers: { heading: number }[] }> } }).__walker;
+    const { heading } = (await walker.run("list")).walkers[0]!;
+    window.__scene!.setWalkerLook(255 - heading, -2);
+  });
+  await expectRealRender(page);
+  await shot(page, "21-street-trees");
+
   // Escape goes back to the map: the look is gone, and the map by day has no haze, as before.
   await page.keyboard.press("Escape");
   await expect(page.locator('#walker-panel button[data-view="map"]')).toHaveAttribute("aria-pressed", "true");
-  expect(await street(page)).toMatchObject({ active: false, tier: "off", passes: [], exposure: 1, ground: { surfaces: 0, water: false } });
+  expect(await street(page)).toMatchObject({ active: false, tier: "off", passes: [], exposure: 1, ground: { surfaces: 0, water: false }, trees: { street: 0, cards: 0 } });
   expect((await page.evaluate(() => window.__scene!.lightState())).fog).toBe(false);
   await expectRealRender(page);
 
@@ -73,8 +86,10 @@ test("from a walker's height every building has storeys, windows and walls drawn
   await expectRealRender(page);
   await shot(page, "21-street-facade");
 
-  // Back on the map every building has the map's materials again.
+  // Back on the map every building has the map's materials again, and the map's trees are back.
   await page.keyboard.press("Escape");
   await expect(page.locator('#walker-panel button[data-view="map"]')).toHaveAttribute("aria-pressed", "true");
-  expect((await street(page)).facades).toEqual({ university: 0, city: 0 });
+  const off = await street(page);
+  expect(off.facades).toEqual({ university: 0, city: 0 });
+  expect(off.trees).toEqual({ street: 0, cards: 0 });
 });

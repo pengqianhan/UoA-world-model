@@ -611,3 +611,38 @@ export function packGround(n: number): Uint8Array {
   out.set(groundVariation(n), surfaces.length);
   return out;
 }
+
+// ---------------------------------------------------------------------------------------------
+// The bark of the walker views' trees (trees.ts), packed as the walls' layers are: the joints
+// channel is the furrows and cracks.
+
+/** Metres one repeat of the bark covers, round the trunk and up it. */
+export const BARK_TILE: readonly [number, number] = [0.9, 1.8];
+
+/**
+ * Bark: plates between furrows that run up the trunk, broken across now and then, the plates
+ * paler than the cracks and mottled where lichen and weather have marked them.
+ */
+function bark(n: number, rand: () => number): Surface {
+  const s = blank(n);
+  // Cells long up the tile, so that the lines where the noise crosses its middle run up it; and
+  // cells long across it for the breaks.
+  const ridges = fbm(n, 9, 3, rand, 2);
+  const breaks = fbm(n, 5, 3, rand, 14);
+  const fine = noise(n, 96, rand);
+  const mottle = fbm(n, 3, 3, rand);
+  for (let i = 0; i < n * n; i++) {
+    const furrow = 1 - smooth(Math.min(1, Math.abs(ridges[i]! * 2 - 1) / 0.16));
+    const crack = (1 - smooth(Math.min(1, Math.abs(breaks[i]! * 2 - 1) / 0.08))) * (1 - furrow) * 0.6;
+    const cut = Math.max(furrow, crack);
+    s.height[i] = (1 - cut) * 0.012 + fine[i]! * 0.0015;
+    s.joint[i] = cut;
+    s.tone[i] = Math.min(1, Math.max(0, 0.5 + (mottle[i]! - 0.5) * 0.5 + (fine[i]! - 0.5) * 0.18 - cut * 0.15));
+  }
+  return s;
+}
+
+/** The bark packed for the GPU, `n` texels square. */
+export function packBark(n: number): Uint8Array {
+  return packSurfaces([bark(n, mulberry32(0xba4c))], n, [BARK_TILE]);
+}

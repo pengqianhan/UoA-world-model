@@ -1,8 +1,8 @@
 // The look of the walker views, the street seen from a walker's height: a sky with the sun where it
 // really stands (or stars and a moon by night), the light it throws, haze in the distance, walls
 // with storeys, windows and the grain of what they are made of (facade.ts), ground of asphalt,
-// kerbs, paving, grass and water (ground.ts), and a picture exposed and tone-mapped like a
-// camera's. On a renderer that draws in high dynamic range (tier "full", tier.ts) the scene is
+// kerbs, paving, grass and water (ground.ts), trees of bark and leaves that sway in a breeze
+// (trees.ts), and a picture exposed and tone-mapped like a camera's. On a renderer that draws in high dynamic range (tier "full", tier.ts) the scene is
 // drawn into a half-float target, with ambient occlusion and bloom laid on before the tone curve;
 // elsewhere the materials tone-map as they draw.
 //
@@ -29,6 +29,7 @@ import type { NightSky } from "./night.ts";
 import type { StreetEffects } from "./effects.ts";
 import type { StreetFacades } from "./facade.ts";
 import type { StreetGround } from "./ground.ts";
+import type { StreetTrees } from "./trees.ts";
 
 export interface StreetLights {
   sun: DirectionalLight;
@@ -79,9 +80,10 @@ export class StreetLook {
   /** Whether the renderer draws into a half-float target before tone-mapping (tier "full" at start). */
   private readonly hdr: boolean;
   private on = false;
-  private kit?: { sky: StreetSky; night: NightSky; effects?: StreetEffects; facades: StreetFacades; ground: StreetGround };
+  private kit?: { sky: StreetSky; night: NightSky; effects?: StreetEffects; facades: StreetFacades; ground: StreetGround; trees: StreetTrees };
   private loading?: Promise<void>;
   private inputs: StreetInputs = { night: 0 };
+  private month = 0;
   private lighting?: StreetLighting;
   private fog = new FogExp2(0xffffff, 0);
   /** What the map had, put back on leaving. */
@@ -125,6 +127,17 @@ export class StreetLook {
   /** What draws the ground in a walker view, once it has loaded; none on the map. */
   get ground(): StreetGround | undefined {
     return this.on ? this.kit?.ground : undefined;
+  }
+
+  /** What draws the trees in a walker view, once it has loaded; none on the map. */
+  get trees(): StreetTrees | undefined {
+    return this.on ? this.kit?.trees : undefined;
+  }
+
+  /** The month shown, 1-12: what deciduous trees wear. */
+  setSeason(month: number): void {
+    this.month = month;
+    this.kit?.trees.setSeason(month);
   }
 
   /** Puts the look in place. The light follows from setLight, which the scene calls after. */
@@ -176,10 +189,15 @@ export class StreetLook {
       kit.effects?.follow(this.camera.position);
       kit.facades.tick(performance.now() / 60000);
       kit.ground.tick(performance.now() / 1000);
+      kit.trees.tick(performance.now() / 1000);
+      kit.trees.follow(this.camera.position);
       // Made again only when the sky has changed enough to show (sky.ts).
       if (this.hdr) this.scene.environment = kit.sky.environment();
     }
     this.haze();
+    // What is not drawn over shows the haze, the colour of the sky low down where the camera looks,
+    // not the map's sky: the edges of leaves (trees.ts) let it through here and there.
+    this.renderer.setClearColor(this.fog.color);
     this.renderer.render(this.scene, this.camera);
     this.govern();
   }
@@ -202,19 +220,22 @@ export class StreetLook {
     this.kit?.effects?.dispose();
     this.kit?.facades.dispose();
     this.kit?.ground.dispose();
+    this.kit?.trees.dispose();
   }
 
-  /** The sky, the stars, the effects, the facades and the ground come in a chunk of their own with the first walker view. */
+  /** The sky, the stars, the effects, the facades, the ground and the trees come in a chunk of their own with the first walker view. */
   private load(): void {
-    this.loading ??= Promise.all([import("./sky.ts"), import("./night.ts"), this.hdr ? import("./effects.ts") : undefined, import("./facade.ts"), import("./ground.ts")])
-      .then(([sky, night, effects, facade, ground]) => {
+    this.loading ??= Promise.all([import("./sky.ts"), import("./night.ts"), this.hdr ? import("./effects.ts") : undefined, import("./facade.ts"), import("./ground.ts"), import("./trees.ts")])
+      .then(([sky, night, effects, facade, ground, trees]) => {
         this.kit = {
           sky: new sky.StreetSky(this.renderer),
           night: new night.NightSky(),
           effects: effects && new effects.StreetEffects(this.scene, this.camera),
           facades: new facade.StreetFacades(this.renderer),
           ground: new ground.StreetGround(this.renderer, !this.hdr),
+          trees: new trees.StreetTrees(this.renderer, this.hdr),
         };
+        this.kit.trees.setSeason(this.month);
         if (!this.on) return;
         this.install();
         this.apply();

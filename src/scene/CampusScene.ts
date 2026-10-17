@@ -57,6 +57,7 @@ import { StreetLook, type StreetState } from "./street/look.ts";
 import { streetTier } from "./street/tier.ts";
 import { PART, STYLE, STYLES, buildingSeed, cityStoreys, facadeCode, facadeStyle } from "./street/rules.ts";
 import { GROUND, RAIL_WIDTH, ROAD_EDGE_WIDTH, ROAD_WIDTH, type GroundKind } from "./street/roads.ts";
+import type { TreeSpec } from "./street/crowns.ts";
 
 export interface Selection {
   building?: string;
@@ -88,6 +89,12 @@ export interface FacadeCount {
 export interface GroundCount {
   surfaces: number;
   water: boolean;
+}
+
+/** The walker views' trees: how many are planted, and how many cards of leaves are drawn round the camera. */
+export interface TreeCount {
+  street: number;
+  cards: number;
 }
 
 /** Weather as the scene draws it, each 0-1. */
@@ -310,6 +317,9 @@ export class CampusScene {
   private cityMaterial?: MeshStandardMaterial;
   private openMaterials?: { below: MeshStandardMaterial; cut: MeshStandardMaterial };
   private trees?: Group;
+  /** The map's trees as the walker views draw them again (street/trees.ts), and the ones they last planted. */
+  private treeSpecs: TreeSpec[] = [];
+  private treesPlanted?: TreeSpec[];
   private wallTexture: CanvasTexture;
   private glowTexture: CanvasTexture;
 
@@ -763,12 +773,16 @@ export class CampusScene {
     const turn = new Matrix4();
     const shade = new Color();
     const vary = mulberry32(99);
+    // The walker views draw each tree again where it stands, at its size, turn and shade (street/trees.ts).
+    const specs: TreeSpec[] = [];
     [...pts, ...deciduous].forEach(([x, y], i) => {
       const width = 5.5 + vary() * 5;
       const height = width * (0.95 + vary() * 0.6);
+      const angle = vary() * Math.PI * 2;
+      const ground = this.groundAt(x, y);
       m.makeScale(width, height, width);
-      m.multiply(turn.makeRotationY(vary() * Math.PI * 2));
-      m.setPosition(x, this.groundAt(x, y), -y);
+      m.multiply(turn.makeRotationY(angle));
+      m.setPosition(x, ground, -y);
       trunks?.setMatrixAt(i, m);
       // Lighter and darker greens, and now and then one turned towards yellow.
       const light = 0.84 + vary() * 0.34;
@@ -780,7 +794,9 @@ export class CampusScene {
         deciduousCrowns.setMatrixAt(i - pts.length, m);
         deciduousCrowns.setColorAt(i - pts.length, shade.setRGB(light, light, light));
       }
+      specs.push({ x, y: ground, z: -y, width, height, turn: angle, shade: [shade.r, shade.g, shade.b], deciduous: i >= pts.length });
     });
+    this.treeSpecs = specs;
     this.deciduousMaterial = deciduousMaterial;
     const group = new Group();
     for (const mesh of trunks ? [crowns, deciduousCrowns, trunks] : [crowns, deciduousCrowns]) {
@@ -971,6 +987,9 @@ export class CampusScene {
     if (month === this.month) return;
     this.month = month;
     if (this.deciduousMaterial) this.deciduousMaterial.color.setHex(this.deciduousColour(this.palette));
+    this.street.setSeason(month);
+    // In a walker view a bare tree casts the shadow of its boughs, not of its leaves.
+    if (this.street.active) this.needsShadow = true;
     this.needsRender = true;
   }
 
@@ -2369,7 +2388,7 @@ export class CampusScene {
    * How the walker views are drawn now: tier, passes, sky and exposure, and how many buildings
    * wear the facades drawn by rule; "off" and none on the map. For tests.
    */
-  streetState(): StreetState & { facades: FacadeCount; ground: GroundCount } {
+  streetState(): StreetState & { facades: FacadeCount; ground: GroundCount; trees: TreeCount } {
     const street = (m: Material | Material[]) => !Array.isArray(m) && m.name.startsWith("StreetFacade");
     const ground = (m: Material | Material[]) => !Array.isArray(m) && m.name.startsWith("StreetGround");
     const surfaces = [...this.terrainMeshes, this.ground, ...this.groundLayers].filter((m) => ground(m.material));
@@ -2383,6 +2402,7 @@ export class CampusScene {
         surfaces: surfaces.length,
         water: surfaces.some((m) => (m.material as Material).name === "StreetGround-water"),
       },
+      trees: this.street.trees?.count() ?? { street: 0, cards: 0 },
     };
   }
 
@@ -2422,8 +2442,34 @@ export class CampusScene {
       this.depthFirst(mesh, first && role === "below");
     }
     this.dressGround();
+    this.dressTrees();
     this.restyle();
     this.needsRender = true;
+  }
+
+  /**
+   * Gives the trees the look of the view they are seen in: in a walker view, once it has loaded,
+   * trees of bark and leaves drawn by rule where the map's stand (street/trees.ts), planted the
+   * first time; on the map its own, as they were. Both stand in the map's group of trees, which
+   * goes while a building is open.
+   */
+  private dressTrees(): void {
+    const group = this.trees;
+    const trees = this.street.trees;
+    if (!group) return;
+    if (trees && this.treesPlanted !== this.treeSpecs) {
+      trees.plant(this.treeSpecs);
+      this.treesPlanted = this.treeSpecs;
+    }
+    if (trees && trees.group.parent !== group) group.add(trees.group);
+    // The shadows are drawn again only when the trees that cast them change.
+    let changed = false;
+    for (const child of group.children) {
+      const show = child.name === "StreetTrees" ? !!trees : !trees;
+      if (child.visible !== show) changed = true;
+      child.visible = show;
+    }
+    if (changed) this.needsShadow = true;
   }
 
   /**

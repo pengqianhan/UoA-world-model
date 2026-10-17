@@ -35,6 +35,8 @@ interface SceneHandle {
     facades: { university: number; city: number };
     /** How many of the ground's meshes and layers of paint wear the walker views' surfaces, and whether one is water. */
     ground: { surfaces: number; water: boolean };
+    /** How many of the map's trees the walker views draw again, and how many cards of leaves are drawn round the camera. */
+    trees: { street: number; cards: number };
   };
   floorWalls(): { planWallFaces: number; rooms: number; walledRooms: number; outerWalls: boolean; windowsBelow: boolean };
   openFloorBox(): { left: number; top: number; right: number; bottom: number } | undefined;
