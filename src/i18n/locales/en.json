@@ -299,7 +299,9 @@
     "noneNow": "No classes are scheduled at this time.",
     "noTimetable": "Class times are not shown: the timetable is not public.",
     "why": "Why?",
-    "hintCampus": "Click a building to see its floors and rooms."
+    "hintCampus": "Click a building to see its floors and rooms.",
+    "show": "{campus}: the term, other campuses, a walk and other worlds",
+    "hide": "Hide the campus panel"
   },
   "travel": {
     "heading": "Other worlds",
@@ -334,15 +336,9 @@
     "near": "Near {place}",
     "arrived": "Arrived: {place}",
     "stopped": "Stopped before getting there",
-    "arrows": "Walk",
-    "arrow": {
-      "up": "Walk forward",
-      "down": "Walk back",
-      "left": "Turn left",
-      "right": "Turn right"
-    },
+    "more": "Walk to a place, let it wander, and how to steer",
     "keys": "W A S D or the arrow keys to walk, Shift to hurry. Drag to look round; click a building or the ground to walk there.",
-    "keysTouch": "Hold the arrows to walk. Drag to look round; tap a building or the ground to walk there.",
+    "keysTouch": "Push the stick with one thumb to walk and turn, and drag the map with the other to look round. Tap a building or the ground to walk there.",
     "note": "A made-up figure: it stands for no real person, and where it goes stays in your browser. Doors are not mapped, so it walks to the nearest side of a building, and inside it keeps to corridors where it can.",
     "inside": "Inside {place}, floor {floor}",
     "moves": "In and out",

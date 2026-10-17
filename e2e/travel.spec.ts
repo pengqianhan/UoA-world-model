@@ -1,7 +1,7 @@
 // The way to another university's campus map: the link, the flight through space, and the ways out of it.
 // The other site is never called: a stand-in answers in its place.
 import { expect, test, type Page } from "@playwright/test";
-import { open, settle, shot } from "./helpers.ts";
+import { open, openStrip, settle, shot } from "./helpers.ts";
 
 const TSINGHUA = "https://tsinghua-world-model.pages.dev/?campus=1&classMode=live";
 const HOST = "https://tsinghua-world-model.pages.dev/**";
@@ -60,6 +60,8 @@ const flightOf = (page: Page) => page.getByRole("dialog", { name: "Travelling to
 test("the campus view offers the Tsinghua World Model as another world; following it plays a flight through space and then leaves for that site", async ({ page }) => {
   const other = await standIn(page);
   await open(page, "?light=day");
+  // Offered in the campus panel, which starts shut.
+  await openStrip(page);
   const link = worldLink(page);
   await expect(link).toHaveText("Tsinghua World Model");
   await expect(link).toHaveAttribute("href", TSINGHUA);
@@ -87,12 +89,14 @@ test("the campus view offers the Tsinghua World Model as another world; followin
   await settle(page);
   await expect(page.locator("#travel")).toHaveCount(0);
   await expect(page.locator(".app")).not.toHaveClass(/travelling/);
+  await openStrip(page);
   await expect(link).toBeVisible();
 });
 
 test("a flight can be called off: with Escape, with Stay in Auckland, and even after the browser has been sent on its way", async ({ page }) => {
   const other = await standIn(page, true);
   await open(page, "?light=day");
+  await openStrip(page);
   const link = worldLink(page);
   const flight = flightOf(page);
 
@@ -135,6 +139,7 @@ test("a visitor who asked for less motion gets a plain link, with no flight", as
   await page.emulateMedia({ reducedMotion: "reduce" });
   const other = await standIn(page);
   await open(page, "?light=day");
+  await openStrip(page);
   await worldLink(page).click();
   await page.waitForURL(TSINGHUA);
   expect(other.requests).toBe(1);

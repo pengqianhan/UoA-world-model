@@ -1,7 +1,7 @@
 // End-to-end checks of the acceptance criteria, numbered as in the project brief.
 // They run against a local build by default and against the deployed site when E2E_BASE_URL is set.
 import { expect, test } from "@playwright/test";
-import { expectRealRender, open, params, settle, shot, withFixtureSchedule } from "./helpers.ts";
+import { expectRealRender, open, openStrip, params, settle, shot, withFixtureSchedule } from "./helpers.ts";
 
 /** What the clocks in Auckland show right now, computed independently of the app. */
 function aucklandNow(): { hhmm: string; minutes: number } {
@@ -216,6 +216,7 @@ test("4b. Now mode outside teaching says why on the campus view", async ({ page 
   await withFixtureSchedule(page);
   await open(page, "?light=day");
   await expect(page.locator(".chip-time")).toHaveText("10:00");
+  await openStrip(page);
   const strip = page.locator("#status-strip");
   await expect(strip).toContainText("Semester Two 2026 · examinations");
   await expect(strip).toContainText("examination period");
@@ -311,12 +312,63 @@ test("the top bar links straight to the source code on GitHub, beside About", as
   await expect(link).toBeVisible();
 });
 
+test("the campus panel starts shut, as a small button with the campus's name, and opens and shuts from there or with Escape", async ({ page }) => {
+  await open(page, "?light=day");
+  const toggle = page.locator("#status-toggle");
+  const strip = page.locator("#status-strip");
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toContainText("City Campus");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(strip).toBeHidden();
+  // Small, and in the corner the panel opens from, so the map has the screen.
+  const box = (await toggle.boundingBox())!;
+  const view = page.viewportSize()!;
+  expect(box.width).toBeLessThan(220);
+  expect(box.height).toBeLessThanOrEqual(44);
+  expect(box.x).toBeLessThan(30);
+  expect(view.height - (box.y + box.height)).toBeLessThan(30);
+  await shot(page, "01-campus-panel-shut");
+
+  await toggle.click();
+  await expect(strip).toBeVisible();
+  await expect(strip.locator(".status-term")).not.toBeEmpty();
+  for (const part of [".campus-tabs", "#walk-start", 'a[data-world="tsinghua"]']) await expect(strip.locator(part)).toBeVisible();
+  // Focus goes into the panel and back to its button, for whoever is using the keyboard.
+  await expect(page.locator("#status-hide")).toBeFocused();
+  await shot(page, "01-campus-panel-open");
+  await page.locator("#status-hide").click();
+  await expect(strip).toBeHidden();
+  await expect(toggle).toBeFocused();
+
+  await toggle.press("Enter");
+  await expect(strip).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(strip).toBeHidden();
+  await expect(toggle).toBeFocused();
+
+  // Left open for a building: back on the campus it is shut again.
+  await toggle.click();
+  await expect(strip).toBeVisible();
+  const pt = (await page.evaluate(() => window.__scene!.screenPoint("building", "303")))!;
+  await page.mouse.click(pt.x, pt.y);
+  await settle(page);
+  expect(params(page).get("building")).toBe("303");
+  await expect(toggle).toHaveCount(0);
+  await page.locator(".btn.back").click();
+  await settle(page);
+  await expect(toggle).toBeVisible();
+  await expect(strip).toBeHidden();
+});
+
 test("timetable features work end to end when a schedule is present (fixture schedule, never published)", async ({ page }) => {
   // Tuesday 13 Oct 2026, 10:15 in Auckland: the fixture has a class in 303-G23 from 10:00 to 11:00.
   await page.clock.setFixedTime(new Date("2026-10-12T21:15:00Z"));
   await withFixtureSchedule(page);
   await open(page, "?light=day");
 
+  // Shut, the campus panel's button counts the classes timetabled now, as the building labels do.
+  await expect(page.locator("#status-toggle .status-toggle-count")).toHaveText("1");
+  await openStrip(page);
   const strip = page.locator("#status-strip");
   await expect(strip).toContainText("Semester Two 2026 · teaching week 11");
   await expect(strip).toContainText("1 class scheduled at this time");
@@ -355,9 +407,13 @@ test("other campuses: Grafton and Newmarket beside the City Campus, and the camp
   await open(page, "?light=day");
   const city = await page.evaluate(() => window.__scene!.cameraState());
 
+  await openStrip(page);
   await page.locator('.campus-tabs [data-campus="grafton"]').click();
   await settle(page);
   expect(params(page).get("campus")).toBe("grafton");
+  // The panel shuts so that the campus can be seen, and its button names the campus now shown.
+  await expect(page.locator("#status-strip")).toBeHidden();
+  await expect(page.locator("#status-toggle")).toContainText("Grafton Campus");
   const grafton = await page.evaluate(() => window.__scene!.cameraState());
   // Grafton is about a kilometre south of the City Campus (south is +z in the scene).
   expect(grafton.target[2] - city.target[2]).toBeGreaterThan(600);
@@ -376,6 +432,7 @@ test("other campuses: Grafton and Newmarket beside the City Campus, and the camp
   // A campus far from the centre is chosen from the list, and the map goes there with its own
   // surroundings: Leigh is about 65 km north of the City Campus.
   await open(page, "?light=day");
+  await openStrip(page);
   await page.locator("#campus-more").selectOption("leigh");
   await settle(page);
   expect(params(page).get("campus")).toBe("leigh");

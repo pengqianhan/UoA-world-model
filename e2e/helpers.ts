@@ -29,6 +29,7 @@ interface SceneHandle {
   openFloorBox(): { left: number; top: number; right: number; bottom: number } | undefined;
   probe(): { width: number; height: number; distinctColours: number; samples: number };
   cameraState(): { azimuth: number; polar: number; zoom: number; target: [number, number, number] };
+  walkerLook(): { yaw: number; pitch: number };
   screenPoint(kind: "building" | "room", id: string): { x: number; y: number } | undefined;
 }
 
@@ -61,6 +62,14 @@ export async function expectRealRender(page: Page, minColours = 12): Promise<voi
   const probe = await page.evaluate(() => window.__scene!.probe());
   expect(probe.width).toBeGreaterThan(100);
   expect(probe.distinctColours, `distinct colours in ${probe.samples} samples`).toBeGreaterThan(minColours);
+}
+
+/** Opens the campus panel, which starts shut as a button with the campus's name. */
+export async function openStrip(page: Page): Promise<void> {
+  const strip = page.locator("#status-strip");
+  if (await strip.isVisible()) return;
+  await page.locator("#status-toggle").click();
+  await expect(strip).toBeVisible();
 }
 
 export async function shot(page: Page, name: string): Promise<void> {

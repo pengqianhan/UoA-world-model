@@ -1,6 +1,6 @@
 // The walker: a made-up figure a visitor or an agent walks round the campus, and its views.
 import { expect, test, type Page } from "@playwright/test";
-import { expectRealRender, open, shot } from "./helpers.ts";
+import { expectRealRender, open, openStrip, shot } from "./helpers.ts";
 
 type Reply = Record<string, unknown> & { error?: string };
 
@@ -78,8 +78,10 @@ test("a walker stands on the ground by the Clock Tower, walks round the building
 test("walkers meet and hear each other; every walker looks the same; the keyboard walks the visitor's walker", async ({ page }) => {
   await open(page, `?${QUERY}`);
   await ready(page);
-  // Taking a walk from the campus status strip.
+  // Taking a walk from the campus panel, which starts shut. On a wide screen the walk starts on the map.
+  await openStrip(page);
   await page.locator("#walk-start").click();
+  await expect(page.locator('#walker-panel button[data-view="map"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#walker-panel")).toBeVisible();
 
   const kea = (await walker(page, "spawn", { name: "Kea", near: "201" })) as { spawned: Record<string, unknown> };
@@ -107,6 +109,15 @@ test("walkers meet and hear each other; every walker looks the same; the keyboar
   const to = ((await walker(page, "list")) as { walkers: { name: string; at: [number, number] }[] }).walkers.find((w) => w.name === "Walker")!.at;
   expect(Math.hypot(to[0] - from[0], to[1] - from[1])).toBeGreaterThan(0.3);
 
+  // On a wide screen everything in the panel shows, and its button folds the rest away.
+  await expect(page.locator("#walker-more")).toHaveAttribute("aria-expanded", "true");
+  await page.locator("#walker-more").click();
+  await expect(page.locator("#walker-wander")).toBeHidden();
+  await expect(page.locator("#walker-panel button[data-view]")).toHaveCount(3);
+  await page.locator("#walker-more").click();
+  // There is no stick: the keys walk it.
+  await expect(page.locator("#walker-stick")).toHaveCount(0);
+
   // Let it wander: it strolls off on its own, and Stop wandering stops it.
   await page.locator("#walker-wander").click();
   await expect(page.locator("#walker-wander")).toHaveAttribute("aria-pressed", "true");
@@ -123,7 +134,9 @@ test("walkers meet and hear each other; every walker looks the same; the keyboar
   // Stopping the walk takes every walker away, and their names and words with them.
   await page.locator("#walker-close").click();
   await expect(page.locator("#walker-panel")).toHaveCount(0);
-  await expect(page.locator("#status-strip")).toBeVisible();
+  // The campus panel comes back as its button, shut.
+  await expect(page.locator("#status-toggle")).toBeVisible();
+  await expect(page.locator("#status-strip")).toBeHidden();
   await expect(page.locator('[data-label^="walker:"], [data-label^="say:"]')).toHaveCount(0);
   expect(new URL(page.url()).searchParams.get("walk")).toBeNull();
 });

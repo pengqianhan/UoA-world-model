@@ -14,6 +14,10 @@
   --radius: 12px;
   --shadow: 0 10px 34px rgba(5, 12, 18, 0.34), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   --gap: 12px;
+  /* The gap, or more where the page runs under a phone's notch, rounded corners or home bar. */
+  --edge-l: max(var(--gap), env(safe-area-inset-left, 0px));
+  --edge-r: max(var(--gap), env(safe-area-inset-right, 0px));
+  --edge-b: max(var(--gap), env(safe-area-inset-bottom, 0px));
   --top: 60px;
   --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
   --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Noto Serif", serif;
@@ -435,8 +439,8 @@ a.btn {
   position: absolute;
   z-index: 30;
   top: var(--gap);
-  right: var(--gap);
-  left: var(--gap);
+  right: var(--edge-r);
+  left: var(--edge-l);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -962,9 +966,9 @@ select optgroup {
 .status {
   position: absolute;
   z-index: 20;
-  bottom: var(--gap);
-  left: var(--gap);
-  max-width: min(430px, calc(100vw - 2 * var(--gap)));
+  bottom: var(--edge-b);
+  left: var(--edge-l);
+  max-width: min(430px, calc(100vw - var(--edge-l) - var(--edge-r)));
   padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -973,9 +977,83 @@ select optgroup {
   box-shadow: var(--shadow);
 }
 
+/* Shut, the panel is a button with the campus's name, in the corner it opens from. */
+.status-toggle {
+  position: absolute;
+  z-index: 20;
+  bottom: var(--edge-b);
+  left: var(--edge-l);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100vw - var(--edge-l) - var(--edge-r));
+  height: 40px;
+  padding: 0 10px 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.status-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(24, 40, 53, 0.96);
+}
+
+.status-toggle .icon:first-child {
+  color: var(--accent);
+}
+
+.status-toggle .icon:last-child {
+  color: var(--muted);
+}
+
+.status-toggle-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Classes timetabled now, as on the building labels. */
+.status-toggle-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  text-align: center;
+}
+
+.status-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
 .status-term {
+  flex: 1;
+  min-width: 0;
   color: var(--teal);
   font-weight: 700;
+}
+
+/* Beside the first line, partly in the panel's padding, without making the line taller or much shorter. */
+.status-hide.btn.ghost {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: -5px -9px -5px 0;
+  color: var(--muted);
+}
+
+.status-hide.btn.ghost:hover {
+  color: var(--text);
 }
 
 .status-detail {
@@ -1677,10 +1755,16 @@ select optgroup {
   }
 
   .status {
-    right: var(--gap);
+    right: var(--edge-r);
     bottom: 34px;
     max-width: none;
     padding: 9px 12px;
+    font-size: 13px;
+  }
+
+  /* Above the attribution, which runs along the foot of the screen. */
+  .status-toggle {
+    bottom: 34px;
     font-size: 13px;
   }
 
@@ -1889,6 +1973,30 @@ select optgroup {
   white-space: nowrap;
 }
 
+.walker-head .btn.ghost {
+  flex: none;
+  color: var(--muted);
+}
+
+.walker-head .btn.ghost:hover,
+.walker-more[aria-expanded="true"] {
+  color: var(--text);
+}
+
+.walker-more[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.walker-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.walker-menu[hidden] {
+  display: none;
+}
+
 .walker-views {
   display: flex;
   gap: 4px;
@@ -1989,65 +2097,94 @@ select optgroup {
   color: #8496a3;
 }
 
-.walker-pad {
-  display: grid;
-  grid-template-columns: repeat(3, 46px);
-  grid-template-rows: repeat(2, 40px);
-  gap: 4px;
-  justify-content: center;
+/* ---- On a touch screen: a bar at the top, and the thumbs steer, as in a game ---------------- */
+
+.walker-panel.touch {
+  top: calc(var(--top) + 4px);
+  right: auto;
+  bottom: auto;
+  left: var(--edge-l);
+  width: min(440px, calc(100vw - var(--edge-l) - var(--edge-r)));
+  max-height: calc(100% - var(--top) - 4px - var(--edge-b));
+  overflow-y: auto;
+  gap: 6px;
+  padding: 6px 6px 8px 12px;
 }
 
-.walker-arrow {
+.walker-panel.touch .walker-views {
+  margin-right: 6px;
+}
+
+.walker-panel.touch .walker-menu {
+  margin-right: 6px;
+}
+
+/* The stick: the left thumb walks and turns. Ticks on its ring show the four ways to push it. */
+.walker-stick {
+  position: absolute;
+  z-index: 24;
+  bottom: var(--stick-lift, calc(var(--edge-b) + 26px));
+  left: calc(var(--edge-l) + 4px);
   display: grid;
   place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
+  width: 124px;
+  height: 124px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  background:
+    url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 124 124'><g fill='%23eef3f6' fill-opacity='.7'><path d='M62 9l7 9H55zM62 115l7-9H55zM9 62l9-7v14zM115 62l-9-7v14z'/></g></svg>")
+      center / 100% 100% no-repeat,
+    radial-gradient(circle, rgba(16, 28, 38, 0.38) 0 55%, rgba(16, 28, 38, 0.66) 100%);
+  box-shadow: var(--shadow);
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
-.walker-arrow:active {
-  background: rgba(255, 180, 84, 0.25);
+.walker-knob {
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  background: rgba(238, 243, 246, 0.88);
+  box-shadow: 0 4px 14px rgba(5, 12, 18, 0.4);
+  pointer-events: none;
+  transition: transform 0.14s ease;
 }
 
-.walker-arrow span {
-  width: 0;
-  height: 0;
-  border: 8px solid transparent;
+.walker-stick.held {
+  border-color: rgba(255, 180, 84, 0.7);
 }
 
-.arrow-up {
-  grid-column: 2;
-  grid-row: 1;
+.walker-stick.held .walker-knob {
+  background: var(--accent);
+  transition: none;
 }
-.arrow-up span {
-  border-top-width: 0;
-  border-bottom-color: var(--text);
+
+/* Into a building, up, down and out: under the right thumb, which also drags the view round. */
+.walker-actions {
+  position: absolute;
+  z-index: 24;
+  right: calc(var(--edge-r) + 4px);
+  bottom: var(--moves-lift, calc(var(--edge-b) + 26px));
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
-.arrow-left {
-  grid-column: 1;
-  grid-row: 2;
+
+.walker-actions button {
+  flex: none;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background-color: rgba(16, 28, 38, 0.88);
+  box-shadow: var(--shadow);
+  font-size: 13px;
 }
-.arrow-left span {
-  border-left-width: 0;
-  border-right-color: var(--text);
-}
-.arrow-right {
-  grid-column: 3;
-  grid-row: 2;
-}
-.arrow-right span {
-  border-right-width: 0;
-  border-left-color: var(--text);
-}
-.arrow-down {
-  grid-column: 2;
-  grid-row: 2;
-}
-.arrow-down span {
-  border-bottom-width: 0;
-  border-top-color: var(--text);
+
+.walker-actions button:hover {
+  background-color: rgba(24, 40, 53, 0.96);
 }
 
 /* The walker's name over its head, in the site's amber, and what it says in a bubble above. */
@@ -2072,14 +2209,14 @@ select optgroup {
 /* In a building the floor list takes the right-hand side, so the walker's panel stands beside the
    building's dock instead. */
 @media (min-width: 721px) {
-  .walking.in-building .walker-panel {
+  .walking.in-building .walker-panel:not(.touch) {
     right: auto;
     left: calc(min(410px, 100vw - 2 * var(--gap)) + 2 * var(--gap));
     bottom: var(--gap);
   }
 
   /* Short, so that it stays below the walker in the view from behind. */
-  .walking.in-building .walker-panel :is(.walker-keys, .walker-note, .walker-wander) {
+  .walking.in-building .walker-panel:not(.touch) :is(.walker-keys, .walker-note, .walker-wander) {
     display: none;
   }
 }
@@ -2087,7 +2224,9 @@ select optgroup {
 /* A picture of the view for an agent (scripts/walker): the panels step aside, the labels stay. */
 .shot-clean .topbar,
 .shot-clean .walker-panel,
+.shot-clean .walker-thumbs,
 .shot-clean .status,
+.shot-clean .status-toggle,
 .shot-clean .dock,
 .shot-clean .attribution,
 .shot-clean .space-tip,
@@ -2095,29 +2234,37 @@ select optgroup {
   visibility: hidden;
 }
 
+/* The stick and the buttons beside it place themselves; their holder is no box of its own. */
+.walker-thumbs {
+  display: contents;
+}
+
 @media (max-width: 720px) {
-  .walker-panel {
-    top: calc(var(--top) + 4px);
-    right: var(--gap);
-    bottom: auto;
-    left: var(--gap);
+  /* Across the screen under the top bar, and under the floor strip in a building. */
+  .walker-panel.touch {
+    right: var(--edge-r);
     width: auto;
-    gap: 6px;
-    padding: 8px 10px;
   }
 
-  .walker-keys,
-  .walker-note {
-    display: none;
+  .in-building .walker-panel.touch {
+    top: calc(var(--top) + 52px);
+  }
+}
+
+/* A phone on its side: a smaller stick, as the screen is short. */
+@media (max-height: 500px) {
+  .walker-stick {
+    width: 108px;
+    height: 108px;
   }
 
-  .walker-pad {
-    grid-template-columns: repeat(3, 52px);
-    grid-template-rows: repeat(2, 42px);
+  .walker-knob {
+    width: 48px;
+    height: 48px;
   }
 
-  .walking.in-building .walker-panel .walker-go {
-    display: none;
+  .walker-actions button {
+    height: 40px;
   }
 }
 

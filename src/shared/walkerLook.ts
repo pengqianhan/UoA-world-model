@@ -16,6 +16,16 @@ export function compass(deg: number): (typeof COMPASS)[number] {
   return COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8]!;
 }
 
+/**
+ * A look round from a walker, degrees from straight ahead (0-360), with `keep` of its turn left
+ * and the shorter way round: 0.5 halves a look 90° to the right, and one of 350° (10° to the left)
+ * stays to the left. A look within a twentieth of a degree is straight ahead.
+ */
+export function towardsAhead(yaw: number, keep: number): number {
+  const off = ((((yaw + 180) % 360) + 360) % 360) - 180;
+  return Math.abs(off * keep) < 0.05 ? 0 : (off * keep + 360) % 360;
+}
+
 /** Where a bearing lies for someone facing `heading`: ahead, to the left, behind... */
 export function relative(heading: number, deg: number): string {
   const d = ((deg - heading + 540) % 360) - 180;

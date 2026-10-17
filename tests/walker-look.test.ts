@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bearing, compass, describeBuilding, look, relative } from "../src/shared/walkerLook.ts";
+import { bearing, compass, describeBuilding, look, relative, towardsAhead } from "../src/shared/walkerLook.ts";
 
 describe("what a walker sees", () => {
   it("names bearings by the compass, clockwise from north", () => {
@@ -19,6 +19,20 @@ describe("what a walker sees", () => {
     expect(relative(0, 180)).toBe("behind");
     expect(relative(350, 40)).toBe("ahead to the right");
     expect(relative(10, 230)).toBe("behind to the left");
+  });
+
+  it("brings a look round towards straight ahead the shorter way, and stops there", () => {
+    expect(towardsAhead(90, 0.5)).toBe(45);
+    // 350° is 10° to the left: it comes back from the left, not the long way round by the right.
+    expect(towardsAhead(350, 0.5)).toBe(355);
+    expect(towardsAhead(270, 0.1)).toBeCloseTo(351, 6);
+    expect(towardsAhead(180, 0.5)).toBe(270);
+    expect(towardsAhead(-30, 1)).toBe(330);
+    expect(towardsAhead(40, 1)).toBe(40);
+    // Close enough is straight ahead, so the view settles instead of creeping for ever.
+    expect(towardsAhead(0.08, 0.5)).toBe(0);
+    expect(towardsAhead(359.95, 0.9)).toBe(0);
+    expect(towardsAhead(0, 0.5)).toBe(0);
   });
 
   it("lists the nearest buildings first, within range, and what is ahead", () => {
