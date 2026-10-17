@@ -41,7 +41,8 @@ It is built to answer two questions a student actually has:
   can steer, and which talks with other walkers; one look for every walker, with nothing meant to
   mark a sex or a gender. A wall never hides it: the camera comes in front, and its shape shows
   through. About says that Cloudflare counts page views and visits at campusworldmodel.com, where
-  it used to say the site has no analytics.
+  it used to say the site has no analytics. Closing a walk now takes the walker's name off the map
+  too.
 - **2026-10-15:** every campus on the map (194 buildings), standing on the ground's real heights;
   the real sun, the current cloud and rain, and trees that turn with the seasons; signs on stairs,
   lifts and toilets; buildings open on the floor at street level, with the floors under the ground

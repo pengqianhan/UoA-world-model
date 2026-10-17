@@ -34,6 +34,10 @@ A change to what the site does or shows adds its line here, and the README's
 
 ### Fixed
 
+- **A walker's name stayed on the map after the walk.** Closing the walk, or an agent taking the
+  last walker away, left the walker's name, and anything it was saying, where it had stood, over the
+  building names round it, until something else redrew the labels. They now go with the last
+  walker (#46).
 - **About said the site has no analytics.** At campusworldmodel.com, Cloudflare, which serves the
   site, has counted page views and visits with its Web Analytics since the domain was set up. About
   now says so, and what it does not record (#45).

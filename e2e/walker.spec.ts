@@ -69,6 +69,10 @@ test("a walker stands on the ground by the Clock Tower, walks round the building
   // Escape goes back to the map.
   await page.keyboard.press("Escape");
   await expect(page.locator('#walker-panel button[data-view="map"]')).toHaveAttribute("aria-pressed", "true");
+  // An agent taking the last walker away leaves no name on the map.
+  expect((await walker(page, "remove")).removed).toBe("Walker");
+  await expect(page.locator("#walker-panel")).toHaveCount(0);
+  await expect(page.locator('[data-label^="walker:"]')).toHaveCount(0);
 });
 
 test("walkers meet and hear each other; every walker looks the same; the keyboard walks the visitor's walker", async ({ page }) => {
@@ -116,10 +120,11 @@ test("walkers meet and hear each other; every walker looks the same; the keyboar
   await page.locator("#walker-wander").click();
   await expect(page.locator("#walker-wander")).toHaveAttribute("aria-pressed", "false");
 
-  // Stopping the walk takes every walker away.
+  // Stopping the walk takes every walker away, and their names and words with them.
   await page.locator("#walker-close").click();
   await expect(page.locator("#walker-panel")).toHaveCount(0);
   await expect(page.locator("#status-strip")).toBeVisible();
+  await expect(page.locator('[data-label^="walker:"], [data-label^="say:"]')).toHaveCount(0);
   expect(new URL(page.url()).searchParams.get("walk")).toBeNull();
 });
 

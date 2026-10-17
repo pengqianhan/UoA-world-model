@@ -301,7 +301,8 @@ export class CampusScene {
   private eyes = { yaw: 0, pitch: -4 };
   private drag?: { x: number; y: number; moved: boolean };
   private lastFrame = 0;
-  private walkerLabelsVersion = -1;
+  /** The walkers' labelsVersion the labels were last built for; a new world starts at 0, with none. */
+  private walkerLabelsVersion = 0;
   /** A click in a walker view: on a University building, or on the ground at a point. */
   onWalkPick?: (pick: { building?: string; at?: [number, number] }) => void;
 
@@ -1970,15 +1971,14 @@ export class CampusScene {
         return k < 1;
       });
     }
-    if (this.walkers.size) {
-      if (this.walkers.step(dt, now)) {
-        this.needsRender = true;
-        this.needsLabels = true;
-      }
-      if (this.walkers.labelsVersion !== this.walkerLabelsVersion) {
-        this.walkerLabelsVersion = this.walkers.labelsVersion;
-        this.rebuildLabels();
-      }
+    if (this.walkers.size && this.walkers.step(dt, now)) {
+      this.needsRender = true;
+      this.needsLabels = true;
+    }
+    // Also when the last walker has just gone: its name and words come off the map with it.
+    if (this.walkers.labelsVersion !== this.walkerLabelsVersion) {
+      this.walkerLabelsVersion = this.walkers.labelsVersion;
+      this.rebuildLabels();
     }
     if (this.view === "map") this.controls.update();
     else this.placeWalkerCamera(dt);
