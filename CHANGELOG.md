@@ -14,6 +14,22 @@ A change to what the site does or shows adds its line here, and the README's
   the Classes API key arrives, so that what the timetable and the catalogue each supply can be
   settled with both in hand.
 
+## 2026-10-18
+
+### Added
+
+- **The walker's views at street level.** Seen from behind a walker or through its eyes, the
+  campus is now drawn to look as near the real thing as the map allows, all by rule from what the
+  sources already give: a sky lit from the real sun, with stars and a moon by night, haze, an
+  exposure that follows the sun and the weather, ambient occlusion and a gentle bloom; every
+  building, the University's and the city's, with storeys, windows in a recess, glass that reflects
+  the sky, walls of plaster, brick, concrete, stone, glass or weatherboard chosen by where it
+  stands, and a slowly changing pattern of lit rooms after dark; the ground as asphalt with lane
+  lines, kerbs, paved footpaths, steps, rails, lawn and bare earth, and water with a reflection, all
+  wet and glossy in rain; and trees with bark, leaves and a sway in the breeze. No doors, crossings,
+  signs or lamps: none are mapped. The map view is unchanged. A software renderer
+  or a phone gets the same sky and light without the effects. About says what is drawn by rule (#50).
+
 ## 2026-10-17
 
 ### Added

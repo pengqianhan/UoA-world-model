@@ -11,7 +11,7 @@ up an open issue instead. "Decisions" and "Tried and did not work" bind you too.
 with a date are records of that day: what was true then, not now; `CHANGELOG.md` has what came
 after. Notes on "this machine" are about the maintainer's Windows computer.
 
-Last updated: 2026-10-15 NZDT
+Last updated: 2026-10-18 NZDT
 
 ## Now working on
 
@@ -290,6 +290,42 @@ Snapshot: `data/raw/mapsindoors/*.json` (gitignored; URL/date/sha256 in `data/so
   session header and with `/effort status`. Since 2026-10-15 `how-it-was-made` is a required status
   check on `main`, beside `build` and `e2e`, for admins too. That is branch protection, a repository
   setting that does not show in the code.
+- **The street look (the user, 2026-10-17, overnight).** Asked: "对于 walker 界面现在过于简陋，我想让这个界面
+  能尽量接近真实世界，如果无法接近真实也增加细节，让整个画面是 3A 游戏质感", so that a walker can later tour the
+  campus like a person and meet other walkers. Built in layers on the `walker-realism` branch (pull
+  request #50), each by a sub-agent, reviewed by screenshot and committed by the orchestrating
+  agent. What was decided, and why:
+  - **Only the walker views change.** The map's palette and lighting were settled with the user on
+    2026-10-14 and 15, so the map must stay bit-identical: every street material is swapped in on
+    entering a walker view and the map's put back on leaving (`userData.mapMaterial`), and each layer
+    was diffed against the previous commit pixel for pixel: identical through the sky, facade and
+    ground layers; after the trees, two of eight map vantages differed now and then by at most 8 of
+    255 on a few pixels (not visible; the cause, probably timing, was not found; see PR #50).
+    Attributes the map never reads are the only cost there (about 24 MB, and `setContext` about
+    70 ms slower).
+  - **By rule from the data already published; nothing placed.** Storeys, bays, wall materials,
+    lit rooms, lane lines, kerbs, grass, leaves: all come from outlines, heights, classes and
+    positions in `public/data/`, seeded by position so they are stable, and About says what is by
+    rule. No doors, crossings, arrows, signs, lamps, benches, cars or people: none are mapped. Lamp
+    posts and benches from OpenStreetMap would be a new fetch, so a gate; not asked for.
+  - **At street level the University's windows are split into lights and curtain walls get
+    mullions**, within the 3.2 m x 3.6 m grid of the 2026-10-14 decision on how a University
+    building looks from outside. The map is unchanged; the pull request flags this as a gate.
+  - **No new dependency.** three 0.186's own output path (`outputBufferType: HalfFloatType` +
+    `renderer.setEffects`, which draws straight to the screen when tone mapping is off, so the map
+    is untouched) and its examples (Sky.js, GTAOPass at half resolution, UnrealBloomPass) do it all;
+    EffectComposer, CSM, Water.js and screen-space reflections were judged and left out (cost, or an
+    extra scene render). Textures are generated on canvases at start-up, not fetched.
+  - **Tiers.** A software renderer (CI's SwiftShader), a phone (`lite`) or a frame-time governor
+    gets a basic tier: the same sky and light, no effects, no environment map. The full tier caps the
+    pixel ratio at 1.25; measured on the user's machine at 1800x1125, about 12-15 ms a frame on an
+    NVIDIA Quadro P600 and 21-25 ms on an Intel UHD 770 (Chromium picks the NVIDIA unless told
+    `--force_low_power_gpu`).
+  - **Walker views keep the day palette's colours by night** and make the night with the light;
+    the map's night stays in its colours.
+  - Left for later, if wanted: reflections of lit windows in wet streets (needs screen-space
+    reflections); neighbouring buildings in glass; a wind field from the weather; head bob and a
+    vignette at the eyes; street furniture from OpenStreetMap (a gate).
 - **The walker (the user, 2026-10-16), a bonus, not a base feature.** Asked for overnight: "给地图添加小人，
   并且从小人视角来逛校园... 在不违反隐私和相关规定的前提下尽量多做一些功能", with Smallville, AI Town and
   Project Sid as references. What was decided, and why:
